@@ -45,7 +45,6 @@ class Bulle < Formula
   desc "Run developer tools in a sandbox"
   homepage "https://github.com/vincentarelbundock/bulle"
   url "${source_url}"
-  version "${version}"
   sha256 "${sha256}"
   license "MIT"
 
