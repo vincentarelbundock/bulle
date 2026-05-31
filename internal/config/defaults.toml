@@ -11,6 +11,7 @@ add_libs = true
 [profiles.codex]
 inherits = "tool"
 default_app = "codex"
+# Codex's app MCP client appear to require keychain access
 allow_keychain = true
 env = [
   "HOME",
@@ -44,10 +45,7 @@ env = [
   "YARN_HTTP_PROXY",
   "YARN_NO_PROXY",
 ]
-# Codex's app MCP client and Rust TLS stack may need macOS Security services
-# for ChatGPT auth, connector tokens, and native root certificates.
-rw = [
-  "$HOME/Library/Keychains",
+ro = [
   "$HOME/Library/Preferences",
 ]
 rwx = ["$HOME/.codex"]
@@ -56,13 +54,11 @@ rwx = ["$HOME/.codex"]
 inherits = "tool"
 default_app = "claude"
 env = ["HOME", "USER", "TERM", "LANG", "SHELL"]
-# Claude's normal interactive macOS login uses the login Keychain. This is
-# intentionally explicit because that store can contain unrelated secrets.
-allow_keychain = true
+ro = [
+  "$HOME/Library/Preferences",
+]
 rw = [
   "$HOME/.claude.json",
-  "$HOME/Library/Keychains",
-  "$HOME/Library/Preferences",
 ]
 rwx = [
   "$HOME/.claude",
