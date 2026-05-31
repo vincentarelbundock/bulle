@@ -52,8 +52,9 @@ brews:
       owner: vincentarelbundock
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
     homepage: "https://github.com/vincentarelbundock/bulle"
-    description: "Run developer tools in a sandbox."
+    description: "Run developer tools in a sandbox"
     license: "MIT"
     test: |
       system "#{bin}/bulle", "--version"
