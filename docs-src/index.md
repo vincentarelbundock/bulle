@@ -24,7 +24,7 @@ Sandboxes are not limited to agents. You can use `bulle` to run any command with
 
 ## Risk mitigation
 
-`bulle` limits commands to the files and variables you explicitly allow.
+`bulle` uses Operating System-level sandboxing to limit a command's access to the paths and environment variables that you allow. Like all sandboxing approaches, this imposes trade-offs between convenience and safety. `bulle` will not solve all your security problems, but it can mitigate important types of risk.
 
 !!! success "`bulle` can mitigate risk when"
 

@@ -530,7 +530,7 @@
 <p class="admonition-title"><code>bulle</code> is still experimental. Please report bugs, comments, and feature requests <a href="https://github.com/vincentarelbundock/bulle">on GitHub</a>.</p>
 </div>
 <h2 id="risk-mitigation">Risk mitigation<a class="headerlink" href="#risk-mitigation" title="Permanent link">&para;</a></h2>
-<p><code>bulle</code> limits commands to the files and variables you explicitly allow.</p>
+<p><code>bulle</code> uses Operating System-level sandboxing to limit a command's access to the paths and environment variables that you allow. Like all sandboxing approaches, this imposes trade-offs between convenience and safety. <code>bulle</code> will not solve all your security problems, but it can mitigate important types of risk.</p>
 <div class="admonition success">
 <p class="admonition-title"><code>bulle</code> can mitigate risk when</p>
 <ul>
