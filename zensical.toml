@@ -10,6 +10,7 @@ site_dir = "docs"
 use_directory_urls = false
 copyright = "bulle is distributed under the MIT License."
 nav = [
+  { "Install" = "index.html#install" },
   { "Quick start" = "index.html#quick-start" },
   { "CLI reference" = "cli-reference.md" },
 ]

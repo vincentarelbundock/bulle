@@ -36,7 +36,7 @@
     </div>
     <div class="md-header__nav" style="display: flex; gap: 0.9rem; align-items: center; margin-left: 0.8rem; font-size: 0.7rem;">
       {% for nav_item in nav.items %}
-        <a href="{{ nav_item.url | url }}" style="color: var(--md-primary-bg-color); opacity: 0.9; text-decoration: none; white-space: nowrap;">
+        <a href="{{ nav_item.url | url }}" style="color: inherit; opacity: 0.9; text-decoration: none; white-space: nowrap;">
           {{ nav_item.title }}
         </a>
       {% endfor %}

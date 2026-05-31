@@ -45,6 +45,8 @@ For more information on sandboxing tradeoffs, read [A field guide to sandboxes f
 
 ## Install
 
+`bulle` is only available on MacOS and Linux.
+
 With the install script:
 
 ```sh
