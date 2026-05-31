@@ -504,8 +504,8 @@
 <div class="admonition success">
 <p class="admonition-title"><code>bulle</code> can mitigate risk when</p>
 <ul>
-<li>a prompt or skill injection tells an agent to steal your passwords or SSH keys;</li>
-<li>an LLM or script tries to rewrite <code>~/Documents</code> instead of the project where it should be running;</li>
+<li>a prompt or skill injection tells an agent to steal passwords or keys stored outside the sandbox;</li>
+<li>an LLM agent or script tries to rewrite <code>~/Documents</code> instead of the project where it should be running;</li>
 <li>a malicious package searches your home directory for cloud credentials;</li>
 <li>a crash log exposes your <code>API_KEY</code> environment variable;</li>
 <li>a tool surreptitiously runs code from downloads, caches, or another project.</li>
@@ -565,8 +565,8 @@ bulle<span class="w"> </span>--rox<span class="w"> </span>/usr/bin/printenv<span
 <p>This is important for secrets. A command cannot read <code>OPENAI_API_KEY</code>, <code>GITHUB_TOKEN</code>, or similar variables unless you explicitly pass them.</p>
 <h2 id="profiles">Profiles<a class="headerlink" href="#profiles" title="Permanent link">&para;</a></h2>
 <p>Coding agents often need shells, package managers, language runtimes, caches, config files, and app storage. Profiles collect those repeated path and environment grants in one named bundle.</p>
-<p>Use <code>--policy</code> to inspect a profile's grants before launching. You can still add one-off permissions to a profile with the same path and environment flags:</p>
-<div class="language-sh highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>claude<span class="w"> </span>--ro<span class="w"> </span>README.qmd<span class="w"> </span>--rw<span class="w"> </span>~/Desktop<span class="w"> </span>--env<span class="w"> </span>GITHUB_TOKEN<span class="w"> </span>--policy
+<p>You can still add one-off permissions to a profile with the same path and environment flags:</p>
+<div class="language-sh highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>claude<span class="w"> </span>--ro<span class="w"> </span>README.qmd<span class="w"> </span>--rw<span class="w"> </span>~/Desktop<span class="w"> </span>--env<span class="w"> </span>GITHUB_TOKEN
 </code></pre></div>
 <p>Profiles live in the global <code>bulle</code> config file. By default, <code>bulle</code> reads <code>config.toml</code> from the operating system's user config directory, under a <code>bulle</code> subdirectory: on Linux and other XDG systems this is usually <code>$XDG_CONFIG_HOME/bulle/config.toml</code> or <code>~/.config/bulle/config.toml</code>; on macOS it is usually <code>~/Library/Application Support/bulle/config.toml</code>. Use <code>--config PATH</code> to load a different global config file. <code>bulle</code> does not read project-local config files.</p>
 <p>A profile can define a default app, filesystem grants, environment variables, and inheritance:</p>
@@ -585,6 +585,10 @@ bulle<span class="w"> </span>--rox<span class="w"> </span>/usr/bin/printenv<span
 <span class="n">env</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;HOME&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;USER&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;TERM&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;LANG&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SHELL&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;OPENAI_API_KEY&quot;</span><span class="p">]</span>
 </code></pre></div>
 <p>List fields are inherited and appended by default. Set <code>replace_ro</code>, <code>replace_rox</code>, <code>replace_rw</code>, <code>replace_rwx</code>, or <code>replace_env</code> in a child profile to replace the corresponding inherited list instead.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Some coding agents require relatively broad permissions to run. Use the <code>--policy</code> argument to see which rights are granted by a profile before using it.</p>
+</div>
 <h2 id="policy">Policy<a class="headerlink" href="#policy" title="Permanent link">&para;</a></h2>
 <p>Use <code>--policy</code> to inspect the resolved sandbox policy without running the command. This is a useful safety check before launching an agent or script, especially when combining profiles with extra filesystem or environment grants.</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--policy<span class="w"> </span>~/Desktop<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--<span class="w"> </span>/bin/ls

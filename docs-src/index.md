@@ -28,8 +28,8 @@ Sandboxes are not limited to agents. You can use `bulle` to run any command with
 
 !!! success "`bulle` can mitigate risk when"
 
-    - a prompt or skill injection tells an agent to steal your passwords or SSH keys;
-    - an LLM or script tries to rewrite `~/Documents` instead of the project where it should be running;
+    - a prompt or skill injection tells an agent to steal passwords or keys stored outside the sandbox;
+    - an LLM agent or script tries to rewrite `~/Documents` instead of the project where it should be running;
     - a malicious package searches your home directory for cloud credentials;
     - a crash log exposes your `API_KEY` environment variable;
     - a tool surreptitiously runs code from downloads, caches, or another project.
@@ -120,10 +120,10 @@ This is important for secrets. A command cannot read `OPENAI_API_KEY`, `GITHUB_T
 
 Coding agents often need shells, package managers, language runtimes, caches, config files, and app storage. Profiles collect those repeated path and environment grants in one named bundle.
 
-Use `--policy` to inspect a profile's grants before launching. You can still add one-off permissions to a profile with the same path and environment flags:
+You can still add one-off permissions to a profile with the same path and environment flags:
 
 ```sh
-bulle --profile claude --ro README.qmd --rw ~/Desktop --env GITHUB_TOKEN --policy
+bulle --profile claude --ro README.qmd --rw ~/Desktop --env GITHUB_TOKEN
 ```
 
 Profiles live in the global `bulle` config file. By default, `bulle` reads `config.toml` from the operating system's user config directory, under a `bulle` subdirectory: on Linux and other XDG systems this is usually `$XDG_CONFIG_HOME/bulle/config.toml` or `~/.config/bulle/config.toml`; on macOS it is usually `~/Library/Application Support/bulle/config.toml`. Use `--config PATH` to load a different global config file. `bulle` does not read project-local config files.
@@ -147,6 +147,10 @@ env = ["HOME", "USER", "TERM", "LANG", "SHELL", "OPENAI_API_KEY"]
 ```
 
 List fields are inherited and appended by default. Set `replace_ro`, `replace_rox`, `replace_rw`, `replace_rwx`, or `replace_env` in a child profile to replace the corresponding inherited list instead.
+
+!!! warning
+
+    Some coding agents require relatively broad permissions to run. Use the `--policy` argument to see which rights are granted by a profile before using it.
 
 ## Policy
 
