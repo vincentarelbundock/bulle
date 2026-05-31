@@ -10,6 +10,10 @@ rox = [
 [platform.libs]
 ro = [
   "/etc/ssl",
+  "/etc/pki",
+  "/etc/ca-certificates",
+  "/usr/share/ca-certificates",
+  "/usr/local/share/ca-certificates",
   "/etc/resolv.conf",
   "/etc/hosts",
   "/etc/nsswitch.conf",
