@@ -15,8 +15,9 @@ const (
 )
 
 type Input struct {
-	Path   string
-	Source Source
+	Path     string
+	Source   Source
+	Optional bool
 }
 
 type Vars map[string]string
@@ -30,7 +31,7 @@ func ResolveList(inputs []Input, vars Vars) ([]string, error) {
 			return nil, err
 		}
 		if !exists {
-			if input.Source == SourceBuiltIn {
+			if input.Optional || input.Source == SourceBuiltIn {
 				continue
 			}
 			return nil, fmt.Errorf("configured path does not exist: %s", input.Path)

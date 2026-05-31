@@ -521,7 +521,7 @@
 
 <p align="center" style="font-size: 1.2em;"><strong>A simple sandbox for dangerous tools like coding agents</strong></p>
 
-<p><code>bulle</code> is an easy-to-use sandbox for running local commands while exposing only the essential parts of your machine. It allows you to run tools you don't fully trust, without handing over all your files or every secret held in environment variables. <code>bulle</code> sandboxes are especially helpful when running LLM coding agents or untrusted scripts.</p>
+<p><code>bulle</code> is an easy-to-use sandbox for running local commands while exposing only the essential parts of your machine. It allows you to run tools you don't fully trust, without handing over all your files and secrets. <code>bulle</code> sandboxes are especially helpful when running LLM coding agents or untrusted scripts.</p>
 <p>On macOS and Linux, you can spin up an agent with restricted permissions using this simple command:</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>/path/to/project<span class="w"> </span>--profile<span class="w"> </span>claude
 </code></pre></div>
@@ -530,7 +530,7 @@
 <p class="admonition-title"><code>bulle</code> is still experimental. Please report bugs, comments, and feature requests <a href="https://github.com/vincentarelbundock/bulle">on GitHub</a>.</p>
 </div>
 <h2 id="risk-mitigation">Risk mitigation<a class="headerlink" href="#risk-mitigation" title="Permanent link">&para;</a></h2>
-<p><code>bulle</code> uses Operating System-level sandboxing to limit a command's access to the paths and environment variables that you allow. Like all sandboxing approaches, this imposes trade-offs between convenience and safety. <code>bulle</code> will not solve all your security problems, but it can mitigate important types of risk.</p>
+<p><code>bulle</code> uses <a href="#how-it-works">Operating System-level sandboxing</a> to constrain a command's access to paths and environment variables. Like all sandboxing approaches, this strategy imposes trade-offs between convenience and safety. <code>bulle</code> will not solve all your security problems, but it can mitigate several major risks.</p>
 <div class="admonition success">
 <p class="admonition-title"><code>bulle</code> can mitigate risk when</p>
 <ul>

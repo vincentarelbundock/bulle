@@ -43,6 +43,37 @@ func TestResolveRejectsReservedPathVarOverride(t *testing.T) {
 	}
 }
 
+func TestResolveSkipsMissingReadGrants(t *testing.T) {
+	root := t.TempDir()
+	project := filepath.Join(root, "project")
+	if err := os.Mkdir(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Config{
+		DefaultProfile: "default",
+		Profiles: map[string]config.Profile{"default": {
+			Settings: config.Settings{PathSettings: config.PathSettings{
+				ReadOnly:     []string{filepath.Join(root, "missing-ro")},
+				ReadOnlyExec: []string{filepath.Join(root, "missing-rox")},
+			}},
+		}},
+	}
+
+	got, err := Resolve(Inputs{
+		Options:   cli.Options{ProjectPath: project, Command: []string{"tool"}},
+		Global:    cfg,
+		ParentEnv: map[string]string{},
+		Home:      root,
+		Tmp:       root,
+	})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if len(got.ReadOnly) != 0 || len(got.ReadOnlyExec) != 0 {
+		t.Fatalf("read grants = ro:%#v rox:%#v, want missing grants skipped", got.ReadOnly, got.ReadOnlyExec)
+	}
+}
+
 func TestResolveMergesDefaultsConfigAndCLI(t *testing.T) {
 	root := t.TempDir()
 	project := filepath.Join(root, "project")
@@ -272,6 +303,13 @@ func TestResolveToolProfileIncludesToolAndPlatformDefaults(t *testing.T) {
 	if !containsString(got.ReadOnlyExec, "/usr/bin") {
 		t.Fatalf("ReadOnlyExec = %#v, want /usr/bin", got.ReadOnlyExec)
 	}
+	if runtime.GOOS == "linux" {
+		for _, want := range []string{"/etc/ssl", "/etc/resolv.conf", "/etc/hosts", "/etc/nsswitch.conf", "/proc/self", "/dev/null", "/dev/urandom"} {
+			if !containsString(got.ReadOnly, want) {
+				t.Fatalf("ReadOnly = %#v, want %s for Linux runtime support", got.ReadOnly, want)
+			}
+		}
+	}
 	for _, want := range []string{localBin, dotBin} {
 		if !containsString(got.ReadOnlyExec, want) {
 			t.Fatalf("ReadOnlyExec = %#v, want %q", got.ReadOnlyExec, want)
@@ -309,6 +347,31 @@ func TestResolveDoesNotInferAgentProfileFromExplicitCommand(t *testing.T) {
 	}
 	if containsString(got.ReadWriteExec, wantCodexState) {
 		t.Fatalf("ReadWriteExec = %#v, did not want %q", got.ReadWriteExec, wantCodexState)
+	}
+}
+
+func TestResolveCodexProfileOnLinuxDoesNotRequireMacOSPreferences(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux-specific regression for macOS-only profile defaults")
+	}
+	root := t.TempDir()
+	project := filepath.Join(root, "project")
+	tmp := filepath.Join(root, "tmp")
+	for _, path := range []string{project, filepath.Join(tmp, "bulle", "tmp"), filepath.Join(root, ".codex")} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	_, err := Resolve(Inputs{
+		Options:   cli.Options{ProjectPath: project, Command: []string{"bash"}, Flags: cli.Flags{Profile: "codex"}},
+		Global:    config.DefaultConfig(),
+		ParentEnv: map[string]string{"HOME": root, "PATH": "/usr/bin"},
+		Home:      root,
+		Tmp:       tmp,
+	})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
 	}
 }
 

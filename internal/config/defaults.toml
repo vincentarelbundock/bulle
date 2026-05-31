@@ -45,18 +45,12 @@ env = [
   "YARN_HTTP_PROXY",
   "YARN_NO_PROXY",
 ]
-ro = [
-  "$HOME/Library/Preferences",
-]
 rwx = ["$HOME/.codex"]
 
 [profiles.claude]
 inherits = "tool"
 default_app = "claude"
 env = ["HOME", "USER", "TERM", "LANG", "SHELL"]
-ro = [
-  "$HOME/Library/Preferences",
-]
 rw = [
   "$HOME/.claude.json",
 ]

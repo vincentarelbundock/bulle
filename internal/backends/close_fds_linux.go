@@ -14,7 +14,7 @@ func closeUnexpectedFileDescriptors() error {
 		// /proc may be unavailable in unusual Linux environments. Fall back to a
 		// conservative fixed range rather than failing open.
 		for fd := 3; fd < 1024; fd++ {
-			_ = syscall.Close(fd)
+			syscall.CloseOnExec(fd)
 		}
 		return nil
 	}
@@ -23,7 +23,7 @@ func closeUnexpectedFileDescriptors() error {
 		if err != nil || fd <= 2 {
 			continue
 		}
-		_ = syscall.Close(fd)
+		syscall.CloseOnExec(fd)
 	}
 	return nil
 }

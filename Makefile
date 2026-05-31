@@ -3,7 +3,7 @@
 .DEFAULT_GOAL := help
 
 BIN     := bulle
-PREFIX  ?= /usr/local
+PREFIX  ?= $(HOME)/.local
 VERSION ?= dev
 LDFLAGS = -X github.com/vincentarelbundock/bulle/internal/app.Version=$(VERSION)
 

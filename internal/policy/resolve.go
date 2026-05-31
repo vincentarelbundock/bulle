@@ -62,22 +62,22 @@ func Resolve(in Inputs) (Policy, error) {
 	if err := validateProjectPath(p.ProjectPath, in.Home); err != nil {
 		return Policy{}, err
 	}
-	p.ReadOnly, err = resolvePathList(p.ReadOnly, len(defaults.ReadOnly), vars)
+	p.ReadOnly, err = resolvePathList(p.ReadOnly, len(defaults.ReadOnly), vars, true)
 	if err != nil {
 		return Policy{}, err
 	}
-	p.ReadOnlyExec, err = resolvePathList(p.ReadOnlyExec, len(defaults.ReadOnlyExec), vars)
+	p.ReadOnlyExec, err = resolvePathList(p.ReadOnlyExec, len(defaults.ReadOnlyExec), vars, true)
 	if err != nil {
 		return Policy{}, err
 	}
 	if !in.Options.NoWorkspace {
 		p.ReadWrite = append(p.ReadWrite, "$WORKSPACE")
 	}
-	p.ReadWrite, err = resolvePathList(p.ReadWrite, len(defaults.ReadWrite), vars)
+	p.ReadWrite, err = resolvePathList(p.ReadWrite, len(defaults.ReadWrite), vars, false)
 	if err != nil {
 		return Policy{}, err
 	}
-	p.ReadWriteExec, err = resolvePathList(p.ReadWriteExec, len(defaults.ReadWriteExec), vars)
+	p.ReadWriteExec, err = resolvePathList(p.ReadWriteExec, len(defaults.ReadWriteExec), vars, false)
 	if err != nil {
 		return Policy{}, err
 	}
@@ -194,18 +194,18 @@ func sameExistingPath(a, b string) bool {
 	return os.SameFile(ainfo, binfo)
 }
 
-func resolvePathList(paths []string, builtinCount int, vars bpaths.Vars) ([]string, error) {
-	return bpaths.ResolveList(toInputs(paths, builtinCount), vars)
+func resolvePathList(paths []string, builtinCount int, vars bpaths.Vars, optionalMissing bool) ([]string, error) {
+	return bpaths.ResolveList(toInputs(paths, builtinCount, optionalMissing), vars)
 }
 
-func toInputs(xs []string, builtinCount int) []bpaths.Input {
+func toInputs(xs []string, builtinCount int, optionalMissing bool) []bpaths.Input {
 	out := make([]bpaths.Input, 0, len(xs))
 	for i, x := range xs {
 		source := bpaths.SourceUser
 		if i < builtinCount {
 			source = bpaths.SourceBuiltIn
 		}
-		out = append(out, bpaths.Input{Path: x, Source: source})
+		out = append(out, bpaths.Input{Path: x, Source: source, Optional: optionalMissing})
 	}
 	return out
 }

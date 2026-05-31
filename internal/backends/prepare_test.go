@@ -44,6 +44,42 @@ func TestPreparePolicyAddsShebangInterpreterWhenAddExecIsSet(t *testing.T) {
 	}
 }
 
+func TestPreparePolicyAddsRealShebangScriptDirectoryForImports(t *testing.T) {
+	root := t.TempDir()
+	binDir := filepath.Join(root, "bin")
+	packageDir := filepath.Join(root, "lib", "node_modules", "agent")
+	distDir := filepath.Join(packageDir, "dist")
+	for _, dir := range []string{binDir, distDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	realScript := filepath.Join(distDir, "cli.js")
+	if err := os.WriteFile(filepath.Join(packageDir, "package.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(realScript, []byte("#!/usr/bin/env node\nimport \"./config.js\";\nimport \"dep\";\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(binDir, "agent")
+	if err := os.Symlink(realScript, link); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := PreparePolicy(policy.Policy{
+		Backend: policy.BackendLinuxLandlock,
+		Command: []string{link},
+		AddExec: true,
+		Env:     map[string]string{},
+	})
+	if err != nil {
+		t.Fatalf("PreparePolicy returned error: %v", err)
+	}
+	if !containsString(got.ReadOnlyExec, packageDir) {
+		t.Fatalf("ReadOnlyExec = %#v, want package root %q", got.ReadOnlyExec, packageDir)
+	}
+}
+
 func TestPreparePolicyRejectsDisallowedShebangInterpreterWithoutAddExec(t *testing.T) {
 	root := t.TempDir()
 	allowed := filepath.Join(root, "allowed")

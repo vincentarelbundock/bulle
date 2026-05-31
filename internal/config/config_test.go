@@ -2,6 +2,7 @@ package config
 
 import (
 	"reflect"
+	"runtime"
 	"testing"
 )
 
@@ -175,9 +176,7 @@ func TestCodexProfileSupportsAppMCP(t *testing.T) {
 	if profile.AllowKeychain == nil || !*profile.AllowKeychain {
 		t.Fatalf("codex AllowKeychain = %#v, want true", profile.AllowKeychain)
 	}
-	if !contains(profile.ReadOnly, "$HOME/Library/Preferences") {
-		t.Fatalf("codex ReadOnly = %#v, want $HOME/Library/Preferences", profile.ReadOnly)
-	}
+	assertMacOSPreferencesDefault(t, "codex", profile)
 	if contains(profile.ReadWrite, "$HOME/Library/Keychains") {
 		t.Fatalf("codex ReadWrite = %#v, did not want $HOME/Library/Keychains", profile.ReadWrite)
 	}
@@ -192,9 +191,7 @@ func TestClaudeProfileDoesNotAllowKeychainByDefault(t *testing.T) {
 	if profile.AllowKeychain != nil && *profile.AllowKeychain {
 		t.Fatalf("claude AllowKeychain = %#v, want false", profile.AllowKeychain)
 	}
-	if !contains(profile.ReadOnly, "$HOME/Library/Preferences") {
-		t.Fatalf("claude ReadOnly = %#v, want $HOME/Library/Preferences", profile.ReadOnly)
-	}
+	assertMacOSPreferencesDefault(t, "claude", profile)
 	if contains(profile.ReadWrite, "$HOME/Library/Keychains") {
 		t.Fatalf("claude ReadWrite = %#v, did not want $HOME/Library/Keychains", profile.ReadWrite)
 	}
@@ -279,6 +276,17 @@ func TestPlatformSettingsArePathOnly(t *testing.T) {
 		if _, ok := settingsType.FieldByName(field); ok {
 			t.Fatalf("PlatformSettings.Exec exposes profile-only field %s", field)
 		}
+	}
+}
+
+func assertMacOSPreferencesDefault(t *testing.T, name string, profile Profile) {
+	t.Helper()
+	hasPreferences := contains(profile.ReadOnly, "$HOME/Library/Preferences")
+	if runtime.GOOS == "darwin" && !hasPreferences {
+		t.Fatalf("profile %q ReadOnly = %#v, want /Library/Preferences on darwin", name, profile.ReadOnly)
+	}
+	if runtime.GOOS != "darwin" && hasPreferences {
+		t.Fatalf("profile %q ReadOnly = %#v, did not want macOS preferences on %s", name, profile.ReadOnly, runtime.GOOS)
 	}
 }
 

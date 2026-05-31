@@ -10,7 +10,7 @@ hide:
 
 <p align="center" style="font-size: 1.2em;"><strong>A simple sandbox for dangerous tools like coding agents</strong></p>
 
-`bulle` is an easy-to-use sandbox for running local commands while exposing only the essential parts of your machine. It allows you to run tools you don't fully trust, without handing over all your files or every secret held in environment variables. `bulle` sandboxes are especially helpful when running LLM coding agents or untrusted scripts.
+`bulle` is an easy-to-use sandbox for running local commands while exposing only the essential parts of your machine. It allows you to run tools you don't fully trust, without handing over all your files and secrets. `bulle` sandboxes are especially helpful when running LLM coding agents or untrusted scripts.
 
 On macOS and Linux, you can spin up an agent with restricted permissions using this simple command:
 
@@ -24,7 +24,7 @@ Sandboxes are not limited to agents. You can use `bulle` to run any command with
 
 ## Risk mitigation
 
-`bulle` uses Operating System-level sandboxing to limit a command's access to the paths and environment variables that you allow. Like all sandboxing approaches, this imposes trade-offs between convenience and safety. `bulle` will not solve all your security problems, but it can mitigate important types of risk.
+`bulle` uses [Operating System-level sandboxing](#how-it-works) to constrain a command's access to paths and environment variables. Like all sandboxing approaches, this strategy imposes trade-offs between convenience and safety. `bulle` will not solve all your security problems, but it can mitigate several major risks.
 
 !!! success "`bulle` can mitigate risk when"
 

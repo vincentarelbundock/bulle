@@ -51,12 +51,45 @@ func prepareShebangInterpreter(p *policy.Policy) error {
 		if real, err := filepath.EvalSymlinks(interpreter); err == nil {
 			p.ReadOnlyExec = appendAbsolutePaths(p.ReadOnlyExec, real)
 		}
+		for _, script := range shebangScriptPaths(p.Command[0]) {
+			dir := filepath.Dir(script)
+			if packageRoot, ok := nearestPackageRoot(dir); ok {
+				p.ReadOnlyExec = appendAbsolutePaths(p.ReadOnlyExec, packageRoot)
+			} else {
+				p.ReadOnly = appendAbsolutePaths(p.ReadOnly, dir)
+			}
+		}
 		return nil
 	}
 	if executablePathAllowed(interpreter, *p) {
 		return nil
 	}
 	return fmt.Errorf("%w before sandbox setup: script interpreter %q is not executable under current filesystem policy. Add --rox %s or enable --add-exec", policy.ErrCommandNotFound, interpreter, filepath.Dir(interpreter))
+}
+
+func nearestPackageRoot(dir string) (string, bool) {
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "package.json")); err == nil {
+			return dir, true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", false
+		}
+		dir = parent
+	}
+}
+
+func shebangScriptPaths(path string) []string {
+	out := []string{}
+	if path == "" || !filepath.IsAbs(path) {
+		return out
+	}
+	out = append(out, filepath.Clean(path))
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		out = appendAbsolutePaths(out, real)
+	}
+	return out
 }
 
 func linuxELFDependencyRoots(command string) []string {

@@ -1,3 +1,9 @@
+[profiles.codex]
+ro = ["$HOME/Library/Preferences"]
+
+[profiles.claude]
+ro = ["$HOME/Library/Preferences"]
+
 [platform.exec]
 rox = [
   "/bin",
