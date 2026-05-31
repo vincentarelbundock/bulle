@@ -175,26 +175,28 @@ func TestCodexProfileSupportsAppMCP(t *testing.T) {
 	if profile.AllowKeychain == nil || !*profile.AllowKeychain {
 		t.Fatalf("codex AllowKeychain = %#v, want true", profile.AllowKeychain)
 	}
-	for _, want := range []string{"$HOME/Library/Keychains", "$HOME/Library/Preferences"} {
-		if !contains(profile.ReadWrite, want) {
-			t.Fatalf("codex ReadWrite = %#v, want %q", profile.ReadWrite, want)
-		}
+	if !contains(profile.ReadOnly, "$HOME/Library/Preferences") {
+		t.Fatalf("codex ReadOnly = %#v, want $HOME/Library/Preferences", profile.ReadOnly)
+	}
+	if contains(profile.ReadWrite, "$HOME/Library/Keychains") {
+		t.Fatalf("codex ReadWrite = %#v, did not want $HOME/Library/Keychains", profile.ReadWrite)
 	}
 }
 
-func TestClaudeProfileAllowsKeychainByDefault(t *testing.T) {
+func TestClaudeProfileDoesNotAllowKeychainByDefault(t *testing.T) {
 	cfg := DefaultConfig()
 	profile, err := cfg.ResolveProfile("claude")
 	if err != nil {
 		t.Fatalf("ResolveProfile returned error: %v", err)
 	}
-	if profile.AllowKeychain == nil || !*profile.AllowKeychain {
-		t.Fatalf("claude AllowKeychain = %#v, want true", profile.AllowKeychain)
+	if profile.AllowKeychain != nil && *profile.AllowKeychain {
+		t.Fatalf("claude AllowKeychain = %#v, want false", profile.AllowKeychain)
 	}
-	for _, want := range []string{"$HOME/Library/Keychains", "$HOME/Library/Preferences"} {
-		if !contains(profile.ReadWrite, want) {
-			t.Fatalf("claude ReadWrite = %#v, want %q", profile.ReadWrite, want)
-		}
+	if !contains(profile.ReadOnly, "$HOME/Library/Preferences") {
+		t.Fatalf("claude ReadOnly = %#v, want $HOME/Library/Preferences", profile.ReadOnly)
+	}
+	if contains(profile.ReadWrite, "$HOME/Library/Keychains") {
+		t.Fatalf("claude ReadWrite = %#v, did not want $HOME/Library/Keychains", profile.ReadWrite)
 	}
 }
 

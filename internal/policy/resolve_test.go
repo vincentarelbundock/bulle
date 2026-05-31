@@ -402,7 +402,7 @@ func TestResolveClaudeProfileDoesNotFollowUnlistedConfigSymlinkTargets(t *testin
 	}
 }
 
-func TestResolveClaudeProfileAllowsKeychain(t *testing.T) {
+func TestResolveClaudeProfileDoesNotAllowKeychain(t *testing.T) {
 	root := t.TempDir()
 	project := filepath.Join(root, "project")
 	tmp := filepath.Join(root, "tmp")
@@ -436,22 +436,16 @@ func TestResolveClaudeProfileAllowsKeychain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if !got.AllowKeychain {
-		t.Fatalf("AllowKeychain = false, want true")
+	if got.AllowKeychain {
+		t.Fatalf("AllowKeychain = true, want false")
 	}
-	if runtime.GOOS == "darwin" {
-		for _, want := range []string{
-			filepath.Join(root, "Library", "Keychains"),
-			filepath.Join(root, "Library", "Preferences"),
-		} {
-			real, err := filepath.EvalSymlinks(want)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !containsString(got.ReadWrite, real) {
-				t.Fatalf("ReadWrite = %#v, want %q", got.ReadWrite, real)
-			}
-		}
+	keychains := filepath.Join(root, "Library", "Keychains")
+	realKeychains, err := filepath.EvalSymlinks(keychains)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if containsString(got.ReadWrite, realKeychains) {
+		t.Fatalf("ReadWrite = %#v, did not want %q", got.ReadWrite, realKeychains)
 	}
 }
 
@@ -510,10 +504,10 @@ func TestResolveBuiltInAgentProfiles(t *testing.T) {
 			if name == "codex" && got.Env["CODEX_CONNECTORS_TOKEN"] != "connector-secret" {
 				t.Fatalf("codex Env[CODEX_CONNECTORS_TOKEN] = %q", got.Env["CODEX_CONNECTORS_TOKEN"])
 			}
-			if (name == "claude" || name == "codex") && !got.AllowKeychain {
+			if name == "codex" && !got.AllowKeychain {
 				t.Fatalf("AllowKeychain = false, want true")
 			}
-			if name != "claude" && name != "codex" && got.AllowKeychain {
+			if name != "codex" && got.AllowKeychain {
 				t.Fatalf("AllowKeychain = true, want false")
 			}
 		})
