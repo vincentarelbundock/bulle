@@ -1,0 +1,59 @@
+version: 2
+
+project_name: bulle
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: bulle
+    main: ./cmd/bulle
+    binary: bulle
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/vincentarelbundock/bulle/internal/app.Version={{ .Version }}
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
+    files:
+      - README.md
+      - LICENSES/*.txt
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+
+brews:
+  - name: bulle
+    repository:
+      owner: vincentarelbundock
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/vincentarelbundock/bulle"
+    description: "Run developer tools in a sandbox."
+    license: "MIT"
+    test: |
+      system "#{bin}/bulle", "--version"

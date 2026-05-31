@@ -1,0 +1,34 @@
+[platform.exec]
+rox = [
+  "/bin",
+  "/usr/bin",
+  "/usr/local/bin",
+  "~/.local/bin",
+  "~/.bin",
+  "/opt/homebrew/bin",
+]
+
+[platform.libs]
+ro = [
+  "/etc",
+  "/private/etc",
+  "/usr/share",
+  "/usr/local/etc",
+  "/usr/local/share",
+  "/opt/homebrew/etc",
+  "/opt/homebrew/share",
+  "/System/Library",
+  "/Library/Keychains",
+  "/Library/Preferences/SystemConfiguration",
+  "/Library/Security",
+  "/var/select",
+]
+rox = [
+  "/usr/local/lib",
+  "/usr/local/Cellar",
+  "/usr/local/opt",
+  "/opt/homebrew/lib",
+  "/opt/homebrew/Cellar",
+  "/opt/homebrew/opt",
+  "/usr/lib",
+]

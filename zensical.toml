@@ -1,0 +1,46 @@
+[project]
+site_name = ""
+site_description = "bulle runs local commands in a sandbox, exposing only the essential parts of your machine."
+site_author = "Vincent Arel-Bundock"
+site_url = "https://vincentarelbundock.github.io/bulle/"
+repo_url = "https://github.com/vincentarelbundock/bulle"
+repo_name = "vincentarelbundock/bulle"
+docs_dir = "docs-src"
+site_dir = "docs"
+use_directory_urls = false
+copyright = "bulle is distributed under the MIT License."
+nav = [
+  { "Quick start" = "index.html#quick-start" },
+  { "CLI reference" = "cli-reference.md" },
+]
+[project.theme]
+custom_dir = "docs-src/overrides"
+logo = "assets/bulle.svg"
+favicon = "assets/favicon.png"
+language = "en"
+features = [
+  "content.code.copy",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+]
+
+[[project.theme.palette]]
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.md_in_html]
+[project.markdown_extensions.pymdownx.details]
+[project.markdown_extensions.toc]
+permalink = true
+[project.markdown_extensions.pymdownx.highlight]
+pygments_lang_class = true
+[project.markdown_extensions.pymdownx.superfences]

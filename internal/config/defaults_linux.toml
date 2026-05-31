@@ -1,0 +1,16 @@
+[platform.exec]
+rox = [
+  "/bin",
+  "/usr/bin",
+  "/usr/local/bin",
+  "~/.local/bin",
+  "~/.bin",
+]
+
+[platform.libs]
+rox = [
+  "/lib",
+  "/lib64",
+  "/usr/lib",
+  "/usr/lib64",
+]

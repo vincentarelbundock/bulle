@@ -1,0 +1,699 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A simple sandbox for dangerous tools like coding agents">
+      
+      
+        <meta name="author" content="Vincent Arel-Bundock">
+      
+      
+        <link rel="canonical" href="https://vincentarelbundock.github.io/bulle/index.html">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="./assets/favicon.png">
+      <meta name="generator" content="zensical-0.0.43">
+    
+    
+      
+        <title></title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="./assets/stylesheets/modern/main.fba56155.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="./assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL(".",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#risk-mitigation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="index.html" title="" class="md-header__button md-logo" aria-label="" data-md-component="logo">
+      
+  <img src="./assets/bulle.svg" alt="">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    <div class="md-header__nav" style="display: flex; gap: 0.9rem; align-items: center; margin-left: 0.8rem; font-size: 0.7rem;">
+      
+        <a href="./index.html#quick-start" style="color: var(--md-primary-bg-color); opacity: 0.9; text-decoration: none; white-space: nowrap;">
+          Quick start
+        </a>
+      
+        <a href="./cli-reference.html" style="color: var(--md-primary-bg-color); opacity: 0.9; text-decoration: none; white-space: nowrap;">
+          CLI reference
+        </a>
+      
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/vincentarelbundock/bulle" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    vincentarelbundock/bulle
+  </div>
+</a>
+      
+    </div>
+  </nav>
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+                
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" hidden>
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="index.html" title="" class="md-nav__button md-logo" aria-label="" data-md-component="logo">
+      
+  <img src="./assets/bulle.svg" alt="">
+
+    </a>
+    
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/vincentarelbundock/bulle" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    vincentarelbundock/bulle
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./index.html#quick-start" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Quick start
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./cli-reference.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  CLI reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+                
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#risk-mitigation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Risk mitigation
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#install" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Install
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Quick start
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#filesystem" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Filesystem
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Environment
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Profiles
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Policy
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#executables-and-libraries" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Executables and libraries
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        How it works
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How it works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#linux" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Linux
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#macos" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        macOS
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#license-and-attribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        License and attribution
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+  <h1 id="__skip"></h1>
+
+<p align="center"><img src="assets/bulle.svg" alt="bulle logo" width="300"></p>
+
+<p align="center" style="font-size: 1.2em;"><strong>A simple sandbox for dangerous tools like coding agents</strong></p>
+
+<p><code>bulle</code> is an easy-to-use sandbox to run local commands while exposing only the essential parts of your machine. It allows you to run tools you don't fully trust, without handing over all your files, or every secret held in environment variables. <code>bulle</code> sandboxes are especially helpful when using LLM coding agents or untrusted scripts.</p>
+<p>On MacOS and Linux, you can start up an agent with restricted permissions using this simple command:</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>/path/to/project<span class="w"> </span>--profile<span class="w"> </span>claude
+</code></pre></div>
+<p>Sandboxes are not limited to agents. You can use <code>bulle</code> to run any command with custom permissions. See the <a href="#quick-start">Quick start</a> section and the <a href="cli-reference">CLI reference</a> for details.</p>
+<div class="admonition warning">
+<p class="admonition-title"><code>bulle</code> is still experimental. Please report bugs, comments, and feature requests <a href="https://github.com/vincentarelbundock/bulle">on github.</a></p>
+</div>
+<h2 id="risk-mitigation">Risk mitigation<a class="headerlink" href="#risk-mitigation" title="Permanent link">&para;</a></h2>
+<p><code>bulle</code> limits commands to act only on the files and variables you explicitly allow.</p>
+<div class="admonition success">
+<p class="admonition-title"><code>bulle</code> can mitigate risk when</p>
+<ul>
+<li>a prompt or skill injection tells an agent to steal your passwords or ssh keys;</li>
+<li>a script tries to rewrite <code>~/Documents</code> instead of the project where it should be running;</li>
+<li>a malicious package hook searches your home directory for cloud credentials;</li>
+<li>a crash log or subprocess exposes your <code>API_KEY</code> environment variable;</li>
+<li>a tool surreptitiously runs code from downloads, caches, or another project.</li>
+</ul>
+</div>
+<div class="admonition warning">
+<p class="admonition-title"><code>bulle</code> is not sufficient when</p>
+<ul>
+<li>a command should not send readable code over the network;</li>
+<li>the command itself needs secrets or paths you cannot afford to leak;</li>
+<li>you need CPU, memory, disk, or time limits;</li>
+<li>you are running code from hostile parties and need a separate machine boundary, not just local OS rules.</li>
+</ul>
+</div>
+<p>For more information on sandboxing tradeoffs, read <a href="https://www.luiscardoso.dev/blog/sandboxes-for-ai">A field guide to sandboxes for AI</a> by Luis Cardoso.</p>
+<h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h2>
+<p>With Homebrew:</p>
+<div class="language-sh highlight"><pre><span></span><code>brew<span class="w"> </span>install<span class="w"> </span>vincentarelbundock/tap/bulle
+</code></pre></div>
+<p>With Go:</p>
+<div class="language-sh highlight"><pre><span></span><code>go<span class="w"> </span>install<span class="w"> </span>github.com/vincentarelbundock/bulle/cmd/bulle@latest
+</code></pre></div>
+<p>Or download a prebuilt <code>darwin</code>/<code>linux</code>, <code>amd64</code>/<code>arm64</code> archive from the <a href="https://github.com/vincentarelbundock/bulle/releases/latest">latest GitHub release</a>.</p>
+<h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
+<p>By default, <code>bulle</code> runs in the current directory. Access to any other location in the filesystem is denied unless you grant it explicitly. Commands cannot read files, execute programs, or inherit environment variables unless you allow them.</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--<span class="w"> </span>ls
+</code></pre></div>
+<div class="language-text highlight"><pre><span></span><code>command not found before sandbox setup: &quot;ls&quot; is not on policy PATH.
+Add --env PATH with matching --rox/--rwx roots, choose a profile,
+or pass an explicit executable path after --
+</code></pre></div>
+<p>That error is intentional: even finding and executing <code>ls</code> requires permission. We can grant that permission using the <code>--rox</code> flag (read+execute):</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--rox<span class="w"> </span>/bin/ls<span class="w"> </span>--<span class="w"> </span>/bin/ls
+</code></pre></div>
+<p>Instead of specifying the path of every command manually, we can load <a href="#profiles">profiles</a>: named bundles of permissions for common tools. <code>bulle</code> includes profiles for several coding agents. For example, the first command below gives read-write access to the current directory, and launches Claude Code with appropriate permissions:</p>
+<div class="language-sh highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>claude
+<span class="c1"># bulle --profile codex</span>
+<span class="c1"># bulle --profile pi</span>
+<span class="c1"># bulle --profile opencode</span>
+</code></pre></div>
+<h2 id="filesystem">Filesystem<a class="headerlink" href="#filesystem" title="Permanent link">&para;</a></h2>
+<p>The workspace is the command's working directory and writable area. If omitted, it defaults to the current directory. Use <code>--no-workspace</code> when you do not want this automatic read-write grant.</p>
+<p>Additional filesystem access is explicit. Use these flags to add paths to the active policy:</p>
+<div class="language-bash highlight"><pre><span></span><code>--ro<span class="w"> </span>path<span class="w">        </span><span class="c1"># read-only</span>
+--rox<span class="w"> </span>path<span class="w">       </span><span class="c1"># read-only plus execute</span>
+--rw<span class="w"> </span>path<span class="w">        </span><span class="c1"># read-write</span>
+--rwx<span class="w"> </span>path<span class="w">       </span><span class="c1"># read-write plus execute</span>
+--no-workspace<span class="w">   </span><span class="c1"># do not automatically grant the workspace read-write access</span>
+</code></pre></div>
+<p>Advice: grant the narrowest paths that are practical. Use <code>--rw</code> or <code>--rwx</code> only for paths outside the workspace that the command should be allowed to modify. In profiles, <code>$WORKSPACE</code> refers to the workspace path.</p>
+<h2 id="environment">Environment<a class="headerlink" href="#environment" title="Permanent link">&para;</a></h2>
+<p>Environment variables are also explicit. By default, <code>bulle</code> does not pass your shell environment into the sandbox. Use <code>--env NAME</code> to pass a variable from the parent environment, or <code>--env NAME=VALUE</code> to define one on the fly:</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--env<span class="w"> </span>USER<span class="w"> </span>--<span class="w"> </span>/bin/echo<span class="w"> </span><span class="nv">$USER</span>
+bulle<span class="w"> </span>--rox<span class="w"> </span>/usr/bin/printenv<span class="w"> </span>--env<span class="w"> </span><span class="nv">HELLO</span><span class="o">=</span>WORLD<span class="w"> </span>--<span class="w"> </span>/usr/bin/printenv<span class="w"> </span>HELLO
+</code></pre></div>
+<p>This is important for secrets. A command cannot read <code>OPENAI_API_KEY</code>, <code>GITHUB_TOKEN</code>, or similar variables unless you explicitly pass them.</p>
+<h2 id="profiles">Profiles<a class="headerlink" href="#profiles" title="Permanent link">&para;</a></h2>
+<p>Coding agents often need shells, package managers, language runtimes, caches, config files, and app storage. Profiles collect those repeated path and environment grants in one named bundle.</p>
+<p>Use <code>--policy</code> to inspect a profile's grants before launching. You can still add one-off permissions to a profile with the same path and environment flags:</p>
+<div class="language-sh highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>claude<span class="w"> </span>--ro<span class="w"> </span>README.qmd<span class="w"> </span>--rw<span class="w"> </span>~/Desktop<span class="w"> </span>--env<span class="w"> </span>GITHUB_TOKEN<span class="w"> </span>--policy
+</code></pre></div>
+<p>Profiles live in the global <code>bulle</code> config file. By default, <code>bulle</code> reads <code>config.toml</code> from the operating system's user config directory, under a <code>bulle</code> subdirectory: on Linux and other XDG systems this is usually <code>$XDG_CONFIG_HOME/bulle/config.toml</code> or <code>~/.config/bulle/config.toml</code>; on macOS it is usually <code>~/Library/Application Support/bulle/config.toml</code>. Use <code>--config PATH</code> to load a different global config file. <code>bulle</code> does not read project-local config files.</p>
+<p>A profile can define a default app, filesystem grants, environment variables, and inheritance:</p>
+<div class="language-toml highlight"><pre><span></span><code><span class="n">default_profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;tool&quot;</span>
+
+<span class="k">[profiles.tool]</span>
+<span class="n">rw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;$TMP/bulle/tmp&quot;</span><span class="p">]</span>
+<span class="n">env</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;PATH&quot;</span><span class="p">]</span>
+<span class="n">add_exec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<span class="n">add_libs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+
+<span class="k">[profiles.agent]</span>
+<span class="n">inherits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;tool&quot;</span>
+<span class="n">default_app</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;codex&quot;</span>
+<span class="n">rw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;$HOME/.cache/example-agent&quot;</span><span class="p">]</span>
+<span class="n">env</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;HOME&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;USER&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;TERM&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;LANG&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SHELL&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;OPENAI_API_KEY&quot;</span><span class="p">]</span>
+</code></pre></div>
+<p>List fields are inherited and appended by default. Set <code>replace_ro</code>, <code>replace_rox</code>, <code>replace_rw</code>, <code>replace_rwx</code>, or <code>replace_env</code> in a child profile to replace the corresponding inherited list instead.</p>
+<h2 id="policy">Policy<a class="headerlink" href="#policy" title="Permanent link">&para;</a></h2>
+<p>Use <code>--policy</code> to inspect the resolved sandbox policy without running the command. This is a useful safety check before launching an agent or script, especially when combining profiles with extra filesystem or environment grants.</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--policy<span class="w"> </span>~/Desktop<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--<span class="w"> </span>/bin/ls
+</code></pre></div>
+<div class="language-json highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;backend&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;macos-seatbelt&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;workspace_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/home/user/Desktop&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;command&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;/bin/ls&quot;</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;ro&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;rox&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;/bin&quot;</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;rw&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;/home/user/Desktop&quot;</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;rwx&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;env_keys&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;add_exec&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;add_libs&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;allow_keychain&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>In this example, <code>workspace_path</code> is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read &amp; write access to <code>/home/user/Desktop</code>, shown in the <code>rw</code> array. The <code>command</code> field is the command that would be executed, and the <code>ro</code>, <code>rox</code>, <code>rw</code>, and <code>rwx</code> arrays show the readable, executable, writable, and writable-executable path grants. The <code>env_keys</code> array lists environment variables that would be passed into the sandbox. The <code>backend</code> value depends on your operating system.</p>
+<h2 id="executables-and-libraries">Executables and libraries<a class="headerlink" href="#executables-and-libraries" title="Permanent link">&para;</a></h2>
+<p>For quick local commands, <code>--add-exec</code> can save you from spelling out executable grants by hand. It resolves the command before the sandbox starts and adds the executable to the policy:</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--add-exec<span class="w"> </span>--<span class="w"> </span>/bin/ls
+</code></pre></div>
+<p>On Linux, dynamically linked executables also need access to runtime libraries. <code>--add-libs</code> discovers the shared libraries needed by the executable and adds read-only grants for them:</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--add-exec<span class="w"> </span>--add-libs<span class="w"> </span>--<span class="w"> </span>/usr/bin/git<span class="w"> </span>status
+</code></pre></div>
+<p>These flags are conveniences for executables and runtime libraries. They do not add app state files, config directories, caches, secrets, or shell environment variables. Use profiles for agents and other tools that need a larger, repeatable policy.</p>
+<p>Profiles can enable these conveniences with <code>add_exec = true</code> and <code>add_libs = true</code>. Boolean capabilities are inherited with OR semantics: once a parent enables one, a child profile cannot disable it. Use a different parent profile when you need a stricter variant.</p>
+<h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
+<p><code>bulle</code> builds a policy before the command starts. The policy is assembled from the workspace, selected profile, command-line flags, selected environment variables, executable discovery, and runtime library defaults. Paths are resolved before sandbox setup, and <code>--policy</code> prints the resulting policy without running the command.</p>
+<h3 id="linux">Linux<a class="headerlink" href="#linux" title="Permanent link">&para;</a></h3>
+<p>On Linux, <code>bulle</code> applies the policy with <a href="https://docs.kernel.org/userspace-api/landlock.html">Landlock</a>. Landlock is a kernel feature, not a package to install; basic filesystem sandboxing requires Linux 5.13 or later with Landlock enabled. The Linux backend restricts filesystem access for the process and its children according to the resolved read, write, and execute grants.</p>
+<h3 id="macos">macOS<a class="headerlink" href="#macos" title="Permanent link">&para;</a></h3>
+<p>On macOS, <code>bulle</code> generates a <a href="https://www.unix.com/man_page/osx/5/sandbox/">Seatbelt</a> profile and runs the command with <code>/usr/bin/sandbox-exec</code>. The macOS backend maps the same policy model to Seatbelt rules, including filesystem rules, network allowance, and selected Mach service access such as Keychain support when a profile enables it. This is useful for local workflows, but its behavior is not identical to Linux Landlock.</p>
+<h2 id="license-and-attribution">License and attribution<a class="headerlink" href="#license-and-attribution" title="Permanent link">&para;</a></h2>
+<p><code>bulle</code> is distributed under the MIT License. See <a href="LICENSES/bulle-MIT.txt">LICENSES/bulle-MIT.txt</a>.</p>
+<p>Thank you to <a href="https://github.com/Zouuup/landrun">Landrun</a>, an excellent, compact Go implementation of practical Landlock sandboxing. The Linux sandbox backend and filesystem permission model owe a clear debt to Landrun's design, and portions of the Linux backend and ELF dependency discovery are derived from or inspired by Landrun. See <a href="LICENSES/landrun-MIT.txt">LICENSES/landrun-MIT.txt</a> for the full third-party notice and license.</p>
+
+  
+
+
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+  
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      bulle is distributed under the MIT License.
+    </div>
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":".","features":["content.code.copy","navigation.top","navigation.tracking","search.highlight"],"search":"./assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="./assets/javascripts/bundle.6e5f0216.min.js"></script>
+      
+    
+  </body>
+</html>

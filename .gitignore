@@ -1,0 +1,22 @@
+# Local build artifacts
+/bulle
+/dist/
+/build/
+/.worktrees
+
+# Go test and coverage outputs
+*.test
+*.out
+coverage.*
+
+# Calepin/Quarto render caches
+/.quarto/
+/_freeze/
+/_site/
+
+# Editor and OS files
+.DS_Store
+*~
+*.swp
+*.swo
+.tmp
