@@ -7,4 +7,3 @@
 </p>
 
 Read the documentation at <https://vincentarelbundock.github.io/bulle>
-
