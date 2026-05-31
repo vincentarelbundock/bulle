@@ -525,14 +525,8 @@
 <p>With the install script:</p>
 <div class="language-sh highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/vincentarelbundock/bulle/main/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh
 </code></pre></div>
-<p>To install somewhere other than <code>/usr/local/bin</code>:</p>
-<div class="language-sh highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/vincentarelbundock/bulle/main/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>-b<span class="w"> </span>~/.local/bin
-</code></pre></div>
 <p>With Homebrew:</p>
 <div class="language-sh highlight"><pre><span></span><code>brew<span class="w"> </span>install<span class="w"> </span>vincentarelbundock/tap/bulle
-</code></pre></div>
-<p>With Go:</p>
-<div class="language-sh highlight"><pre><span></span><code>go<span class="w"> </span>install<span class="w"> </span>github.com/vincentarelbundock/bulle/cmd/bulle@latest
 </code></pre></div>
 <p>Or download a prebuilt <code>darwin</code>/<code>linux</code>, <code>amd64</code>/<code>arm64</code> archive from the <a href="https://github.com/vincentarelbundock/bulle/releases/latest">latest GitHub release</a>.</p>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
@@ -543,11 +537,12 @@
 Add --env PATH with matching --rox/--rwx roots, choose a profile,
 or pass an explicit executable path after --
 </code></pre></div>
-<p>That error is intentional: even finding and executing <code>ls</code> requires permission. We can grant that permission using the <code>--rox</code> flag (read+execute):</p>
+<p>That error is intentional: even finding and executing <code>ls</code> requires permission. We can grant that permission using the <code>--rox</code> flag (read-only+execute):</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--rox<span class="w"> </span>/bin/ls<span class="w"> </span>--<span class="w"> </span>/bin/ls
 </code></pre></div>
-<p>Instead of specifying the path of every command manually, we can load <a href="#profiles">profiles</a>: named bundles of permissions for common tools. <code>bulle</code> includes profiles for several coding agents. For example, the first command below gives read-write access to the current directory, and launches Claude Code with appropriate permissions:</p>
+<p>Instead of specifying the path of every command manually, we can load <a href="#profiles">profiles</a>: named bundles of permissions for common tools. <code>bulle</code> ships with built-in profiles for several coding agents. For example, the first command below gives read-write access to the current directory, and launches Claude Code with minimal permissions:</p>
 <div class="language-sh highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>claude
+<span class="c1"># bulle /path/to/project --profile claude</span>
 <span class="c1"># bulle --profile codex</span>
 <span class="c1"># bulle --profile pi</span>
 <span class="c1"># bulle --profile opencode</span>
@@ -561,7 +556,7 @@ or pass an explicit executable path after --
 --rwx<span class="w"> </span>path<span class="w">       </span><span class="c1"># read-write plus execute</span>
 --no-workspace<span class="w">   </span><span class="c1"># do not automatically grant the workspace read-write access</span>
 </code></pre></div>
-<p>Advice: grant the narrowest paths that are practical. Use <code>--rw</code> or <code>--rwx</code> only for paths outside the workspace that the command should be allowed to modify. In profiles, <code>$WORKSPACE</code> refers to the workspace path.</p>
+<p>Advice: grant the narrowest paths that are practical. Use <code>--rw</code> or <code>--rwx</code> only for paths outside the workspace that the command should be allowed to modify. In profile definitions, <code>$WORKSPACE</code> refers to the workspace path.</p>
 <h2 id="environment">Environment<a class="headerlink" href="#environment" title="Permanent link">&para;</a></h2>
 <p>Environment variables are also explicit. By default, <code>bulle</code> does not pass your shell environment into the sandbox. Use <code>--env NAME</code> to pass a variable from the parent environment, or <code>--env NAME=VALUE</code> to define one on the fly:</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--env<span class="w"> </span>USER<span class="w"> </span>--<span class="w"> </span>/bin/echo<span class="w"> </span><span class="nv">$USER</span>

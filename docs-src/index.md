@@ -51,22 +51,10 @@ With the install script:
 curl -fsSL https://raw.githubusercontent.com/vincentarelbundock/bulle/main/install.sh | sh
 ```
 
-To install somewhere other than `/usr/local/bin`:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/vincentarelbundock/bulle/main/install.sh | sh -s -- -b ~/.local/bin
-```
-
 With Homebrew:
 
 ```sh
 brew install vincentarelbundock/tap/bulle
-```
-
-With Go:
-
-```sh
-go install github.com/vincentarelbundock/bulle/cmd/bulle@latest
 ```
 
 Or download a prebuilt `darwin`/`linux`, `amd64`/`arm64` archive from the [latest GitHub release](https://github.com/vincentarelbundock/bulle/releases/latest).
@@ -85,16 +73,17 @@ Add --env PATH with matching --rox/--rwx roots, choose a profile,
 or pass an explicit executable path after --
 ```
 
-That error is intentional: even finding and executing `ls` requires permission. We can grant that permission using the `--rox` flag (read+execute):
+That error is intentional: even finding and executing `ls` requires permission. We can grant that permission using the `--rox` flag (read-only+execute):
 
 ```bash
 bulle --rox /bin/ls -- /bin/ls
 ```
 
-Instead of specifying the path of every command manually, we can load [profiles](#profiles): named bundles of permissions for common tools. `bulle` includes profiles for several coding agents. For example, the first command below gives read-write access to the current directory, and launches Claude Code with appropriate permissions:
+Instead of specifying the path of every command manually, we can load [profiles](#profiles): named bundles of permissions for common tools. `bulle` ships with built-in profiles for several coding agents. For example, the first command below gives read-write access to the current directory, and launches Claude Code with minimal permissions:
 
 ```sh
 bulle --profile claude
+# bulle /path/to/project --profile claude
 # bulle --profile codex
 # bulle --profile pi
 # bulle --profile opencode
@@ -114,7 +103,7 @@ Additional filesystem access is explicit. Use these flags to add paths to the ac
 --no-workspace   # do not automatically grant the workspace read-write access
 ```
 
-Advice: grant the narrowest paths that are practical. Use `--rw` or `--rwx` only for paths outside the workspace that the command should be allowed to modify. In profiles, `$WORKSPACE` refers to the workspace path.
+Advice: grant the narrowest paths that are practical. Use `--rw` or `--rwx` only for paths outside the workspace that the command should be allowed to modify. In profile definitions, `$WORKSPACE` refers to the workspace path.
 
 ## Environment
 

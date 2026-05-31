@@ -8,24 +8,3 @@
 
 Read the documentation at <https://vincentarelbundock.github.io/bulle>
 
-## Install
-
-With the install script:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/vincentarelbundock/bulle/main/install.sh | sh
-```
-
-With Homebrew:
-
-```sh
-brew install vincentarelbundock/tap/bulle
-```
-
-With Go:
-
-```sh
-go install github.com/vincentarelbundock/bulle/cmd/bulle@latest
-```
-
-Or download a prebuilt `darwin`/`linux`, `amd64`/`arm64` archive from the [latest GitHub release](https://github.com/vincentarelbundock/bulle/releases/latest).
