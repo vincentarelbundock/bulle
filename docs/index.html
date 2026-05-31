@@ -491,23 +491,23 @@
 
 <p align="center" style="font-size: 1.2em;"><strong>A simple sandbox for dangerous tools like coding agents</strong></p>
 
-<p><code>bulle</code> is an easy-to-use sandbox to run local commands while exposing only the essential parts of your machine. It allows you to run tools you don't fully trust, without handing over all your files, or every secret held in environment variables. <code>bulle</code> sandboxes are especially helpful when using LLM coding agents or untrusted scripts.</p>
-<p>On MacOS and Linux, you can start up an agent with restricted permissions using this simple command:</p>
+<p><code>bulle</code> is an easy-to-use sandbox for running local commands while exposing only the essential parts of your machine. It allows you to run tools you don't fully trust, without handing over all your files or every secret held in environment variables. <code>bulle</code> sandboxes are especially helpful when running LLM coding agents or untrusted scripts.</p>
+<p>On macOS and Linux, you can spin up an agent with restricted permissions using this simple command:</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>/path/to/project<span class="w"> </span>--profile<span class="w"> </span>claude
 </code></pre></div>
 <p>Sandboxes are not limited to agents. You can use <code>bulle</code> to run any command with custom permissions. See the <a href="#quick-start">Quick start</a> section and the <a href="cli-reference">CLI reference</a> for details.</p>
 <div class="admonition warning">
-<p class="admonition-title"><code>bulle</code> is still experimental. Please report bugs, comments, and feature requests <a href="https://github.com/vincentarelbundock/bulle">on github.</a></p>
+<p class="admonition-title"><code>bulle</code> is still experimental. Please report bugs, comments, and feature requests <a href="https://github.com/vincentarelbundock/bulle">on GitHub</a>.</p>
 </div>
 <h2 id="risk-mitigation">Risk mitigation<a class="headerlink" href="#risk-mitigation" title="Permanent link">&para;</a></h2>
-<p><code>bulle</code> limits commands to act only on the files and variables you explicitly allow.</p>
+<p><code>bulle</code> limits commands to the files and variables you explicitly allow.</p>
 <div class="admonition success">
 <p class="admonition-title"><code>bulle</code> can mitigate risk when</p>
 <ul>
-<li>a prompt or skill injection tells an agent to steal your passwords or ssh keys;</li>
-<li>a script tries to rewrite <code>~/Documents</code> instead of the project where it should be running;</li>
-<li>a malicious package hook searches your home directory for cloud credentials;</li>
-<li>a crash log or subprocess exposes your <code>API_KEY</code> environment variable;</li>
+<li>a prompt or skill injection tells an agent to steal your passwords or SSH keys;</li>
+<li>an LLM or script tries to rewrite <code>~/Documents</code> instead of the project where it should be running;</li>
+<li>a malicious package searches your home directory for cloud credentials;</li>
+<li>a crash log exposes your <code>API_KEY</code> environment variable;</li>
 <li>a tool surreptitiously runs code from downloads, caches, or another project.</li>
 </ul>
 </div>
@@ -522,6 +522,12 @@
 </div>
 <p>For more information on sandboxing tradeoffs, read <a href="https://www.luiscardoso.dev/blog/sandboxes-for-ai">A field guide to sandboxes for AI</a> by Luis Cardoso.</p>
 <h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h2>
+<p>With the install script:</p>
+<div class="language-sh highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/vincentarelbundock/bulle/main/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh
+</code></pre></div>
+<p>To install somewhere other than <code>/usr/local/bin</code>:</p>
+<div class="language-sh highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/vincentarelbundock/bulle/main/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>-b<span class="w"> </span>~/.local/bin
+</code></pre></div>
 <p>With Homebrew:</p>
 <div class="language-sh highlight"><pre><span></span><code>brew<span class="w"> </span>install<span class="w"> </span>vincentarelbundock/tap/bulle
 </code></pre></div>
@@ -602,7 +608,7 @@ bulle<span class="w"> </span>--rox<span class="w"> </span>/usr/bin/printenv<span
 <span class="w">  </span><span class="nt">&quot;allow_keychain&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
 <span class="p">}</span>
 </code></pre></div>
-<p>In this example, <code>workspace_path</code> is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read &amp; write access to <code>/home/user/Desktop</code>, shown in the <code>rw</code> array. The <code>command</code> field is the command that would be executed, and the <code>ro</code>, <code>rox</code>, <code>rw</code>, and <code>rwx</code> arrays show the readable, executable, writable, and writable-executable path grants. The <code>env_keys</code> array lists environment variables that would be passed into the sandbox. The <code>backend</code> value depends on your operating system.</p>
+<p>In this example, <code>workspace_path</code> is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to <code>/home/user/Desktop</code>, shown in the <code>rw</code> array. The <code>command</code> field is the command that would be executed, and the <code>ro</code>, <code>rox</code>, <code>rw</code>, and <code>rwx</code> arrays show the readable, executable, writable, and writable-executable path grants. The <code>env_keys</code> array lists environment variables that would be passed into the sandbox. The <code>backend</code> value depends on your operating system.</p>
 <h2 id="executables-and-libraries">Executables and libraries<a class="headerlink" href="#executables-and-libraries" title="Permanent link">&para;</a></h2>
 <p>For quick local commands, <code>--add-exec</code> can save you from spelling out executable grants by hand. It resolves the command before the sandbox starts and adds the executable to the policy:</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--add-exec<span class="w"> </span>--<span class="w"> </span>/bin/ls

@@ -10,9 +10,9 @@ hide:
 
 <p align="center" style="font-size: 1.2em;"><strong>A simple sandbox for dangerous tools like coding agents</strong></p>
 
-`bulle` is an easy-to-use sandbox to run local commands while exposing only the essential parts of your machine. It allows you to run tools you don't fully trust, without handing over all your files, or every secret held in environment variables. `bulle` sandboxes are especially helpful when using LLM coding agents or untrusted scripts.
+`bulle` is an easy-to-use sandbox for running local commands while exposing only the essential parts of your machine. It allows you to run tools you don't fully trust, without handing over all your files or every secret held in environment variables. `bulle` sandboxes are especially helpful when running LLM coding agents or untrusted scripts.
 
-On MacOS and Linux, you can start up an agent with restricted permissions using this simple command:
+On macOS and Linux, you can spin up an agent with restricted permissions using this simple command:
 
 ```bash
 bulle /path/to/project --profile claude
@@ -20,18 +20,18 @@ bulle /path/to/project --profile claude
 
 Sandboxes are not limited to agents. You can use `bulle` to run any command with custom permissions. See the [Quick start](#quick-start) section and the [CLI reference](cli-reference) for details.
 
-!!! warning "`bulle` is still experimental. Please report bugs, comments, and feature requests [on github.](https://github.com/vincentarelbundock/bulle)"
+!!! warning "`bulle` is still experimental. Please report bugs, comments, and feature requests [on GitHub](https://github.com/vincentarelbundock/bulle)."
 
 ## Risk mitigation
 
-`bulle` limits commands to act only on the files and variables you explicitly allow.
+`bulle` limits commands to the files and variables you explicitly allow.
 
 !!! success "`bulle` can mitigate risk when"
 
-    - a prompt or skill injection tells an agent to steal your passwords or ssh keys;
-    - a script tries to rewrite `~/Documents` instead of the project where it should be running;
-    - a malicious package hook searches your home directory for cloud credentials;
-    - a crash log or subprocess exposes your `API_KEY` environment variable;
+    - a prompt or skill injection tells an agent to steal your passwords or SSH keys;
+    - an LLM or script tries to rewrite `~/Documents` instead of the project where it should be running;
+    - a malicious package searches your home directory for cloud credentials;
+    - a crash log exposes your `API_KEY` environment variable;
     - a tool surreptitiously runs code from downloads, caches, or another project.
 
 !!! warning "`bulle` is not sufficient when"
@@ -44,6 +44,18 @@ Sandboxes are not limited to agents. You can use `bulle` to run any command with
 For more information on sandboxing tradeoffs, read [A field guide to sandboxes for AI](https://www.luiscardoso.dev/blog/sandboxes-for-ai) by Luis Cardoso.
 
 ## Install
+
+With the install script:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vincentarelbundock/bulle/main/install.sh | sh
+```
+
+To install somewhere other than `/usr/local/bin`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vincentarelbundock/bulle/main/install.sh | sh -s -- -b ~/.local/bin
+```
 
 With Homebrew:
 
@@ -171,7 +183,7 @@ bulle --policy ~/Desktop --rox /bin -- /bin/ls
 }
 ```
 
-In this example, `workspace_path` is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read & write access to `/home/user/Desktop`, shown in the `rw` array. The `command` field is the command that would be executed, and the `ro`, `rox`, `rw`, and `rwx` arrays show the readable, executable, writable, and writable-executable path grants. The `env_keys` array lists environment variables that would be passed into the sandbox. The `backend` value depends on your operating system.
+In this example, `workspace_path` is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to `/home/user/Desktop`, shown in the `rw` array. The `command` field is the command that would be executed, and the `ro`, `rox`, `rw`, and `rwx` arrays show the readable, executable, writable, and writable-executable path grants. The `env_keys` array lists environment variables that would be passed into the sandbox. The `backend` value depends on your operating system.
 
 ## Executables and libraries
 

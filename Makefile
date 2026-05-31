@@ -27,6 +27,7 @@ check: vet test ## Run vet and tests
 
 website: ## Render docs-src/ into docs/
 	go run ./cmd/bulle-docs
+	@if [ -d .cache ]; then chmod -R u+w .cache 2>/dev/null || true; fi
 	uv run zensical build --clean
 
 serve: ## Build and serve the website at http://localhost:8000

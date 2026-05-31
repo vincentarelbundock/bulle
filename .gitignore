@@ -8,6 +8,8 @@
 *.test
 *.out
 coverage.*
+.cache
+.claude
 
 # Calepin/Quarto render caches
 /.quarto/

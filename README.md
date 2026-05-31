@@ -10,6 +10,12 @@ Read the documentation at <https://vincentarelbundock.github.io/bulle>
 
 ## Install
 
+With the install script:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vincentarelbundock/bulle/main/install.sh | sh
+```
+
 With Homebrew:
 
 ```sh
