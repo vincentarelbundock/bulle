@@ -44,6 +44,7 @@ Configuration:
 Profiles:
   -p, --profile NAME
                     named profile from the configuration file
+  --list-profiles  list available profiles and exit
 `
 
 const usageAfterProfiles = `
@@ -94,6 +95,17 @@ func Usage() string {
 
 func profileUsage() string {
 	cfg := config.DefaultConfig()
+	names := ProfileNames(cfg)
+	var b strings.Builder
+	for _, name := range names {
+		fmt.Fprintf(&b, "  %-17s %s\n", name, profileDescription(name, cfg.Profiles[name]))
+	}
+	return b.String()
+}
+
+// ProfileNames returns user-facing profile names in the same stable order used
+// by help output: built-ins first, then custom names alphabetically.
+func ProfileNames(cfg config.Config) []string {
 	var names []string
 	for name := range cfg.Profiles {
 		if name != "default" {
@@ -111,12 +123,7 @@ func profileUsage() string {
 		}
 		return names[i] < names[j]
 	})
-
-	var b strings.Builder
-	for _, name := range names {
-		fmt.Fprintf(&b, "  %-17s %s\n", name, profileDescription(name, cfg.Profiles[name]))
-	}
-	return b.String()
+	return names
 }
 
 func profileDescription(name string, profile config.Profile) string {

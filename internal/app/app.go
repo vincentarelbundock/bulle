@@ -62,6 +62,12 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return ExitConfigError
 	}
+	if opts.ListProfiles {
+		for _, name := range cli.ProfileNames(global) {
+			fmt.Fprintln(stdout, name)
+		}
+		return ExitOK
+	}
 	if len(opts.Command) == 0 {
 		defaultApp, err := defaultAppForRun(opts, global)
 		if err != nil {

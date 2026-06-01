@@ -102,6 +102,47 @@ func TestRunVersionPrintsVersion(t *testing.T) {
 	}
 }
 
+func TestRunListProfilesPrintsBuiltInProfiles(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"bulle", "--list-profiles"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
+	}
+	for _, want := range []string{"tool\n", "claude\n", "codex\n", "pi\n", "opencode\n"} {
+		if !bytes.Contains(stdout.Bytes(), []byte(want)) {
+			t.Fatalf("stdout = %s, want profile %q", stdout.String(), want)
+		}
+	}
+	if bytes.Contains(stdout.Bytes(), []byte("default\n")) {
+		t.Fatalf("stdout = %s, did not want internal default profile listed", stdout.String())
+	}
+}
+
+func TestRunListProfilesIncludesConfigProfiles(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	tmp := t.TempDir()
+	cfg := filepath.Join(tmp, "config.toml")
+	if err := os.WriteFile(cfg, []byte(`
+[profiles.custom]
+inherits = "tool"
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	code := Run([]string{"bulle", "--config", cfg, "--list-profiles"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte("custom\n")) {
+		t.Fatalf("stdout = %s, want custom profile", stdout.String())
+	}
+}
+
 func TestEnsureRuntimeDirsCreatesPrivateTmpOnly(t *testing.T) {
 	tmp := t.TempDir()
 
