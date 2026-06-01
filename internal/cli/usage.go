@@ -69,6 +69,9 @@ Examples:
   bulle . --rox /bin --policy=json -- /bin/bash
   bulle --profile codex --policy
   bulle --profile codex,offline
+  bulle --install-profiles agent.toml
+  bulle --install-profiles ./profiles
+  bulle --install-profiles github:vincentarelbundock/bulle/custom_profiles
 `
 
 // Usage returns the full help text printed for --help and the help subcommand.

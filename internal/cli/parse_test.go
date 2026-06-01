@@ -214,6 +214,15 @@ func TestUsageShowsProfileShortFlag(t *testing.T) {
 	if !strings.Contains(Usage(), "--install-profiles SOURCE") {
 		t.Fatalf("Usage() does not show --install-profiles:\n%s", Usage())
 	}
+	for _, example := range []string{
+		"bulle --install-profiles agent.toml",
+		"bulle --install-profiles ./profiles",
+		"bulle --install-profiles github:vincentarelbundock/bulle/custom_profiles",
+	} {
+		if !strings.Contains(Usage(), example) {
+			t.Fatalf("Usage() does not show install-profile example %q:\n%s", example, Usage())
+		}
+	}
 	if !strings.Contains(Usage(), "--policy[=summary|json]") {
 		t.Fatalf("Usage() does not show policy formats:\n%s", Usage())
 	}
