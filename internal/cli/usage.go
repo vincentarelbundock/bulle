@@ -36,12 +36,14 @@ Environment flags (no variables are passed unless requested):
   --env NAME=VALUE  set NAME to VALUE inside the sandbox
 
 Configuration:
-  --config PATH     path to a configuration file
+  --config PATH     path to a configuration directory
 
 Profiles:
   -p, --profile NAME
-                    named profile from the configuration file; comma-separated names merge left to right
+                    named profile, or comma-separated profiles merged left to right
   --list-profiles  list available profiles and exit
+  --install-profiles SOURCE
+                    install profile TOML files from a file, directory, local git repository, or GitHub source
 `
 
 const usageAfterProfiles = `
@@ -89,9 +91,7 @@ func profileUsage() string {
 func ProfileNames(cfg config.Config) []string {
 	var names []string
 	for name := range cfg.Profiles {
-		if name != "default" {
-			names = append(names, name)
-		}
+		names = append(names, name)
 	}
 	sort.Strings(names)
 	return names

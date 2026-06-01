@@ -116,8 +116,8 @@ func TestRunListProfilesPrintsBuiltInProfiles(t *testing.T) {
 			t.Fatalf("stdout = %s, want profile %q", stdout.String(), want)
 		}
 	}
-	if bytes.Contains(stdout.Bytes(), []byte("default\n")) {
-		t.Fatalf("stdout = %s, did not want internal default profile listed", stdout.String())
+	if !bytes.Contains(stdout.Bytes(), []byte("default\n")) {
+		t.Fatalf("stdout = %s, want default profile listed", stdout.String())
 	}
 }
 
@@ -125,21 +125,158 @@ func TestRunListProfilesIncludesConfigProfiles(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
-	cfg := filepath.Join(tmp, "config.toml")
-	if err := os.WriteFile(cfg, []byte(`
-[profiles.custom]
-inherits = "tool"
-`), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writeConfigProfile(t, tmp, "custom", `inherits = "tool"
+`)
 
-	code := Run([]string{"bulle", "--config", cfg, "--list-profiles"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--config", tmp, "--list-profiles"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
 	}
 	if !bytes.Contains(stdout.Bytes(), []byte("custom\n")) {
 		t.Fatalf("stdout = %s, want custom profile", stdout.String())
+	}
+}
+
+func TestRunInstallProfilesCopiesSingleProfileFile(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	configRoot := t.TempDir()
+	sourceDir := t.TempDir()
+	source := filepath.Join(sourceDir, "agent.toml")
+	data := "title = \"Agent\"\ninherits = \"tool\"\n"
+	if err := os.WriteFile(source, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	code := Run([]string{"bulle", "--config", configRoot, "--install-profiles", source}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
+	}
+	dest := filepath.Join(configRoot, "profiles", "agent.toml")
+	got, err := os.ReadFile(dest)
+	if err != nil {
+		t.Fatalf("read installed profile: %v", err)
+	}
+	if string(got) != data {
+		t.Fatalf("installed profile = %q, want %q", string(got), data)
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte("installed agent\n")) {
+		t.Fatalf("stdout = %s, want installed agent", stdout.String())
+	}
+}
+
+func TestRunInstallProfilesCopiesDirectoryTomlFiles(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	configRoot := t.TempDir()
+	sourceDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(sourceDir, "one.toml"), []byte("title = \"One\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sourceDir, "two.toml"), []byte("title = \"Two\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sourceDir, "README.md"), []byte("not a profile"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	code := Run([]string{"bulle", "--config", configRoot, "--install-profiles", sourceDir}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
+	}
+	for _, name := range []string{"one", "two"} {
+		if _, err := os.Stat(filepath.Join(configRoot, "profiles", name+".toml")); err != nil {
+			t.Fatalf("installed %s: %v", name, err)
+		}
+	}
+}
+
+func TestRunInstallProfilesUsesProfilesDirectoryInRepository(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	configRoot := t.TempDir()
+	repo := t.TempDir()
+	if err := os.Mkdir(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	profiles := filepath.Join(repo, "profiles")
+	if err := os.Mkdir(profiles, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(profiles, "repo-agent.toml"), []byte("title = \"Repo Agent\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "ignored.toml"), []byte("title = \"Ignored\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	code := Run([]string{"bulle", "--config", configRoot, "--install-profiles", repo}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(configRoot, "profiles", "repo-agent.toml")); err != nil {
+		t.Fatalf("installed repo-agent: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(configRoot, "profiles", "ignored.toml")); !os.IsNotExist(err) {
+		t.Fatalf("ignored root profile err = %v, want not installed", err)
+	}
+}
+
+func TestRunInstallProfilesDoesNotPartiallyCopyInvalidDirectory(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	configRoot := t.TempDir()
+	sourceDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(sourceDir, "good.toml"), []byte("title = \"Good\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sourceDir, "zz-bad.toml"), []byte("unknown = true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	code := Run([]string{"bulle", "--config", configRoot, "--install-profiles", sourceDir}, &stdout, &stderr)
+
+	if code == 0 {
+		t.Fatalf("exit code = 0, want install failure")
+	}
+	if _, err := os.Stat(filepath.Join(configRoot, "profiles", "good.toml")); !os.IsNotExist(err) {
+		t.Fatalf("good profile err = %v, want no partial install", err)
+	}
+}
+
+func TestParseGitHubProfileInstallSourceWithSubdirectory(t *testing.T) {
+	repo, subdir, ok := parseGitHubProfileInstallSource("github:vincentarelbundock/bulle/custom_profiles")
+	if !ok {
+		t.Fatal("parseGitHubProfileInstallSource returned ok=false")
+	}
+	if repo != "https://github.com/vincentarelbundock/bulle.git" {
+		t.Fatalf("repo = %q", repo)
+	}
+	if subdir != "custom_profiles" {
+		t.Fatalf("subdir = %q", subdir)
+	}
+}
+
+func TestParseGitHubProfileInstallSourceRequiresPrefix(t *testing.T) {
+	for _, source := range []string{"vincentarelbundock/bulle/custom_profiles", "https://github.com/vincentarelbundock/bulle.git"} {
+		if _, _, ok := parseGitHubProfileInstallSource(source); ok {
+			t.Fatalf("parseGitHubProfileInstallSource(%q) ok=true, want false", source)
+		}
+	}
+}
+
+func writeConfigProfile(t *testing.T, root string, name string, data string) {
+	t.Helper()
+	profileDir := filepath.Join(root, "profiles")
+	if err := os.MkdirAll(profileDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(profileDir, name+".toml"), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -237,16 +374,11 @@ func TestRunExplainsDefaultAppNotFoundBeforeSandbox(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
-	cfg := filepath.Join(tmp, "config.toml")
-	if err := os.WriteFile(cfg, []byte(`
-[profiles.missing]
-inherits = "tool"
+	writeConfigProfile(t, tmp, "missing", `inherits = "tool"
 default_app = "definitely-not-installed-bulle-test-command"
-`), 0o600); err != nil {
-		t.Fatal(err)
-	}
+`)
 
-	code := Run([]string{"bulle", "--config", cfg, "--profile", "missing", tmp}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--config", tmp, "--profile", "missing", tmp}, &stdout, &stderr)
 
 	if code != ExitNotFound {
 		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitNotFound, stderr.String())
@@ -263,15 +395,11 @@ func TestRunUsesDefaultAppFromConfig(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
-	cfg := filepath.Join(tmp, "config.toml")
-	if err := os.WriteFile(cfg, []byte(`
-default_app = "/bin/echo hi"
+	writeConfigProfile(t, tmp, "default", `default_app = "/bin/echo hi"
 rox = ["/bin"]
-`), 0o600); err != nil {
-		t.Fatal(err)
-	}
+`)
 
-	code := Run([]string{"bulle", "--config", cfg, tmp, "--policy=json"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--config", tmp, tmp, "--policy=json"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -285,20 +413,11 @@ func TestRunUsesDefaultAppFromProfile(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
-	cfg := filepath.Join(tmp, "config.toml")
-	if err := os.WriteFile(cfg, []byte(`
-[profiles.default]
-rw = ["$WORKSPACE"]
-env = ["PATH"]
-
-[profiles.agent]
-inherits = "tool"
+	writeConfigProfile(t, tmp, "agent", `inherits = "tool"
 default_app = "echo profile"
-`), 0o600); err != nil {
-		t.Fatal(err)
-	}
+`)
 
-	code := Run([]string{"bulle", "--config", cfg, "--profile", "agent", tmp, "--policy=json"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--config", tmp, "--profile", "agent", tmp, "--policy=json"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -312,15 +431,11 @@ func TestRunParsesQuotedDefaultApp(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
-	cfg := filepath.Join(tmp, "config.toml")
-	if err := os.WriteFile(cfg, []byte(`
-default_app = "/bin/echo 'hello world'"
+	writeConfigProfile(t, tmp, "default", `default_app = "/bin/echo 'hello world'"
 rox = ["/bin"]
-`), 0o600); err != nil {
-		t.Fatal(err)
-	}
+`)
 
-	code := Run([]string{"bulle", "--config", cfg, tmp, "--policy=json"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--config", tmp, tmp, "--policy=json"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -334,14 +449,10 @@ func TestRunRejectsInvalidDefaultApp(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
-	cfg := filepath.Join(tmp, "config.toml")
-	if err := os.WriteFile(cfg, []byte(`
-default_app = "echo 'unterminated"
-`), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writeConfigProfile(t, tmp, "default", `default_app = "echo 'unterminated"
+`)
 
-	code := Run([]string{"bulle", "--config", cfg, tmp, "--policy=json"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--config", tmp, tmp, "--policy=json"}, &stdout, &stderr)
 
 	if code != ExitConfigError {
 		t.Fatalf("exit code = %d, want %d; stdout = %s; stderr = %s", code, ExitConfigError, stdout.String(), stderr.String())

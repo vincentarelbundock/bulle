@@ -56,6 +56,8 @@
       
     
     
+      <link rel="stylesheet" href="./assets/toc.css">
+    
     <script>__md_scope=new URL(".",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
     
       
@@ -129,11 +131,11 @@
         </a>
       
         <a href="./index.html#quick-start" style="color: inherit; opacity: 0.9; text-decoration: none; white-space: nowrap;">
-          Quick start
+          Quick Start
         </a>
       
         <a href="./cli-reference.html" style="color: inherit; opacity: 0.9; text-decoration: none; white-space: nowrap;">
-          CLI reference
+          CLI Reference
         </a>
       
     </div>
@@ -283,7 +285,7 @@
   <span class="md-ellipsis">
     
   
-  Quick start
+  Quick Start
 
     
   </span>
@@ -309,7 +311,7 @@
   <span class="md-ellipsis">
     
   
-  CLI reference
+  CLI Reference
 
     
   </span>
@@ -363,7 +365,7 @@
   <a href="#risk-mitigation" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Risk mitigation
+        Risk Mitigation
       </span>
     </span>
   </a>
@@ -385,7 +387,7 @@
   <a href="#quick-start" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Quick start
+        Quick Start
       </span>
     </span>
   </a>
@@ -415,21 +417,71 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#network" class="md-nav__link">
+  <a href="#profiles" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Network
+        Profiles
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Profiles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#use" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Use
       </span>
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#profiles" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#list" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Profiles
+        List
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Install
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toml" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TOML
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#network" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Network
       </span>
     </span>
   </a>
@@ -451,7 +503,7 @@
   <a href="#executables-and-libraries" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Executables and libraries
+        Executables and Libraries
       </span>
     </span>
   </a>
@@ -459,15 +511,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-it-works" class="md-nav__link">
+  <a href="#os-level-sandboxing" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        How it works
+        OS-Level Sandboxing
       </span>
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="How it works">
+    <nav class="md-nav" aria-label="OS-Level Sandboxing">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -501,7 +553,7 @@
   <a href="#license-and-attribution" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        License and attribution
+        License and Attribution
       </span>
     </span>
   </a>
@@ -533,15 +585,15 @@
 <p align="center" style="font-size: 1.2em;"><strong>A simple sandbox for dangerous tools like coding agents</strong></p>
 
 <p><code>bulle</code> is an easy-to-use sandbox for running local commands while exposing only the essential parts of your machine. It allows you to run tools you don't fully trust, without handing over all your files or secrets, and with an option to deny network access. <code>bulle</code> sandboxes are especially helpful when running LLM coding agents or untrusted scripts.</p>
-<p>On macOS and Linux, you can spin up an agent with restricted permissions using this simple command:</p>
+<p>You can spin up an agent with restricted permissions using this simple command:</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>/path/to/project<span class="w"> </span>--profile<span class="w"> </span>claude
 </code></pre></div>
 <p>Sandboxes are not limited to agents. You can use <code>bulle</code> to run any command with custom permissions. See the <a href="#quick-start">Quick start</a> section and the <a href="cli-reference">CLI reference</a> for details.</p>
 <div class="admonition warning">
 <p class="admonition-title"><code>bulle</code> is still experimental. Please report bugs, comments, and feature requests <a href="https://github.com/vincentarelbundock/bulle">on GitHub</a>.</p>
 </div>
-<h2 id="risk-mitigation">Risk mitigation<a class="headerlink" href="#risk-mitigation" title="Permanent link">&para;</a></h2>
-<p><code>bulle</code> uses <a href="#how-it-works">Operating System-level sandboxing</a> to constrain a command's access to paths and environment variables. Like all sandboxing approaches, this strategy imposes trade-offs between convenience and safety. <code>bulle</code> will not solve all your security problems, but it can mitigate several major risks.</p>
+<h2 id="risk-mitigation">Risk Mitigation<a class="headerlink" href="#risk-mitigation" title="Permanent link">&para;</a></h2>
+<p><code>bulle</code> uses <a href="#os-level-sandboxing">Operating System-level sandboxing</a> to constrain a command's access to paths and environment variables. Like all sandboxing approaches, this strategy imposes trade-offs between convenience and safety. <code>bulle</code> will not solve all your security problems, but it can mitigate some important risks.</p>
 <div class="admonition success">
 <p class="admonition-title"><code>bulle</code> can mitigate risk when</p>
 <ul>
@@ -571,7 +623,7 @@
 <div class="language-sh highlight"><pre><span></span><code>brew<span class="w"> </span>install<span class="w"> </span>vincentarelbundock/tap/bulle
 </code></pre></div>
 <p>Or download a prebuilt <code>darwin</code>/<code>linux</code>, <code>amd64</code>/<code>arm64</code> archive from the <a href="https://github.com/vincentarelbundock/bulle/releases/latest">latest GitHub release</a>.</p>
-<h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
+<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
 <p>By default, <code>bulle</code> runs in the current directory. Access to any other location in the filesystem is denied unless you grant it explicitly. Commands cannot read files, execute programs, or inherit environment variables unless you allow them.</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--<span class="w"> </span>ls
 </code></pre></div>
@@ -579,7 +631,7 @@
 Grant an executable path with --rox/--rwx, choose a profile,
 or pass an explicit executable path after --
 </code></pre></div>
-<p>That error is intentional: even finding and executing <code>ls</code> requires permission. Grant an executable directory with <code>--rox</code> and <code>bulle</code> can find commands in it:</p>
+<p>That error is intentional: even finding and executing <code>ls</code> requires permission. Grant read-and-execute access to a directory with <code>--rox</code>, and <code>bulle</code> can find commands in it:</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--<span class="w"> </span>ls
 </code></pre></div>
 <p>Instead of specifying the path of every command manually, we can load <a href="#profiles">profiles</a>: named bundles of permissions for common tools. <code>bulle</code> ships with built-in profiles for several coding agents. For example, the first command below gives read-write access to the current directory, and launches Claude Code with minimal permissions:</p>
@@ -598,75 +650,108 @@ or pass an explicit executable path after --
 --rwx<span class="w"> </span>path<span class="w">       </span><span class="c1"># read-write plus execute</span>
 --no-workspace<span class="w">   </span><span class="c1"># do not automatically grant the workspace read-write access</span>
 </code></pre></div>
-<p>Advice: grant the narrowest paths that are practical. Use <code>--rw</code> or <code>--rwx</code> only for paths outside the workspace that the command should be allowed to modify. In profile definitions, <code>$WORKSPACE</code> refers to the workspace path. Fixed placeholders are <code>$HOME</code>, <code>$WORKSPACE</code>, <code>$TMP</code>, and <code>$TMPDIR</code>; custom path variables are not part of the config model.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Grant the narrowest paths that are practical. Use <code>--rw</code> or <code>--rwx</code> only for paths outside the workspace that the command should be allowed to modify.</p>
+</div>
 <h2 id="environment">Environment<a class="headerlink" href="#environment" title="Permanent link">&para;</a></h2>
 <p>Environment variables are also explicit. By default, <code>bulle</code> does not pass your shell environment into the sandbox. Use <code>--env NAME</code> to pass a variable from the parent environment, or <code>--env NAME=VALUE</code> to define one on the fly:</p>
-<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--env<span class="w"> </span>USER<span class="w"> </span>--<span class="w"> </span>/bin/echo<span class="w"> </span><span class="nv">$USER</span>
-bulle<span class="w"> </span>--rox<span class="w"> </span>/usr/bin/printenv<span class="w"> </span>--env<span class="w"> </span><span class="nv">HELLO</span><span class="o">=</span>WORLD<span class="w"> </span>--<span class="w"> </span>/usr/bin/printenv<span class="w"> </span>HELLO
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--rox<span class="w"> </span>/usr/bin<span class="w"> </span>--env<span class="w"> </span><span class="nv">HELLO</span><span class="o">=</span>WORLD<span class="w"> </span>--<span class="w"> </span>printenv<span class="w"> </span>HELLO
 </code></pre></div>
 <p>This is important for secrets. A command cannot read <code>OPENAI_API_KEY</code>, <code>GITHUB_TOKEN</code>, or similar variables unless you explicitly pass them.</p>
 <p>The summary and JSON views list environment variables by name only; neither view prints their values.</p>
+<h2 id="profiles">Profiles<a class="headerlink" href="#profiles" title="Permanent link">&para;</a></h2>
+<p>A profile is a named bundle of path, environment, network, and platform grants. It saves you from spelling out the same permissions every time you run a tool.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Profiles can grant broad filesystem, environment, network, and platform access. Use <code>--policy</code> to inspect the resolved permissions before running an unfamiliar profile or combining profiles.</p>
+</div>
+<h3 id="use">Use<a class="headerlink" href="#use" title="Permanent link">&para;</a></h3>
+<p>The simplest way to use <code>bulle</code> is to select a built-in agent profile. This will launch the Claude Code app with appropriate permissions and constraints:</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>claude
+</code></pre></div>
+<p>Without a profile or an explicit grant, <code>bulle</code> cannot find or execute anything, so command discovery fails before the sandbox starts:</p>
+<div class="language-text highlight"><pre><span></span><code>bulle -- ping google.com
+
+command not found before sandbox setup: &quot;ping&quot; is not on policy PATH, parent PATH, or executable roots. Add --env PATH with matching --rox/--rwx roots, add a --rox/--rwx root containing the command, choose a profile, or pass an explicit executable path after --
+</code></pre></div>
+<p>The built-in <code>tool</code> profile adds <code>PATH</code>, executable discovery, temporary directory access, runtime library access, and network access:</p>
+<div class="language-text highlight"><pre><span></span><code>bulle --profile tool -- ping google.com
+
+PING google.com (...): 56 data bytes
+64 bytes from ...
+</code></pre></div>
+<p>Comma-separated profiles merge from left to right. Adding <code>offline</code> after <code>tool</code> keeps the command setup but removes network access:</p>
+<div class="language-text highlight"><pre><span></span><code>bulle --profile tool,offline -- ping google.com
+
+ping: cannot resolve google.com: Unknown host
+</code></pre></div>
+<p>You can still add one-off permissions on top of a profile:</p>
+<div class="language-text highlight"><pre><span></span><code>bulle --profile claude --ro README.qmd --rw ~/Desktop --env GITHUB_TOKEN
+</code></pre></div>
+<h3 id="list">List<a class="headerlink" href="#list" title="Permanent link">&para;</a></h3>
+<p>Use <code>--list-profiles</code> to print available profiles:</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--list-profiles
+
+claude
+codex
+default
+keychain
+macos-certs
+macos-dns
+network
+offline
+opencode
+pi
+tool
+</code></pre></div>
+<p>Built-in helper profiles such as <code>default</code>, <code>network</code>, <code>offline</code>, <code>macos-dns</code>, <code>macos-certs</code>, and <code>keychain</code> are ordinary profiles that can be inherited directly or selected explicitly when you pass a command.</p>
+<h3 id="install_1">Install<a class="headerlink" href="#install_1" title="Permanent link">&para;</a></h3>
+<p>Install or override profiles with <code>--install-profiles SOURCE</code>. The source can be one <code>.toml</code> file, a directory containing <code>.toml</code> files, a local git repository, or a GitHub source such as <code>github:vincentarelbundock/bulle/custom_profiles</code>.</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--install-profiles<span class="w"> </span>agent.toml
+bulle<span class="w"> </span>--install-profiles<span class="w"> </span>./profiles
+bulle<span class="w"> </span>--install-profiles<span class="w"> </span>github:vincentarelbundock/bulle/custom_profiles
+</code></pre></div>
+<p>By default, profiles are installed under the operating system user config directory: usually <code>$XDG_CONFIG_HOME/bulle/profiles/</code> or <code>~/.config/bulle/profiles/</code> on Linux, and <code>~/Library/Application Support/bulle/profiles/</code> on macOS. Use <code>--config PATH</code> to install into a different config directory; <code>bulle</code> creates its <code>profiles/</code> subdirectory if needed. The filename becomes the profile name, so <code>profiles/agent.toml</code> is selected with <code>--profile agent</code>.</p>
+<p>When installing from a local git repository root or <code>github:owner/repo</code>, <code>bulle</code> uses <code>profiles/*.toml</code> if that directory exists. When a GitHub source includes a subdirectory, such as <code>github:owner/repo/custom_profiles</code>, that subdirectory is used as the profile source.</p>
+<h3 id="toml">TOML<a class="headerlink" href="#toml" title="Permanent link">&para;</a></h3>
+<p>Built-in and user profiles use the same one-profile TOML format. The filename is the profile name, and profile fields live at the top level of that file. This example shows all profile option groups:</p>
+<div class="language-toml highlight"><pre><span></span><code><span class="n">title</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;Agent&quot;</span>
+<span class="n">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;custom Codex profile&quot;</span>
+<span class="n">inherits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;tool&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;keychain&quot;</span><span class="p">]</span>
+<span class="n">default_app</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;codex&quot;</span>
+
+<span class="n">ro</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;README.md&quot;</span><span class="p">]</span>
+<span class="n">rox</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;/usr/bin&quot;</span><span class="p">]</span>
+<span class="n">rw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;$TMP/bulle/tmp&quot;</span><span class="p">]</span>
+<span class="n">rwx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;$HOME/.cache/example-agent&quot;</span><span class="p">]</span>
+
+<span class="n">env</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;HOME&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;USER&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;NODE_ENV=development&quot;</span><span class="p">]</span>
+<span class="n">allow</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;network&quot;</span><span class="p">]</span>
+<span class="n">deny</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[]</span>
+
+<span class="n">add_exec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<span class="n">add_libs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+
+<span class="k">[macos]</span>
+<span class="n">ro</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;$HOME/Library/Preferences&quot;</span><span class="p">]</span>
+<span class="n">mach_lookup</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;com.apple.trustd.agent&quot;</span><span class="p">]</span>
+<span class="n">deny_mach_lookup</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;com.apple.SystemConfiguration.configd&quot;</span><span class="p">]</span>
+
+<span class="k">[linux]</span>
+<span class="n">ro</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;$HOME/.config&quot;</span><span class="p">]</span>
+<span class="n">rox</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;/usr/bin&quot;</span><span class="p">]</span>
+</code></pre></div>
+<p>Available top-level options are <code>title</code>, <code>description</code>, <code>inherits</code>, <code>default_app</code>, path grants (<code>ro</code>, <code>rox</code>, <code>rw</code>, <code>rwx</code>), <code>env</code>, network settings (<code>allow</code>, <code>deny</code>), macOS Mach services (<code>mach_lookup</code>, <code>deny_mach_lookup</code>), executable discovery defaults (<code>add_exec</code>, <code>add_libs</code>), and platform tables (<code>[macos]</code>, <code>[linux]</code>). Only <code>title</code> and <code>description</code> are metadata fields.</p>
+<p>Path grants can use placeholders. <code>$WORKSPACE</code> refers to the workspace path. Fixed placeholders are <code>$HOME</code>, <code>$WORKSPACE</code>, <code>$TMP</code>, and <code>$TMPDIR</code>; custom path variables are not part of the config model.</p>
+<p><code>inherits</code> can be one profile name or an array of profile names. Parents are merged left to right and the child is applied last. Path grants merge by path and promote permissions, so <code>rox</code> plus <code>rw</code> for the same path becomes <code>rwx</code>. Environment entries merge by variable name with later values winning. Network and Mach allow/deny entries supersede by name.</p>
+<p><code>env</code> entries can be variable names copied from the parent environment or explicit <code>KEY=value</code> assignments. The only current network capability name is <code>network</code>, so <code>allow = ["network"]</code> enables network access and <code>deny = ["network"]</code> disables it.</p>
+<p>The <code>[macos]</code> and <code>[linux]</code> tables are applied only on that platform. They accept <code>default_app</code>, path grants, <code>env</code>, <code>allow</code>, <code>deny</code>, <code>mach_lookup</code>, <code>deny_mach_lookup</code>, <code>add_exec</code>, and <code>add_libs</code>. They do not accept profile metadata or <code>inherits</code>.</p>
 <h2 id="network">Network<a class="headerlink" href="#network" title="Permanent link">&para;</a></h2>
-<p>Network access is controlled by the <code>network</code> capability. The built-in <code>network</code> profile allows it, and the built-in <code>offline</code> profile denies it. On macOS, the <code>network</code> profile also inherits DNS and certificate service bundles that network clients normally need. Built-in agent profiles inherit network access for compatibility with package managers and remote services.</p>
-<p>There is no separate network flag. Use the <code>offline</code> profile directly, or compose it with another profile using a comma-separated profile list:</p>
+<p>Network access is controlled by profiles. The built-in <code>network</code> profile allows it, and the built-in <code>offline</code> profile denies it. On macOS, the <code>network</code> profile also inherits DNS and certificate service bundles that network clients normally need. Built-in agent profiles inherit network access for compatibility with package managers and remote services.</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>offline<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--<span class="w"> </span>/bin/ls
 bulle<span class="w"> </span>--profile<span class="w"> </span>codex,offline
 </code></pre></div>
-<p>Profiles can compose network access like any other capability, either on the command line or in config:</p>
-<div class="language-toml highlight"><pre><span></span><code><span class="k">[profiles.codex-offline]</span>
-<span class="n">inherits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;codex&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;offline&quot;</span><span class="p">]</span>
-
-<span class="k">[profiles.always-offline]</span>
-<span class="n">deny</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;network&quot;</span><span class="p">]</span>
-</code></pre></div>
-<p>Capability conflicts are resolved in merge order, so a later <code>deny = ["network"]</code> overrides an earlier <code>allow = ["network"]</code>. On macOS, denying network omits Seatbelt <code>network*</code>. On Linux, it installs a seccomp filter that denies socket-related system calls. This also blocks local Unix sockets. It cannot revoke access to an already-inherited standard input, output, or error file descriptor if one of those descriptors is connected to a socket.</p>
-<h2 id="profiles">Profiles<a class="headerlink" href="#profiles" title="Permanent link">&para;</a></h2>
-<p>Coding agents often need shells, package managers, language runtimes, caches, config files, and app storage. Profiles collect those repeated path, environment, capability, and platform grants in one named bundle.</p>
-<p>You can still add one-off permissions on top of a profile with the same path and environment flags:</p>
-<div class="language-sh highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>claude<span class="w"> </span>--ro<span class="w"> </span>README.qmd<span class="w"> </span>--rw<span class="w"> </span>~/Desktop<span class="w"> </span>--env<span class="w"> </span>GITHUB_TOKEN
-</code></pre></div>
-<p><code>--profile</code> accepts one profile name or a comma-separated list. Comma-separated profiles merge left to right, so <code>--profile codex,offline</code> applies <code>codex</code> and then lets <code>offline</code> override network-related grants.</p>
-<p><code>bulle</code> ships with embedded built-in profiles. Each built-in profile is stored as one profile file: the filename is the profile name, and profile fields live at the top level of that file. Profile metadata is intentionally small: only <code>title</code> and <code>description</code> are accepted, and they are used for CLI help text. There is no <code>category</code>, <code>hidden</code>, or <code>order</code> field; <code>bulle --list-profiles</code> omits the built-in <code>default</code> profile and prints the rest alphabetically.</p>
-<p>A built-in profile file can look like this:</p>
-<div class="language-toml highlight"><pre><span></span><code><span class="n">title</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;Tool&quot;</span>
-<span class="n">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;general local command support (PATH, executables, libs)&quot;</span>
-<span class="n">inherits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;network&quot;</span>
-<span class="n">rw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;$TMP/bulle/tmp&quot;</span><span class="p">]</span>
-<span class="n">env</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;PATH&quot;</span><span class="p">]</span>
-<span class="n">add_exec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<span class="n">add_libs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-</code></pre></div>
-<p>If <code>--profile</code> is omitted, <code>bulle</code> uses the built-in <code>default</code> profile. There is no <code>default_profile</code> setting. The built-in <code>default</code> profile inherits network access but grants no filesystem paths or environment variables; the workspace grant is still added separately unless <code>--no-workspace</code> is set.</p>
-<p>User configuration still lives in a single global <code>config.toml</code>. By default, <code>bulle</code> reads that file from the operating system user config directory under a <code>bulle</code> subdirectory: on Linux and other XDG systems this is usually <code>$XDG_CONFIG_HOME/bulle/config.toml</code> or <code>~/.config/bulle/config.toml</code>; on macOS it is usually <code>~/Library/Application Support/bulle/config.toml</code>. Use <code>--config PATH</code> to load a different global config file. <code>bulle</code> does not read project-local config files.</p>
-<p>Because a user config file can define several profiles, user profiles and overrides use <code>[profiles.&lt;name&gt;]</code> tables:</p>
-<div class="language-toml highlight"><pre><span></span><code><span class="k">[profiles.codex-offline]</span>
-<span class="n">inherits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;codex&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;offline&quot;</span><span class="p">]</span>
-
-<span class="k">[profiles.agent]</span>
-<span class="n">inherits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;tool&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;keychain&quot;</span><span class="p">]</span>
-<span class="n">default_app</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;codex&quot;</span>
-<span class="n">rwx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;$HOME/.cache/example-agent&quot;</span><span class="p">]</span>
-<span class="n">env</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;HOME&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;USER&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;TERM&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;LANG&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SHELL&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;OPENAI_API_KEY&quot;</span><span class="p">]</span>
-
-<span class="k">[profiles.agent.macos]</span>
-<span class="n">ro</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;$HOME/Library/Preferences&quot;</span><span class="p">]</span>
-</code></pre></div>
-<p>Profiles can inherit from one profile with <code>inherits = "tool"</code> or from several profiles with <code>inherits = ["base", "tool"]</code>. Parents are merged left to right and the child is applied last. Built-in helper profiles such as <code>network</code>, <code>offline</code>, <code>macos-dns</code>, <code>macos-certs</code>, and <code>keychain</code> are ordinary profiles that can be inherited directly or selected explicitly when you also pass a command.</p>
-<p>A profile can define:</p>
-<ul>
-<li><code>default_app</code>, used when no command is given after <code>--</code></li>
-<li>filesystem grants with <code>ro</code>, <code>rox</code>, <code>rw</code>, and <code>rwx</code></li>
-<li>environment entries with <code>env</code></li>
-<li>portable capability entries with <code>allow</code> and <code>deny</code>, currently only <code>network</code></li>
-<li>macOS Mach service entries with <code>mach_lookup</code> and <code>deny_mach_lookup</code></li>
-<li>platform-specific overrides under <code>[macos]</code> and <code>[linux]</code> in built-in profile files, or <code>[profiles.&lt;name&gt;.macos]</code> and <code>[profiles.&lt;name&gt;.linux]</code> in user config files</li>
-<li>executable discovery defaults with <code>add_exec</code> and <code>add_libs</code></li>
-</ul>
-<p>Path grants are merged by path and permissions are promoted rather than narrowed, so <code>rox</code> plus <code>rw</code> for the same path becomes <code>rwx</code>. Environment entries merge by variable name with later values winning. <code>mach_lookup</code> and <code>deny_mach_lookup</code> supersede by service name, <code>allow</code> and <code>deny</code> supersede by capability name, and explicit scalar or boolean settings in later profiles override earlier ones.</p>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>Some coding agents require relatively broad permissions to run. Use the <code>--policy</code> argument to see which rights are granted by a profile before using it.</p>
-</div>
 <h2 id="policy">Policy<a class="headerlink" href="#policy" title="Permanent link">&para;</a></h2>
 <p>Use <code>--policy</code> to inspect the resolved sandbox policy without running the command. By default, it prints the same human-readable permissions summary that <code>bulle</code> sends to supported LLM agent profiles at startup. This is a useful safety check before launching an agent or script, especially when combining profiles with extra filesystem or environment grants.</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>codex<span class="w"> </span>--policy
@@ -690,7 +775,7 @@ bulle<span class="w"> </span>--profile<span class="w"> </span>codex,offline
 <span class="p">}</span>
 </code></pre></div>
 <p>In the <code>--policy=json</code> example, <code>workspace_path</code> is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to <code>/home/user/Desktop</code>, shown in the <code>rw</code> array. The <code>command</code> field is the command that would be executed, and the <code>ro</code>, <code>rox</code>, <code>rw</code>, and <code>rwx</code> arrays show the readable, executable, writable, and writable-executable path grants. The <code>env_keys</code> array lists environment variables that would be passed into the sandbox. The <code>mach_lookup</code> array lists configured macOS Mach services. The <code>network</code> field shows the resolved network state. The <code>backend</code> value depends on your operating system.</p>
-<h2 id="executables-and-libraries">Executables and libraries<a class="headerlink" href="#executables-and-libraries" title="Permanent link">&para;</a></h2>
+<h2 id="executables-and-libraries">Executables and Libraries<a class="headerlink" href="#executables-and-libraries" title="Permanent link">&para;</a></h2>
 <p>For quick local commands, <code>--add-exec</code> can save you from spelling out executable grants by hand. It resolves the command before the sandbox starts and adds the executable to the policy:</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--add-exec<span class="w"> </span>--<span class="w"> </span>/bin/ls
 </code></pre></div>
@@ -699,13 +784,13 @@ bulle<span class="w"> </span>--profile<span class="w"> </span>codex,offline
 </code></pre></div>
 <p>These flags are conveniences for executables and runtime libraries. They do not add app state files, config directories, caches, secrets, or shell environment variables. Use profiles for agents and other tools that need a larger, repeatable policy.</p>
 <p>Profiles can enable these conveniences with <code>add_exec = true</code> and <code>add_libs = true</code>. Boolean settings inherit like other scalar profile settings: an explicit value in a later inherited profile or child profile overrides the earlier value.</p>
-<h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
-<p><code>bulle</code> builds a policy before the command starts. The policy is assembled from the workspace, selected profile, command-line flags, selected environment variables, network capability, executable discovery, and runtime library defaults. Paths are resolved before sandbox setup, and <code>--policy</code> prints the resulting policy without running the command.</p>
+<h2 id="os-level-sandboxing">OS-Level Sandboxing<a class="headerlink" href="#os-level-sandboxing" title="Permanent link">&para;</a></h2>
+<p><code>bulle</code> builds a policy before the command starts. The policy is assembled from the workspace, selected profile, command-line flags, selected environment variables, network profile settings, executable discovery, and runtime library defaults. Paths are resolved before sandbox setup, and <code>--policy</code> prints the resulting policy without running the command.</p>
 <h3 id="linux">Linux<a class="headerlink" href="#linux" title="Permanent link">&para;</a></h3>
-<p>On Linux, <code>bulle</code> applies the policy with <a href="https://docs.kernel.org/userspace-api/landlock.html">Landlock</a>. Landlock is a kernel feature, not a package to install; basic filesystem sandboxing requires Linux 5.13 or later with Landlock enabled. The Linux backend restricts filesystem access for the process and its children according to the resolved read, write, and execute grants. When the resolved network capability is denied, it also installs a seccomp filter before <code>exec</code> to deny socket-related system calls.</p>
+<p>On Linux, <code>bulle</code> applies the policy with <a href="https://docs.kernel.org/userspace-api/landlock.html">Landlock</a>. Landlock is a kernel feature, not a package to install; basic filesystem sandboxing requires Linux 5.13 or later with Landlock enabled. The Linux backend restricts filesystem access for the process and its children according to the resolved read, write, and execute grants. When the resolved network setting is denied, it also installs a seccomp filter before <code>exec</code> to deny socket-related system calls.</p>
 <h3 id="macos">macOS<a class="headerlink" href="#macos" title="Permanent link">&para;</a></h3>
 <p>On macOS, <code>bulle</code> generates a <a href="https://www.unix.com/man_page/osx/5/sandbox/">Seatbelt</a> profile and runs the command with <code>/usr/bin/sandbox-exec</code>. The macOS backend maps the same policy model to Seatbelt rules, including filesystem rules, optional network allowance, and selected Mach service access from configured <code>mach_lookup</code> entries. This is useful for local workflows, but its behavior is not identical to Linux Landlock.</p>
-<h2 id="license-and-attribution">License and attribution<a class="headerlink" href="#license-and-attribution" title="Permanent link">&para;</a></h2>
+<h2 id="license-and-attribution">License and Attribution<a class="headerlink" href="#license-and-attribution" title="Permanent link">&para;</a></h2>
 <p><code>bulle</code> is distributed under the MIT License. See <a href="LICENSES/bulle-MIT.txt">LICENSES/bulle-MIT.txt</a>.</p>
 <p>Thank you to <a href="https://github.com/Zouuup/landrun">Landrun</a>, an excellent, compact Go implementation of practical Landlock sandboxing. The Linux sandbox backend and filesystem permission model owe a clear debt to Landrun's design, and portions of the Linux backend and ELF dependency discovery are derived from or inspired by Landrun. See <a href="LICENSES/landrun-MIT.txt">LICENSES/landrun-MIT.txt</a> for the full third-party notice and license.</p>
 

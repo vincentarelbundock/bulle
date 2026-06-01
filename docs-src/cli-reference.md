@@ -1,11 +1,11 @@
 ---
-title: CLI reference
+title: CLI Reference
 description: Command-line reference for bulle.
 hide:
   - navigation
 ---
 
-# CLI reference
+# CLI Reference
 
 This page is generated from bulle --help.
 
@@ -38,14 +38,17 @@ Environment flags (no variables are passed unless requested):
   --env NAME=VALUE  set NAME to VALUE inside the sandbox
 
 Configuration:
-  --config PATH     path to a configuration file
+  --config PATH     path to a configuration directory
 
 Profiles:
   -p, --profile NAME
-                    named profile from the configuration file; comma-separated names merge left to right
+                    named profile, or comma-separated profiles merged left to right
   --list-profiles  list available profiles and exit
+  --install-profiles SOURCE
+                    install profile TOML files from a file, directory, local git repository, or GitHub source
   claude            Claude Code app state, config, and login support
   codex             Codex app state, config, network, MCP, and login support
+  default           default sandbox profile
   keychain          macOS Keychain file and service access
   macos-certs       macOS certificate trust service lookup
   macos-dns         macOS DNS and directory service lookups

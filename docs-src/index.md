@@ -12,7 +12,7 @@ hide:
 
 `bulle` is an easy-to-use sandbox for running local commands while exposing only the essential parts of your machine. It allows you to run tools you don't fully trust, without handing over all your files or secrets, and with an option to deny network access. `bulle` sandboxes are especially helpful when running LLM coding agents or untrusted scripts.
 
-On macOS and Linux, you can spin up an agent with restricted permissions using this simple command:
+You can spin up an agent with restricted permissions using this simple command:
 
 ```bash
 bulle /path/to/project --profile claude
@@ -22,9 +22,9 @@ Sandboxes are not limited to agents. You can use `bulle` to run any command with
 
 !!! warning "`bulle` is still experimental. Please report bugs, comments, and feature requests [on GitHub](https://github.com/vincentarelbundock/bulle)."
 
-## Risk mitigation
+## Risk Mitigation
 
-`bulle` uses [Operating System-level sandboxing](#how-it-works) to constrain a command's access to paths and environment variables. Like all sandboxing approaches, this strategy imposes trade-offs between convenience and safety. `bulle` will not solve all your security problems, but it can mitigate several major risks.
+`bulle` uses [Operating System-level sandboxing](#os-level-sandboxing) to constrain a command's access to paths and environment variables. Like all sandboxing approaches, this strategy imposes trade-offs between convenience and safety. `bulle` will not solve all your security problems, but it can mitigate some important risks.
 
 !!! success "`bulle` can mitigate risk when"
 
@@ -61,7 +61,7 @@ brew install vincentarelbundock/tap/bulle
 
 Or download a prebuilt `darwin`/`linux`, `amd64`/`arm64` archive from the [latest GitHub release](https://github.com/vincentarelbundock/bulle/releases/latest).
 
-## Quick start
+## Quick Start
 
 By default, `bulle` runs in the current directory. Access to any other location in the filesystem is denied unless you grant it explicitly. Commands cannot read files, execute programs, or inherit environment variables unless you allow them.
 
@@ -75,7 +75,7 @@ Grant an executable path with --rox/--rwx, choose a profile,
 or pass an explicit executable path after --
 ```
 
-That error is intentional: even finding and executing `ls` requires permission. Grant an executable directory with `--rox` and `bulle` can find commands in it:
+That error is intentional: even finding and executing `ls` requires permission. Grant read-and-execute access to a directory with `--rox`, and `bulle` can find commands in it:
 
 ```bash
 bulle --rox /bin -- ls
@@ -105,107 +105,155 @@ Additional filesystem access is explicit. Use these flags to add paths to the ac
 --no-workspace   # do not automatically grant the workspace read-write access
 ```
 
-Advice: grant the narrowest paths that are practical. Use `--rw` or `--rwx` only for paths outside the workspace that the command should be allowed to modify. In profile definitions, `$WORKSPACE` refers to the workspace path. Fixed placeholders are `$HOME`, `$WORKSPACE`, `$TMP`, and `$TMPDIR`; custom path variables are not part of the config model.
+!!! note
+
+    Grant the narrowest paths that are practical. Use `--rw` or `--rwx` only for paths outside the workspace that the command should be allowed to modify.
 
 ## Environment
 
 Environment variables are also explicit. By default, `bulle` does not pass your shell environment into the sandbox. Use `--env NAME` to pass a variable from the parent environment, or `--env NAME=VALUE` to define one on the fly:
 
 ```bash
-bulle --rox /bin --env USER -- /bin/echo $USER
-bulle --rox /usr/bin/printenv --env HELLO=WORLD -- /usr/bin/printenv HELLO
+bulle --rox /usr/bin --env HELLO=WORLD -- printenv HELLO
 ```
 
 This is important for secrets. A command cannot read `OPENAI_API_KEY`, `GITHUB_TOKEN`, or similar variables unless you explicitly pass them.
 
 The summary and JSON views list environment variables by name only; neither view prints their values.
 
+## Profiles
+
+A profile is a named bundle of path, environment, network, and platform grants. It saves you from spelling out the same permissions every time you run a tool.
+
+!!! warning
+
+    Profiles can grant broad filesystem, environment, network, and platform access. Use `--policy` to inspect the resolved permissions before running an unfamiliar profile or combining profiles.
+
+### Use
+
+The simplest way to use `bulle` is to select a built-in agent profile. This will launch the Claude Code app with appropriate permissions and constraints:
+
+```bash
+bulle --profile claude
+```
+
+Without a profile or an explicit grant, `bulle` cannot find or execute anything, so command discovery fails before the sandbox starts:
+
+```text
+bulle -- ping google.com
+
+command not found before sandbox setup: "ping" is not on policy PATH, parent PATH, or executable roots. Add --env PATH with matching --rox/--rwx roots, add a --rox/--rwx root containing the command, choose a profile, or pass an explicit executable path after --
+```
+
+The built-in `tool` profile adds `PATH`, executable discovery, temporary directory access, runtime library access, and network access:
+
+```text
+bulle --profile tool -- ping google.com
+
+PING google.com (...): 56 data bytes
+64 bytes from ...
+```
+
+Comma-separated profiles merge from left to right. Adding `offline` after `tool` keeps the command setup but removes network access:
+
+```text
+bulle --profile tool,offline -- ping google.com
+
+ping: cannot resolve google.com: Unknown host
+```
+
+You can still add one-off permissions on top of a profile:
+
+```text
+bulle --profile claude --ro README.qmd --rw ~/Desktop --env GITHUB_TOKEN
+```
+
+### List
+
+Use `--list-profiles` to print available profiles:
+
+```bash
+bulle --list-profiles
+
+claude
+codex
+default
+keychain
+macos-certs
+macos-dns
+network
+offline
+opencode
+pi
+tool
+```
+
+Built-in helper profiles such as `default`, `network`, `offline`, `macos-dns`, `macos-certs`, and `keychain` are ordinary profiles that can be inherited directly or selected explicitly when you pass a command.
+
+### Install
+
+Install or override profiles with `--install-profiles SOURCE`. The source can be one `.toml` file, a directory containing `.toml` files, a local git repository, or a GitHub source such as `github:vincentarelbundock/bulle/custom_profiles`.
+
+```bash
+bulle --install-profiles agent.toml
+bulle --install-profiles ./profiles
+bulle --install-profiles github:vincentarelbundock/bulle/custom_profiles
+```
+
+By default, profiles are installed under the operating system user config directory: usually `$XDG_CONFIG_HOME/bulle/profiles/` or `~/.config/bulle/profiles/` on Linux, and `~/Library/Application Support/bulle/profiles/` on macOS. Use `--config PATH` to install into a different config directory; `bulle` creates its `profiles/` subdirectory if needed. The filename becomes the profile name, so `profiles/agent.toml` is selected with `--profile agent`.
+
+When installing from a local git repository root or `github:owner/repo`, `bulle` uses `profiles/*.toml` if that directory exists. When a GitHub source includes a subdirectory, such as `github:owner/repo/custom_profiles`, that subdirectory is used as the profile source.
+
+### TOML
+
+Built-in and user profiles use the same one-profile TOML format. The filename is the profile name, and profile fields live at the top level of that file. This example shows all profile option groups:
+
+```toml
+title = "Agent"
+description = "custom Codex profile"
+inherits = ["tool", "keychain"]
+default_app = "codex"
+
+ro = ["README.md"]
+rox = ["/usr/bin"]
+rw = ["$TMP/bulle/tmp"]
+rwx = ["$HOME/.cache/example-agent"]
+
+env = ["HOME", "USER", "NODE_ENV=development"]
+allow = ["network"]
+deny = []
+
+add_exec = true
+add_libs = true
+
+[macos]
+ro = ["$HOME/Library/Preferences"]
+mach_lookup = ["com.apple.trustd.agent"]
+deny_mach_lookup = ["com.apple.SystemConfiguration.configd"]
+
+[linux]
+ro = ["$HOME/.config"]
+rox = ["/usr/bin"]
+```
+
+Available top-level options are `title`, `description`, `inherits`, `default_app`, path grants (`ro`, `rox`, `rw`, `rwx`), `env`, network settings (`allow`, `deny`), macOS Mach services (`mach_lookup`, `deny_mach_lookup`), executable discovery defaults (`add_exec`, `add_libs`), and platform tables (`[macos]`, `[linux]`). Only `title` and `description` are metadata fields.
+
+Path grants can use placeholders. `$WORKSPACE` refers to the workspace path. Fixed placeholders are `$HOME`, `$WORKSPACE`, `$TMP`, and `$TMPDIR`; custom path variables are not part of the config model.
+
+`inherits` can be one profile name or an array of profile names. Parents are merged left to right and the child is applied last. Path grants merge by path and promote permissions, so `rox` plus `rw` for the same path becomes `rwx`. Environment entries merge by variable name with later values winning. Network and Mach allow/deny entries supersede by name.
+
+`env` entries can be variable names copied from the parent environment or explicit `KEY=value` assignments. The only current network capability name is `network`, so `allow = ["network"]` enables network access and `deny = ["network"]` disables it.
+
+The `[macos]` and `[linux]` tables are applied only on that platform. They accept `default_app`, path grants, `env`, `allow`, `deny`, `mach_lookup`, `deny_mach_lookup`, `add_exec`, and `add_libs`. They do not accept profile metadata or `inherits`.
+
 ## Network
 
-Network access is controlled by the `network` capability. The built-in `network` profile allows it, and the built-in `offline` profile denies it. On macOS, the `network` profile also inherits DNS and certificate service bundles that network clients normally need. Built-in agent profiles inherit network access for compatibility with package managers and remote services.
-
-There is no separate network flag. Use the `offline` profile directly, or compose it with another profile using a comma-separated profile list:
+Network access is controlled by profiles. The built-in `network` profile allows it, and the built-in `offline` profile denies it. On macOS, the `network` profile also inherits DNS and certificate service bundles that network clients normally need. Built-in agent profiles inherit network access for compatibility with package managers and remote services.
 
 ```bash
 bulle --profile offline --rox /bin -- /bin/ls
 bulle --profile codex,offline
 ```
-
-Profiles can compose network access like any other capability, either on the command line or in config:
-
-```toml
-[profiles.codex-offline]
-inherits = ["codex", "offline"]
-
-[profiles.always-offline]
-deny = ["network"]
-```
-
-Capability conflicts are resolved in merge order, so a later `deny = ["network"]` overrides an earlier `allow = ["network"]`. On macOS, denying network omits Seatbelt `network*`. On Linux, it installs a seccomp filter that denies socket-related system calls. This also blocks local Unix sockets. It cannot revoke access to an already-inherited standard input, output, or error file descriptor if one of those descriptors is connected to a socket.
-
-## Profiles
-
-Coding agents often need shells, package managers, language runtimes, caches, config files, and app storage. Profiles collect those repeated path, environment, capability, and platform grants in one named bundle.
-
-You can still add one-off permissions on top of a profile with the same path and environment flags:
-
-```sh
-bulle --profile claude --ro README.qmd --rw ~/Desktop --env GITHUB_TOKEN
-```
-
-`--profile` accepts one profile name or a comma-separated list. Comma-separated profiles merge left to right, so `--profile codex,offline` applies `codex` and then lets `offline` override network-related grants.
-
-`bulle` ships with embedded built-in profiles. Each built-in profile is stored as one profile file: the filename is the profile name, and profile fields live at the top level of that file. Profile metadata is intentionally small: only `title` and `description` are accepted, and they are used for CLI help text. There is no `category`, `hidden`, or `order` field; `bulle --list-profiles` omits the built-in `default` profile and prints the rest alphabetically.
-
-A built-in profile file can look like this:
-
-```toml
-title = "Tool"
-description = "general local command support (PATH, executables, libs)"
-inherits = "network"
-rw = ["$TMP/bulle/tmp"]
-env = ["PATH"]
-add_exec = true
-add_libs = true
-```
-
-If `--profile` is omitted, `bulle` uses the built-in `default` profile. There is no `default_profile` setting. The built-in `default` profile inherits network access but grants no filesystem paths or environment variables; the workspace grant is still added separately unless `--no-workspace` is set.
-
-User configuration still lives in a single global `config.toml`. By default, `bulle` reads that file from the operating system user config directory under a `bulle` subdirectory: on Linux and other XDG systems this is usually `$XDG_CONFIG_HOME/bulle/config.toml` or `~/.config/bulle/config.toml`; on macOS it is usually `~/Library/Application Support/bulle/config.toml`. Use `--config PATH` to load a different global config file. `bulle` does not read project-local config files.
-
-Because a user config file can define several profiles, user profiles and overrides use `[profiles.<name>]` tables:
-
-```toml
-[profiles.codex-offline]
-inherits = ["codex", "offline"]
-
-[profiles.agent]
-inherits = ["tool", "keychain"]
-default_app = "codex"
-rwx = ["$HOME/.cache/example-agent"]
-env = ["HOME", "USER", "TERM", "LANG", "SHELL", "OPENAI_API_KEY"]
-
-[profiles.agent.macos]
-ro = ["$HOME/Library/Preferences"]
-```
-
-Profiles can inherit from one profile with `inherits = "tool"` or from several profiles with `inherits = ["base", "tool"]`. Parents are merged left to right and the child is applied last. Built-in helper profiles such as `network`, `offline`, `macos-dns`, `macos-certs`, and `keychain` are ordinary profiles that can be inherited directly or selected explicitly when you also pass a command.
-
-A profile can define:
-
-- `default_app`, used when no command is given after `--`
-- filesystem grants with `ro`, `rox`, `rw`, and `rwx`
-- environment entries with `env`
-- portable capability entries with `allow` and `deny`, currently only `network`
-- macOS Mach service entries with `mach_lookup` and `deny_mach_lookup`
-- platform-specific overrides under `[macos]` and `[linux]` in built-in profile files, or `[profiles.<name>.macos]` and `[profiles.<name>.linux]` in user config files
-- executable discovery defaults with `add_exec` and `add_libs`
-
-Path grants are merged by path and permissions are promoted rather than narrowed, so `rox` plus `rw` for the same path becomes `rwx`. Environment entries merge by variable name with later values winning. `mach_lookup` and `deny_mach_lookup` supersede by service name, `allow` and `deny` supersede by capability name, and explicit scalar or boolean settings in later profiles override earlier ones.
-
-!!! warning
-
-    Some coding agents require relatively broad permissions to run. Use the `--policy` argument to see which rights are granted by a profile before using it.
 
 ## Policy
 
@@ -240,7 +288,7 @@ bulle --policy=json ~/Desktop --rox /bin -- /bin/ls
 
 In the `--policy=json` example, `workspace_path` is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to `/home/user/Desktop`, shown in the `rw` array. The `command` field is the command that would be executed, and the `ro`, `rox`, `rw`, and `rwx` arrays show the readable, executable, writable, and writable-executable path grants. The `env_keys` array lists environment variables that would be passed into the sandbox. The `mach_lookup` array lists configured macOS Mach services. The `network` field shows the resolved network state. The `backend` value depends on your operating system.
 
-## Executables and libraries
+## Executables and Libraries
 
 For quick local commands, `--add-exec` can save you from spelling out executable grants by hand. It resolves the command before the sandbox starts and adds the executable to the policy:
 
@@ -258,19 +306,19 @@ These flags are conveniences for executables and runtime libraries. They do not 
 
 Profiles can enable these conveniences with `add_exec = true` and `add_libs = true`. Boolean settings inherit like other scalar profile settings: an explicit value in a later inherited profile or child profile overrides the earlier value.
 
-## How it works
+## OS-Level Sandboxing
 
-`bulle` builds a policy before the command starts. The policy is assembled from the workspace, selected profile, command-line flags, selected environment variables, network capability, executable discovery, and runtime library defaults. Paths are resolved before sandbox setup, and `--policy` prints the resulting policy without running the command.
+`bulle` builds a policy before the command starts. The policy is assembled from the workspace, selected profile, command-line flags, selected environment variables, network profile settings, executable discovery, and runtime library defaults. Paths are resolved before sandbox setup, and `--policy` prints the resulting policy without running the command.
 
 ### Linux
 
-On Linux, `bulle` applies the policy with [Landlock](https://docs.kernel.org/userspace-api/landlock.html). Landlock is a kernel feature, not a package to install; basic filesystem sandboxing requires Linux 5.13 or later with Landlock enabled. The Linux backend restricts filesystem access for the process and its children according to the resolved read, write, and execute grants. When the resolved network capability is denied, it also installs a seccomp filter before `exec` to deny socket-related system calls.
+On Linux, `bulle` applies the policy with [Landlock](https://docs.kernel.org/userspace-api/landlock.html). Landlock is a kernel feature, not a package to install; basic filesystem sandboxing requires Linux 5.13 or later with Landlock enabled. The Linux backend restricts filesystem access for the process and its children according to the resolved read, write, and execute grants. When the resolved network setting is denied, it also installs a seccomp filter before `exec` to deny socket-related system calls.
 
 ### macOS
 
 On macOS, `bulle` generates a [Seatbelt](https://www.unix.com/man_page/osx/5/sandbox/) profile and runs the command with `/usr/bin/sandbox-exec`. The macOS backend maps the same policy model to Seatbelt rules, including filesystem rules, optional network allowance, and selected Mach service access from configured `mach_lookup` entries. This is useful for local workflows, but its behavior is not identical to Linux Landlock.
 
-## License and attribution
+## License and Attribution
 
 `bulle` is distributed under the MIT License. See [LICENSES/bulle-MIT.txt](LICENSES/bulle-MIT.txt).
 

@@ -110,6 +110,16 @@ func TestParseListProfilesFlag(t *testing.T) {
 	}
 }
 
+func TestParseInstallProfilesFlag(t *testing.T) {
+	opts, err := Parse([]string{"bulle", "--install-profiles", "profiles"})
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if opts.InstallProfiles != "profiles" {
+		t.Fatalf("InstallProfiles = %q, want profiles", opts.InstallProfiles)
+	}
+}
+
 func TestParseNoWorkspaceFlag(t *testing.T) {
 	opts, err := Parse([]string{"bulle", "--no-workspace", "--", "codex"})
 	if err != nil {
@@ -166,7 +176,7 @@ func TestParseDefaultsProjectPathToCurrentDirectory(t *testing.T) {
 	}
 }
 
-func TestProfileNamesSortsAlphabeticallyAndOmitsDefault(t *testing.T) {
+func TestProfileNamesSortsAlphabetically(t *testing.T) {
 	cfg := config.Config{
 		Profiles: map[string]config.Profile{
 			"default":  {},
@@ -179,7 +189,7 @@ func TestProfileNamesSortsAlphabeticallyAndOmitsDefault(t *testing.T) {
 	}
 
 	got := ProfileNames(cfg)
-	want := []string{"custom-a", "custom-b", "early", "hidden", "late"}
+	want := []string{"custom-a", "custom-b", "default", "early", "hidden", "late"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ProfileNames = %#v, want %#v", got, want)
 	}
@@ -200,6 +210,9 @@ func TestUsageShowsProfileShortFlag(t *testing.T) {
 	}
 	if !strings.Contains(Usage(), "--list-profiles") {
 		t.Fatalf("Usage() does not show --list-profiles:\n%s", Usage())
+	}
+	if !strings.Contains(Usage(), "--install-profiles SOURCE") {
+		t.Fatalf("Usage() does not show --install-profiles:\n%s", Usage())
 	}
 	if !strings.Contains(Usage(), "--policy[=summary|json]") {
 		t.Fatalf("Usage() does not show policy formats:\n%s", Usage())

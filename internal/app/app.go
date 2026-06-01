@@ -57,6 +57,21 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return ExitConfigError
 	}
+	if opts.InstallProfiles != "" {
+		root := opts.Config
+		if root == "" {
+			root = defaultConfigRoot()
+		}
+		if root == "" {
+			fmt.Fprintln(stderr, "could not determine user config directory")
+			return ExitConfigError
+		}
+		if err := installProfiles(opts.InstallProfiles, root, stdout); err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitConfigError
+		}
+		return ExitOK
+	}
 	global, err := loadConfig(opts)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -139,13 +154,13 @@ func loadConfig(opts cli.Options) (config.Config, error) {
 		return config.Config{}, err
 	}
 	if opts.Config != "" {
-		loaded, err := config.LoadFile(opts.Config)
+		loaded, err := config.LoadProfileDirectory(filepath.Join(opts.Config, "profiles"))
 		if err != nil {
 			return config.Config{}, err
 		}
 		global = config.MergeConfigs(global, loaded)
-	} else if path := defaultConfigPath(); path != "" {
-		if loaded, err := config.LoadFile(path); err == nil {
+	} else if root := defaultConfigRoot(); root != "" {
+		if loaded, err := config.LoadProfileDirectory(filepath.Join(root, "profiles")); err == nil {
 			global = config.MergeConfigs(global, loaded)
 		} else if !os.IsNotExist(err) {
 			return config.Config{}, err
@@ -169,12 +184,12 @@ func policySummaryProfileName(opts cli.Options) string {
 	return "default"
 }
 
-func defaultConfigPath() string {
+func defaultConfigRoot() string {
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(dir, "bulle", "config.toml")
+	return filepath.Join(dir, "bulle")
 }
 
 func parentEnv() map[string]string {

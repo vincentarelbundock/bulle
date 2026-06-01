@@ -57,8 +57,9 @@ type runCLI struct {
 }
 
 type Flags struct {
-	Profile string `name:"profile" short:"p" placeholder:"NAME" help:"Named profile, or comma-separated profiles merged left to right."`
-	Config  string `name:"config" placeholder:"PATH" help:"Path to a configuration file."`
+	Profile         string `name:"profile" short:"p" placeholder:"NAME" help:"Named profile, or comma-separated profiles merged left to right."`
+	Config          string `name:"config" placeholder:"PATH" help:"Path to a configuration directory."`
+	InstallProfiles string `name:"install-profiles" placeholder:"SOURCE" help:"Install profile TOML files from a file, directory, local git repository, or GitHub source."`
 
 	ReadOnly      []string `name:"ro" placeholder:"PATH" help:"Grant read-only access."`
 	ReadOnlyExec  []string `name:"rox" placeholder:"PATH" help:"Grant read-only access plus execute."`

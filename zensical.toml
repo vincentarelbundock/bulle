@@ -9,10 +9,11 @@ docs_dir = "docs-src"
 site_dir = "docs"
 use_directory_urls = false
 copyright = "bulle is distributed under the MIT License."
+extra_css = ["assets/toc.css"]
 nav = [
   { "Install" = "index.html#install" },
-  { "Quick start" = "index.html#quick-start" },
-  { "CLI reference" = "cli-reference.md" },
+  { "Quick Start" = "index.html#quick-start" },
+  { "CLI Reference" = "cli-reference.md" },
 ]
 [project.theme]
 custom_dir = "docs-src/overrides"
@@ -42,6 +43,7 @@ toggle.name = "Switch to light mode"
 [project.markdown_extensions.pymdownx.details]
 [project.markdown_extensions.toc]
 permalink = true
+toc_depth = "2-3"
 [project.markdown_extensions.pymdownx.highlight]
 pygments_lang_class = true
 [project.markdown_extensions.pymdownx.superfences]

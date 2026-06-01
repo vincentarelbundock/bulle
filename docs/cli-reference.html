@@ -27,7 +27,7 @@
     
     
       
-        <title>CLI reference - </title>
+        <title>CLI Reference - </title>
       
     
     
@@ -58,6 +58,8 @@
       
     
     
+      <link rel="stylesheet" href="./assets/toc.css">
+    
     <script>__md_scope=new URL(".",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
     
       
@@ -82,8 +84,7 @@
     <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
     <div data-md-component="skip">
       
-        
-        <a href="#cli-reference" class="md-skip">
+        <a href="#__skip" class="md-skip">
           Skip to content
         </a>
       
@@ -118,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              CLI reference
+              CLI Reference
             
           </span>
         </div>
@@ -131,11 +132,11 @@
         </a>
       
         <a href="./index.html#quick-start" style="color: inherit; opacity: 0.9; text-decoration: none; white-space: nowrap;">
-          Quick start
+          Quick Start
         </a>
       
         <a href="cli-reference.html" style="color: inherit; opacity: 0.9; text-decoration: none; white-space: nowrap;">
-          CLI reference
+          CLI Reference
         </a>
       
     </div>
@@ -285,7 +286,7 @@
   <span class="md-ellipsis">
     
   
-  Quick start
+  Quick Start
 
     
   </span>
@@ -310,8 +311,6 @@
       
       
       
-        
-      
       
       <a href="cli-reference.html" class="md-nav__link md-nav__link--active">
         
@@ -320,7 +319,7 @@
   <span class="md-ellipsis">
     
   
-  CLI reference
+  CLI Reference
 
     
   </span>
@@ -349,8 +348,6 @@
                     
                     
                     
-                      
-                    
                     
                   
                   <div class="md-sidebar__inner">
@@ -360,8 +357,6 @@
 <nav class="md-nav md-nav--secondary" aria-label="On this page">
   
   
-  
-    
   
   
 </nav>
@@ -380,7 +375,7 @@
   
 
 
-<h1 id="cli-reference">CLI reference<a class="headerlink" href="#cli-reference" title="Permanent link">&para;</a></h1>
+<h1 id="cli-reference">CLI Reference<a class="headerlink" href="#cli-reference" title="Permanent link">&para;</a></h1>
 <p>This page is generated from bulle --help.</p>
 <div class="language-text highlight"><pre><span></span><code>bulle runs local coding agents inside a controlled workspace.
 
@@ -410,14 +405,17 @@ Environment flags (no variables are passed unless requested):
   --env NAME=VALUE  set NAME to VALUE inside the sandbox
 
 Configuration:
-  --config PATH     path to a configuration file
+  --config PATH     path to a configuration directory
 
 Profiles:
   -p, --profile NAME
-                    named profile from the configuration file; comma-separated names merge left to right
+                    named profile, or comma-separated profiles merged left to right
   --list-profiles  list available profiles and exit
+  --install-profiles SOURCE
+                    install profile TOML files from a file, directory, local git repository, or GitHub source
   claude            Claude Code app state, config, and login support
   codex             Codex app state, config, network, MCP, and login support
+  default           default sandbox profile
   keychain          macOS Keychain file and service access
   macos-certs       macOS certificate trust service lookup
   macos-dns         macOS DNS and directory service lookups

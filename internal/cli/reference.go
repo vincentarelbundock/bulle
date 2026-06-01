@@ -10,13 +10,13 @@ import (
 func ReferenceMarkdown() string {
 	body := strings.TrimRight(Usage(), "\n")
 	return fmt.Sprintf(`---
-title: CLI reference
+title: CLI Reference
 description: Command-line reference for bulle.
 hide:
   - navigation
 ---
 
-# CLI reference
+# CLI Reference
 
 This page is generated from bulle --help.
 

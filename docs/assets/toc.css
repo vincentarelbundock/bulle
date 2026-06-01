@@ -1,0 +1,8 @@
+.md-sidebar--secondary .md-nav__item > .md-nav {
+  display: none;
+}
+
+.md-sidebar--secondary .md-nav__item:has(> .md-nav__link--active) > .md-nav,
+.md-sidebar--secondary .md-nav__item:has(.md-nav__link--active) > .md-nav {
+  display: block;
+}

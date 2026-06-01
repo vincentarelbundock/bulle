@@ -2,6 +2,8 @@ package config
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
@@ -356,6 +358,56 @@ env = ["PATH"]
 `)},
 	})
 	if err == nil || !strings.Contains(err.Error(), "profiles/tool.toml") {
+		t.Fatalf("error = %v, want nested profile table rejection", err)
+	}
+}
+
+func TestLoadProfileDirectoryReadsSingleProfileFiles(t *testing.T) {
+	root := t.TempDir()
+	profileDir := filepath.Join(root, "profiles")
+	if err := os.MkdirAll(profileDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(profileDir, "agent.toml"), []byte(`title = "Agent"
+description = "custom agent"
+inherits = "tool"
+default_app = "agent"
+env = ["PATH"]
+
+[macos]
+ro = ["$HOME/Library/Preferences"]
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadProfileDirectory(profileDir)
+	if err != nil {
+		t.Fatalf("LoadProfileDirectory returned error: %v", err)
+	}
+	meta := cfg.ProfileMetadata["agent"]
+	if meta.Title != "Agent" || meta.Description != "custom agent" {
+		t.Fatalf("metadata = %#v", meta)
+	}
+	profile := cfg.Profiles["agent"]
+	if profile.DefaultApp != "agent" || !reflect.DeepEqual(profile.Inherits.Names, []string{"tool"}) || !contains(profile.Env, "PATH") || !contains(profile.MacOS.ReadOnly, "$HOME/Library/Preferences") {
+		t.Fatalf("profile = %#v", profile)
+	}
+}
+
+func TestLoadProfileDirectoryRejectsNestedProfileTables(t *testing.T) {
+	root := t.TempDir()
+	profileDir := filepath.Join(root, "profiles")
+	if err := os.MkdirAll(profileDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(profileDir, "agent.toml"), []byte(`[profiles.agent]
+env = ["PATH"]
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadProfileDirectory(profileDir)
+	if err == nil || !strings.Contains(err.Error(), "agent.toml") {
 		t.Fatalf("error = %v, want nested profile table rejection", err)
 	}
 }

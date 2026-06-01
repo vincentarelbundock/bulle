@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	pathpkg "path"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -150,6 +152,22 @@ func LoadFile(path string) (Config, error) {
 	return LoadBytes(data)
 }
 
+func LoadProfileFile(path string) (string, Profile, ProfileMetadata, error) {
+	name, profile, metadata, err := loadProfileFragment(os.DirFS(filepath.Dir(path)), filepath.Base(path))
+	if err != nil {
+		return "", Profile{}, ProfileMetadata{}, err
+	}
+	return name, profile, metadata, nil
+}
+
+func LoadProfileDirectory(path string) (Config, error) {
+	cfg := withConfigDefaults(Config{})
+	if err := loadProfileFragmentsInto(&cfg, os.DirFS(path), ".", "profile directory"); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
+}
+
 //go:embed defaults.toml profiles/*.toml
 var defaultConfigFS embed.FS
 
@@ -181,40 +199,51 @@ func loadDefaultConfigFromFS(fsys fs.FS) (Config, error) {
 		cfg.ProfileMetadata = map[string]ProfileMetadata{}
 	}
 
-	entries, err := fs.ReadDir(fsys, "profiles")
-	if err != nil {
+	if err := loadProfileFragmentsInto(&cfg, fsys, "profiles", "embedded profile"); err != nil {
 		return Config{}, err
-	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			return Config{}, fmt.Errorf("embedded profile %s is a directory", entry.Name())
-		}
-		path := "profiles/" + entry.Name()
-		name, profile, metadata, err := loadProfileFragment(fsys, path)
-		if err != nil {
-			return Config{}, err
-		}
-		if _, exists := cfg.Profiles[name]; exists {
-			return Config{}, fmt.Errorf("embedded profile %s defines duplicate profile %q", path, name)
-		}
-		cfg.Profiles[name] = profile
-		cfg.ProfileMetadata[name] = metadata
 	}
 	return withConfigDefaults(cfg), nil
 }
 
-func loadProfileFragment(fsys fs.FS, path string) (string, Profile, ProfileMetadata, error) {
-	wantName, ok := strings.CutSuffix(strings.TrimPrefix(path, "profiles/"), ".toml")
-	if !ok || wantName == "" || strings.Contains(wantName, "/") {
-		return "", Profile{}, ProfileMetadata{}, fmt.Errorf("embedded profile %s must be a profiles/<name>.toml file", path)
+func loadProfileFragmentsInto(cfg *Config, fsys fs.FS, dir string, source string) error {
+	entries, err := fs.ReadDir(fsys, dir)
+	if err != nil {
+		return err
 	}
-	data, err := fs.ReadFile(fsys, path)
+	for _, entry := range entries {
+		profilePath := entry.Name()
+		if dir != "." {
+			profilePath = dir + "/" + entry.Name()
+		}
+		if entry.IsDir() {
+			return fmt.Errorf("%s %s is a directory", source, profilePath)
+		}
+		name, profile, metadata, err := loadProfileFragment(fsys, profilePath)
+		if err != nil {
+			return err
+		}
+		if _, exists := cfg.Profiles[name]; exists {
+			return fmt.Errorf("%s %s defines duplicate profile %q", source, profilePath, name)
+		}
+		cfg.Profiles[name] = profile
+		cfg.ProfileMetadata[name] = metadata
+	}
+	return nil
+}
+
+func loadProfileFragment(fsys fs.FS, profilePath string) (string, Profile, ProfileMetadata, error) {
+	base := pathpkg.Base(profilePath)
+	wantName, ok := strings.CutSuffix(base, ".toml")
+	if !ok || wantName == "" || strings.Contains(wantName, "/") {
+		return "", Profile{}, ProfileMetadata{}, fmt.Errorf("profile %s must be a <name>.toml file", profilePath)
+	}
+	data, err := fs.ReadFile(fsys, profilePath)
 	if err != nil {
 		return "", Profile{}, ProfileMetadata{}, err
 	}
 	profileFile, err := decodeProfileFile(data)
 	if err != nil {
-		return "", Profile{}, ProfileMetadata{}, fmt.Errorf("load %s: %w", path, err)
+		return "", Profile{}, ProfileMetadata{}, fmt.Errorf("load %s: %w", profilePath, err)
 	}
 	return wantName, profileFile.Profile, profileFile.ProfileMetadata, nil
 }
