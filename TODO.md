@@ -8,12 +8,6 @@
   - Show why each grant exists: workspace, CLI flag, profile, inherited profile, platform runtime root, `--add-exec`, or `--add-libs`.
   - Include environment variables by name only, not value.
 
-- [ ] Add profile management commands.
-  - `bulle profiles list`
-  - `bulle profiles show NAME`
-  - `bulle config path`
-  - `bulle init` to write a starter user config.
-
 - [ ] Add ephemeral state support.
   - Provide a mode such as `--ephemeral-home` or `--scratch-profile-state`.
   - Run agents with temporary writable state instead of real app config/cache directories.
@@ -33,7 +27,7 @@
 
 ## Supporting work
 
-- [ ] Add cross-platform CI coverage.
+- [x] Add cross-platform CI coverage.
   - Keep Linux release tests on Ubuntu.
   - Add macOS tests for Seatbelt behavior where GitHub-hosted runners support it.
 
