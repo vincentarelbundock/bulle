@@ -3,6 +3,7 @@ package cli
 type Options struct {
 	Flags
 
-	ProjectPath string
-	Command     []string
+	ProjectPath  string
+	Command      []string
+	PolicyFormat string
 }

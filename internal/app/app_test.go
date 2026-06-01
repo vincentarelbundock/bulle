@@ -31,7 +31,7 @@ func TestRunDefaultsWorkspacePathToCurrentDirectory(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"bulle", "--profile", "tool", "--policy", "--", "echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--profile", "tool", "--policy=json", "--", "echo", "hi"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -58,7 +58,7 @@ func TestRunAddExecWithoutProjectGrantsCurrentDirectory(t *testing.T) {
 		}
 	}()
 
-	code := Run([]string{"bulle", "--add-exec", "--policy", "--", "/bin/echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--add-exec", "--policy=json", "--", "/bin/echo", "hi"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -271,7 +271,7 @@ default_profile = "tool"
 		t.Fatal(err)
 	}
 
-	code := Run([]string{"bulle", "--config", cfg, tmp, "--policy"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--config", cfg, tmp, "--policy=json"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -298,7 +298,7 @@ default_app = "echo profile"
 		t.Fatal(err)
 	}
 
-	code := Run([]string{"bulle", "--config", cfg, "--profile", "agent", tmp, "--policy"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--config", cfg, "--profile", "agent", tmp, "--policy=json"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -320,7 +320,7 @@ default_profile = "tool"
 		t.Fatal(err)
 	}
 
-	code := Run([]string{"bulle", "--config", cfg, tmp, "--policy"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--config", cfg, tmp, "--policy=json"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -342,7 +342,7 @@ default_profile = "tool"
 		t.Fatal(err)
 	}
 
-	code := Run([]string{"bulle", "--config", cfg, tmp, "--policy"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--config", cfg, tmp, "--policy=json"}, &stdout, &stderr)
 
 	if code != ExitConfigError {
 		t.Fatalf("exit code = %d, want %d; stdout = %s; stderr = %s", code, ExitConfigError, stdout.String(), stderr.String())
@@ -374,12 +374,12 @@ func TestRunIgnoresProjectConfig(t *testing.T) {
 	}
 }
 
-func TestRunPolicyPrintsResolvedPolicy(t *testing.T) {
+func TestRunPolicyJSONPrintsResolvedPolicy(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
 
-	code := Run([]string{"bulle", "--profile", "tool", tmp, "--policy", "--", "echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--profile", "tool", tmp, "--policy=json", "--", "echo", "hi"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -398,12 +398,52 @@ func TestRunPolicyPrintsResolvedPolicy(t *testing.T) {
 	}
 }
 
+func TestRunPolicyPrintsHumanReadableSummaryByDefault(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	tmp := t.TempDir()
+
+	code := Run([]string{
+		"bulle",
+		"--profile", "tool",
+		"--env", "BULLE_TEST_SECRET=super-secret-value",
+		tmp,
+		"--policy",
+		"--", "/bin/echo", "hi",
+	}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte(`bulle profile "tool" permissions:`)) {
+		t.Fatalf("stdout = %s", stdout.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte("  filesystem:\n")) {
+		t.Fatalf("stdout missing filesystem section: %s", stdout.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte("  environment: BULLE_TEST_SECRET, BUN_TMPDIR, PATH, TEMP, TMP, TMPDIR\n")) {
+		t.Fatalf("stdout missing environment summary: %s", stdout.String())
+	}
+	if bytes.Contains(stdout.Bytes(), []byte("super-secret-value")) {
+		t.Fatalf("stdout leaked secret value: %s", stdout.String())
+	}
+	if bytes.Contains(stdout.Bytes(), []byte(`"workspace_path"`)) {
+		t.Fatalf("stdout contains JSON policy: %s", stdout.String())
+	}
+	if bytes.Contains(stdout.Bytes(), []byte("\nhi\n")) {
+		t.Fatalf("stdout contains command output: %s", stdout.String())
+	}
+	if stderr.String() != "" {
+		t.Fatalf("stderr = %s", stderr.String())
+	}
+}
+
 func TestRunPolicyIncludesNoNetwork(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
 
-	code := Run([]string{"bulle", "--profile", "tool", "--no-network", tmp, "--policy", "--", "echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--profile", "tool", "--no-network", tmp, "--policy=json", "--", "echo", "hi"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -428,7 +468,7 @@ func TestRunPolicyIncludesLinuxLibraryDepsWhenAddLibsIsSet(t *testing.T) {
 		t.Skip("/usr/bin/true has no discoverable ELF dependencies")
 	}
 
-	code := Run([]string{"bulle", "--add-exec", "--add-libs", tmp, "--policy", "--", "/usr/bin/true"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--add-exec", "--add-libs", tmp, "--policy=json", "--", "/usr/bin/true"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
