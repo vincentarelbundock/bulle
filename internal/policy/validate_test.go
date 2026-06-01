@@ -299,3 +299,49 @@ func TestPrepareCommandExecutableWithAddExecAllowsExecutableRootSymlinkTarget(t 
 		}
 	}
 }
+
+func TestPrepareCommandExecutableWithAddExecPreservesSymlinkTargetSpellingAfterAncestorSymlink(t *testing.T) {
+	root := t.TempDir()
+	realRoot := filepath.Join(root, "real")
+	aliasRoot := filepath.Join(root, "alias")
+	if err := os.MkdirAll(realRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(realRoot, aliasRoot); err != nil {
+		t.Fatal(err)
+	}
+
+	allowedBin := filepath.Join(aliasRoot, "allowed", "bin")
+	outsideBin := filepath.Join(aliasRoot, "outside", "bin")
+	for _, path := range []string{allowedBin, outsideBin} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	target := filepath.Join(outsideBin, "bulle-test-tool")
+	link := filepath.Join(allowedBin, "bulle-test-tool")
+	if err := os.WriteFile(target, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := PrepareCommandExecutable(Policy{
+		Command:      []string{"bulle-test-tool"},
+		AddExec:      true,
+		ReadOnlyExec: []string{allowedBin},
+		Env:          map[string]string{},
+	})
+	if err != nil {
+		t.Fatalf("PrepareCommandExecutable returned error: %v", err)
+	}
+	if got.Command[0] != link {
+		t.Fatalf("Command[0] = %q, want symlink path %q", got.Command[0], link)
+	}
+	for _, want := range []string{link, target} {
+		if !contains(got.ReadOnlyExec, want) {
+			t.Fatalf("ReadOnlyExec = %#v, want %q", got.ReadOnlyExec, want)
+		}
+	}
+}

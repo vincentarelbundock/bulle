@@ -617,10 +617,10 @@ func TestResolveBuiltInAgentProfiles(t *testing.T) {
 			if name == "codex" && got.Env["CODEX_CONNECTORS_TOKEN"] != "connector-secret" {
 				t.Fatalf("codex Env[CODEX_CONNECTORS_TOKEN] = %q", got.Env["CODEX_CONNECTORS_TOKEN"])
 			}
-			if name == "codex" && !containsString(got.MachLookup, "com.apple.SecurityServer") {
+			if name == "codex" && runtime.GOOS == "darwin" && !containsString(got.MachLookup, "com.apple.SecurityServer") {
 				t.Fatalf("MachLookup = %#v, want SecurityServer", got.MachLookup)
 			}
-			if name != "codex" && containsString(got.MachLookup, "com.apple.SecurityServer") {
+			if (name != "codex" || runtime.GOOS != "darwin") && containsString(got.MachLookup, "com.apple.SecurityServer") {
 				t.Fatalf("MachLookup = %#v, did not want SecurityServer", got.MachLookup)
 			}
 		})

@@ -179,6 +179,51 @@ func TestSeatbeltProfileAllowsSymlinkComponentsForPathResolution(t *testing.T) {
 	}
 }
 
+func TestSeatbeltProfileAllowsSymlinkComponentsAfterAncestorSymlink(t *testing.T) {
+	root := t.TempDir()
+	realRoot := filepath.Join(root, "real")
+	aliasRoot := filepath.Join(root, "alias")
+	if err := os.MkdirAll(realRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(realRoot, aliasRoot); err != nil {
+		t.Fatal(err)
+	}
+
+	binDir := filepath.Join(aliasRoot, "bin")
+	framework := filepath.Join(aliasRoot, "Framework.framework")
+	versions := filepath.Join(framework, "Versions")
+	realBin := filepath.Join(versions, "1.0", "Resources", "bin")
+	for _, path := range []string{binDir, realBin} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	launcher := filepath.Join(binDir, "tool")
+	resourceLink := filepath.Join(framework, "Resources")
+	currentLink := filepath.Join(versions, "Current")
+	target := filepath.Join(realBin, "tool")
+	if err := os.WriteFile(target, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("1.0", currentLink); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("Versions", "Current", "Resources"), resourceLink); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(framework, "Resources", "bin", "tool"), launcher); err != nil {
+		t.Fatal(err)
+	}
+
+	sbpl := BuildSeatbeltProfile(policy.Policy{ReadOnlyExec: []string{launcher, target}})
+	for _, want := range []string{resourceLink, currentLink} {
+		if !strings.Contains(sbpl, `(literal "`+want+`")`) {
+			t.Fatalf("profile missing symlink component %q:\n%s", want, sbpl)
+		}
+	}
+}
+
 func TestSeatbeltProfileAllowsConfiguredMachLookups(t *testing.T) {
 	withoutMachLookup := BuildSeatbeltProfile(policy.Policy{})
 	if strings.Contains(withoutMachLookup, "com.apple.SecurityServer") {

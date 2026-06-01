@@ -143,7 +143,6 @@ func symlinkPathComponents(paths []string) []string {
 				expanded = filepath.Join(append([]string{expanded}, remaining...)...)
 			}
 			visit(expanded)
-			return
 		}
 	}
 

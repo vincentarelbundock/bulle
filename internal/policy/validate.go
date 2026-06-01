@@ -35,9 +35,8 @@ func PrepareCommandExecutable(p Policy) (Policy, error) {
 	out.Command[0] = binary
 
 	if p.AddExec {
-		out.ReadOnlyExec = appendExecutablePath(out.ReadOnlyExec, binary)
-		if real, err := filepath.EvalSymlinks(binary); err == nil {
-			out.ReadOnlyExec = appendExecutablePath(out.ReadOnlyExec, real)
+		for _, path := range bpaths.SymlinkPathVariants(binary) {
+			out.ReadOnlyExec = appendExecutablePath(out.ReadOnlyExec, path)
 		}
 		sanitizePolicyPATH(out.Env, append(append([]string{}, out.ReadOnlyExec...), out.ReadWriteExec...))
 		return out, nil
