@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/alecthomas/kong"
 )
@@ -13,6 +14,12 @@ func Parse(args []string) (Options, error) {
 		return opts, fmt.Errorf("missing argv")
 	}
 	cliArgs, command := splitCommand(args[1:])
+	var policyFormat string
+	var err error
+	cliArgs, policyFormat, err = normalizePolicyFormat(cliArgs)
+	if err != nil {
+		return opts, err
+	}
 	// Top-level aliases are handled before Kong because the main invocation has
 	// no explicit subcommand; adding Kong commands would make help/version
 	// ambiguous with the optional workspace argument.
@@ -31,6 +38,10 @@ func Parse(args []string) (Options, error) {
 		return opts, err
 	}
 	opts.Flags = parsed.Flags
+	opts.PolicyFormat = policyFormat
+	if opts.Policy && opts.PolicyFormat == "" {
+		opts.PolicyFormat = "summary"
+	}
 	opts.ProjectPath = parsed.ProjectPath
 	if opts.ProjectPath == "" {
 		opts.ProjectPath = "."
@@ -63,7 +74,28 @@ type Flags struct {
 	AddLibs     bool `name:"add-libs" help:"Add runtime library access for executables."`
 	NoWorkspace bool `name:"no-workspace" help:"Do not automatically grant the workspace read-write access."`
 	NoNetwork   bool `name:"no-network" help:"Deny network access for this invocation."`
-	Policy      bool `name:"policy" help:"Print the resolved policy as JSON and exit."`
+	Policy      bool `name:"policy" help:"Print the resolved policy and exit."`
+}
+
+func normalizePolicyFormat(args []string) ([]string, string, error) {
+	out := make([]string, 0, len(args))
+	format := ""
+	for _, arg := range args {
+		value, ok := strings.CutPrefix(arg, "--policy=")
+		if !ok {
+			out = append(out, arg)
+			continue
+		}
+		if value != "summary" && value != "json" {
+			return nil, "", fmt.Errorf("invalid --policy value %q; use summary or json", value)
+		}
+		if format != "" && format != value {
+			return nil, "", fmt.Errorf("conflicting --policy values %q and %q", format, value)
+		}
+		format = value
+		out = append(out, "--policy")
+	}
+	return out, format, nil
 }
 
 func parseKong(grammar any, args []string) error {
