@@ -433,7 +433,8 @@ Executable discovery:
                     These do not add app state files or environment variables.
 
 Output and safety:
-  --policy          print the resolved policy as JSON and exit
+  --policy[=summary|json]
+                    print the resolved policy and exit; summary by default
   -h, --help        show this help and exit
   -V, --version     show version information and exit
 
@@ -442,7 +443,8 @@ Examples:
   bulle --add-exec -- /bin/ls
   bulle --profile codex --ro ~/.cache/uv
   bulle . --profile secrets --env OPENAI_API_KEY -- codex
-  bulle . --rox /bin --policy -- /bin/bash
+  bulle . --rox /bin --policy=json -- /bin/bash
+  bulle --profile codex --policy
   bulle --profile codex --no-network
 </code></pre></div>
 

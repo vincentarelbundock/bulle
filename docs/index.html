@@ -605,6 +605,7 @@ or pass an explicit executable path after --
 bulle<span class="w"> </span>--rox<span class="w"> </span>/usr/bin/printenv<span class="w"> </span>--env<span class="w"> </span><span class="nv">HELLO</span><span class="o">=</span>WORLD<span class="w"> </span>--<span class="w"> </span>/usr/bin/printenv<span class="w"> </span>HELLO
 </code></pre></div>
 <p>This is important for secrets. A command cannot read <code>OPENAI_API_KEY</code>, <code>GITHUB_TOKEN</code>, or similar variables unless you explicitly pass them.</p>
+<p>The summary and JSON views list environment variables by name only; neither view prints their values.</p>
 <h2 id="network">Network<a class="headerlink" href="#network" title="Permanent link">&para;</a></h2>
 <p>Network access is allowed by default for compatibility with coding agents and package managers. Use <code>--no-network</code> when a command should not create network sockets:</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--no-network<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--<span class="w"> </span>/bin/ls
@@ -645,8 +646,11 @@ bulle<span class="w"> </span>--profile<span class="w"> </span>codex<span class="
 <p>Some coding agents require relatively broad permissions to run. Use the <code>--policy</code> argument to see which rights are granted by a profile before using it.</p>
 </div>
 <h2 id="policy">Policy<a class="headerlink" href="#policy" title="Permanent link">&para;</a></h2>
-<p>Use <code>--policy</code> to inspect the resolved sandbox policy without running the command. This is a useful safety check before launching an agent or script, especially when combining profiles with extra filesystem or environment grants.</p>
-<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--policy<span class="w"> </span>~/Desktop<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--<span class="w"> </span>/bin/ls
+<p>Use <code>--policy</code> to inspect the resolved sandbox policy without running the command. By default, it prints the same human-readable permissions summary that <code>bulle</code> sends to supported LLM agent profiles at startup. This is a useful safety check before launching an agent or script, especially when combining profiles with extra filesystem or environment grants.</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>codex<span class="w"> </span>--policy
+</code></pre></div>
+<p>Stable machine-readable output is available with <code>--policy=json</code>:</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--policy<span class="o">=</span>json<span class="w"> </span>~/Desktop<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--<span class="w"> </span>/bin/ls
 </code></pre></div>
 <div class="language-json highlight"><pre><span></span><code><span class="p">{</span>
 <span class="w">  </span><span class="nt">&quot;backend&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;macos-seatbelt&quot;</span><span class="p">,</span>
@@ -663,7 +667,7 @@ bulle<span class="w"> </span>--profile<span class="w"> </span>codex<span class="
 <span class="w">  </span><span class="nt">&quot;network&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;full&quot;</span>
 <span class="p">}</span>
 </code></pre></div>
-<p>In this example, <code>workspace_path</code> is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to <code>/home/user/Desktop</code>, shown in the <code>rw</code> array. The <code>command</code> field is the command that would be executed, and the <code>ro</code>, <code>rox</code>, <code>rw</code>, and <code>rwx</code> arrays show the readable, executable, writable, and writable-executable path grants. The <code>env_keys</code> array lists environment variables that would be passed into the sandbox. The <code>network</code> field shows the resolved network mode. The <code>backend</code> value depends on your operating system.</p>
+<p>In the <code>--policy=json</code> example, <code>workspace_path</code> is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to <code>/home/user/Desktop</code>, shown in the <code>rw</code> array. The <code>command</code> field is the command that would be executed, and the <code>ro</code>, <code>rox</code>, <code>rw</code>, and <code>rwx</code> arrays show the readable, executable, writable, and writable-executable path grants. The <code>env_keys</code> array lists environment variables that would be passed into the sandbox. The <code>network</code> field shows the resolved network mode. The <code>backend</code> value depends on your operating system.</p>
 <h2 id="executables-and-libraries">Executables and libraries<a class="headerlink" href="#executables-and-libraries" title="Permanent link">&para;</a></h2>
 <p>For quick local commands, <code>--add-exec</code> can save you from spelling out executable grants by hand. It resolves the command before the sandbox starts and adds the executable to the policy:</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--add-exec<span class="w"> </span>--<span class="w"> </span>/bin/ls

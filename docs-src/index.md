@@ -118,6 +118,8 @@ bulle --rox /usr/bin/printenv --env HELLO=WORLD -- /usr/bin/printenv HELLO
 
 This is important for secrets. A command cannot read `OPENAI_API_KEY`, `GITHUB_TOKEN`, or similar variables unless you explicitly pass them.
 
+The summary and JSON views list environment variables by name only; neither view prints their values.
+
 ## Network
 
 Network access is allowed by default for compatibility with coding agents and package managers. Use `--no-network` when a command should not create network sockets:
@@ -178,10 +180,16 @@ List fields are inherited and appended by default. Set `replace_ro`, `replace_ro
 
 ## Policy
 
-Use `--policy` to inspect the resolved sandbox policy without running the command. This is a useful safety check before launching an agent or script, especially when combining profiles with extra filesystem or environment grants.
+Use `--policy` to inspect the resolved sandbox policy without running the command. By default, it prints the same human-readable permissions summary that `bulle` sends to supported LLM agent profiles at startup. This is a useful safety check before launching an agent or script, especially when combining profiles with extra filesystem or environment grants.
 
 ```bash
-bulle --policy ~/Desktop --rox /bin -- /bin/ls
+bulle --profile codex --policy
+```
+
+Stable machine-readable output is available with `--policy=json`:
+
+```bash
+bulle --policy=json ~/Desktop --rox /bin -- /bin/ls
 ```
 
 ```json
@@ -201,7 +209,7 @@ bulle --policy ~/Desktop --rox /bin -- /bin/ls
 }
 ```
 
-In this example, `workspace_path` is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to `/home/user/Desktop`, shown in the `rw` array. The `command` field is the command that would be executed, and the `ro`, `rox`, `rw`, and `rwx` arrays show the readable, executable, writable, and writable-executable path grants. The `env_keys` array lists environment variables that would be passed into the sandbox. The `network` field shows the resolved network mode. The `backend` value depends on your operating system.
+In the `--policy=json` example, `workspace_path` is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to `/home/user/Desktop`, shown in the `rw` array. The `command` field is the command that would be executed, and the `ro`, `rox`, `rw`, and `rwx` arrays show the readable, executable, writable, and writable-executable path grants. The `env_keys` array lists environment variables that would be passed into the sandbox. The `network` field shows the resolved network mode. The `backend` value depends on your operating system.
 
 ## Executables and libraries
 
