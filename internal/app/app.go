@@ -102,9 +102,17 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 	p = prepared
 	if opts.Policy {
-		if err := json.NewEncoder(stdout).Encode(policy.NewView(p)); err != nil {
-			fmt.Fprintln(stderr, err)
-			return ExitCommandFailed
+		switch opts.PolicyFormat {
+		case "", "summary":
+			writeProfilePermissionSummary(policySummaryProfileName(opts, global), p, stdout)
+		case "json":
+			if err := json.NewEncoder(stdout).Encode(policy.NewView(p)); err != nil {
+				fmt.Fprintln(stderr, err)
+				return ExitCommandFailed
+			}
+		default:
+			fmt.Fprintf(stderr, "invalid --policy value %q; use summary or json\n", opts.PolicyFormat)
+			return ExitConfigError
 		}
 		return ExitOK
 	}
@@ -146,6 +154,16 @@ func defaultAppForRun(opts cli.Options, global config.Config) (string, error) {
 		return "", err
 	}
 	return profile.DefaultApp, nil
+}
+
+func policySummaryProfileName(opts cli.Options, global config.Config) string {
+	if opts.Profile != "" {
+		return opts.Profile
+	}
+	if global.DefaultProfile != "" {
+		return global.DefaultProfile
+	}
+	return "default"
 }
 
 func defaultConfigPath() string {
