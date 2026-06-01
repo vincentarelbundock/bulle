@@ -118,27 +118,6 @@ bulle --rox /usr/bin/printenv --env HELLO=WORLD -- /usr/bin/printenv HELLO
 
 This is important for secrets. A command cannot read `OPENAI_API_KEY`, `GITHUB_TOKEN`, or similar variables unless you explicitly pass them.
 
-## Network
-
-Network access is allowed by default for compatibility with coding agents and package managers. Use `--no-network` when a command should not create network sockets:
-
-```bash
-bulle --no-network --rox /bin -- /bin/ls
-bulle --profile codex --no-network
-```
-
-Profiles and top-level config can set the default network mode for repeated workflows:
-
-```toml
-[profiles.offline]
-inherits = "tool"
-network = "none"
-```
-
-Use a top-level `network = "none"` when every profile loaded from that config should default to offline mode.
-
-The supported modes are `full` and `none`. On macOS, `none` omits network permissions from the generated Seatbelt profile. On Linux, `none` installs a seccomp filter that denies socket-related system calls for the sandboxed process and its children. This also blocks local Unix sockets. It cannot revoke access to an already-inherited standard input, output, or error file descriptor if one of those descriptors is connected to a socket.
-
 ## Profiles
 
 Coding agents often need shells, package managers, language runtimes, caches, config files, and app storage. Profiles collect those repeated path and environment grants in one named bundle.
@@ -202,6 +181,16 @@ bulle --policy ~/Desktop --rox /bin -- /bin/ls
 ```
 
 In this example, `workspace_path` is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to `/home/user/Desktop`, shown in the `rw` array. The `command` field is the command that would be executed, and the `ro`, `rox`, `rw`, and `rwx` arrays show the readable, executable, writable, and writable-executable path grants. The `env_keys` array lists environment variables that would be passed into the sandbox. The `network` field shows the resolved network mode. The `backend` value depends on your operating system.
+
+## Network
+
+Network access is allowed by default. Use `--no-network` when a command should not create new network sockets:
+
+```bash
+bulle --no-network --rox /sbin -- ping google.com
+```
+
+Profiles can also set `network = "none"` to make offline mode the default for repeated workflows.
 
 ## Executables and libraries
 
