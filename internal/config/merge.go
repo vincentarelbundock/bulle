@@ -57,7 +57,7 @@ func (c Config) resolveProfile(name string, seen map[string]bool) (Profile, erro
 
 func MergeProfiles(parent Profile, child Profile) Profile {
 	return Profile{
-		Inherits: child.Inherits,
+		Inherits: choose(child.Inherits, parent.Inherits),
 		Settings: MergeSettings(parent.Settings, child.Settings),
 	}
 }

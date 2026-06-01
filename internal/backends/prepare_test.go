@@ -75,8 +75,12 @@ func TestPreparePolicyAddsRealShebangScriptDirectoryForImports(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PreparePolicy returned error: %v", err)
 	}
-	if !containsString(got.ReadOnlyExec, packageDir) {
-		t.Fatalf("ReadOnlyExec = %#v, want package root %q", got.ReadOnlyExec, packageDir)
+	realPackageDir, err := filepath.EvalSymlinks(packageDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsString(got.ReadOnlyExec, realPackageDir) {
+		t.Fatalf("ReadOnlyExec = %#v, want package root %q", got.ReadOnlyExec, realPackageDir)
 	}
 }
 

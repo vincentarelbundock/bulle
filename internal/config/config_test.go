@@ -91,6 +91,37 @@ func TestMergeConfigsDoesNotMutateParentProfiles(t *testing.T) {
 	}
 }
 
+func TestMergeConfigsPreservesProfileInheritanceForPartialOverrides(t *testing.T) {
+	parent := Config{
+		Profiles: map[string]Profile{
+			"agent": {
+				Inherits: "tool",
+				Settings: Settings{
+					PathSettings: PathSettings{ReadWrite: []string{"state"}},
+				},
+			},
+		},
+	}
+	child := Config{
+		Profiles: map[string]Profile{
+			"agent": {
+				Settings: Settings{
+					PathSettings: PathSettings{ReadOnly: []string{"prefs"}},
+				},
+			},
+		},
+	}
+
+	got := MergeConfigs(parent, child)
+	if got.Profiles["agent"].Inherits != "tool" {
+		t.Fatalf("Inherits = %q, want tool", got.Profiles["agent"].Inherits)
+	}
+	profile := got.Profiles["agent"]
+	if !contains(profile.ReadWrite, "state") || !contains(profile.ReadOnly, "prefs") {
+		t.Fatalf("profile paths = %#v", profile.PathSettings)
+	}
+}
+
 func TestDefaultConfigDefaultProfileHasNoFilesystemAccess(t *testing.T) {
 	cfg := DefaultConfig()
 	profile, err := cfg.ResolveProfile("default")
