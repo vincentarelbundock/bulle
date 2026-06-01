@@ -70,15 +70,15 @@ bulle -- ls
 ```
 
 ```text
-command not found before sandbox setup: "ls" is not on policy PATH.
-Add --env PATH with matching --rox/--rwx roots, choose a profile,
+command not found before sandbox setup: "ls"
+Grant an executable path with --rox/--rwx, choose a profile,
 or pass an explicit executable path after --
 ```
 
-That error is intentional: even finding and executing `ls` requires permission. We can grant that permission using the `--rox` flag (read-only+execute):
+That error is intentional: even finding and executing `ls` requires permission. Grant an executable directory with `--rox` and `bulle` can find commands in it:
 
 ```bash
-bulle --rox /bin/ls -- /bin/ls
+bulle --rox /bin -- ls
 ```
 
 Instead of specifying the path of every command manually, we can load [profiles](#profiles): named bundles of permissions for common tools. `bulle` ships with built-in profiles for several coding agents. For example, the first command below gives read-write access to the current directory, and launches Claude Code with minimal permissions:

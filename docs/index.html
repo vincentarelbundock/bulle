@@ -575,12 +575,12 @@
 <p>By default, <code>bulle</code> runs in the current directory. Access to any other location in the filesystem is denied unless you grant it explicitly. Commands cannot read files, execute programs, or inherit environment variables unless you allow them.</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--<span class="w"> </span>ls
 </code></pre></div>
-<div class="language-text highlight"><pre><span></span><code>command not found before sandbox setup: &quot;ls&quot; is not on policy PATH.
-Add --env PATH with matching --rox/--rwx roots, choose a profile,
+<div class="language-text highlight"><pre><span></span><code>command not found before sandbox setup: &quot;ls&quot;
+Grant an executable path with --rox/--rwx, choose a profile,
 or pass an explicit executable path after --
 </code></pre></div>
-<p>That error is intentional: even finding and executing <code>ls</code> requires permission. We can grant that permission using the <code>--rox</code> flag (read-only+execute):</p>
-<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--rox<span class="w"> </span>/bin/ls<span class="w"> </span>--<span class="w"> </span>/bin/ls
+<p>That error is intentional: even finding and executing <code>ls</code> requires permission. Grant an executable directory with <code>--rox</code> and <code>bulle</code> can find commands in it:</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--<span class="w"> </span>ls
 </code></pre></div>
 <p>Instead of specifying the path of every command manually, we can load <a href="#profiles">profiles</a>: named bundles of permissions for common tools. <code>bulle</code> ships with built-in profiles for several coding agents. For example, the first command below gives read-write access to the current directory, and launches Claude Code with minimal permissions:</p>
 <div class="language-sh highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>claude

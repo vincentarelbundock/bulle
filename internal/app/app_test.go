@@ -166,6 +166,32 @@ func TestRunExplainsBareCommandWithoutPolicyPATH(t *testing.T) {
 	}
 }
 
+func TestRunFindsBareCommandFromExplicitExecutableRoot(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	root := t.TempDir()
+	binDir := filepath.Join(root, "bin")
+	tool := filepath.Join(binDir, "bulle-test-tool")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(tool, []byte("not a script\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	code := Run([]string{"bulle", "--rox", binDir, "--policy", "--", "bulle-test-tool"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte(tool)) {
+		t.Fatalf("stdout = %s, want command resolved to %q", stdout.String(), tool)
+	}
+	if bytes.Contains(stdout.Bytes(), []byte(`"PATH"`)) {
+		t.Fatalf("stdout = %s, want executable root lookup without PATH env", stdout.String())
+	}
+}
+
 func TestRunExplainsDefaultAppNotFoundBeforeSandbox(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

@@ -68,6 +68,59 @@ func TestPrepareCommandExecutableUsesPolicyPATH(t *testing.T) {
 	}
 }
 
+func TestPrepareCommandExecutableUsesExecutableRootsWhenPolicyPATHMissing(t *testing.T) {
+	binDir := filepath.Join(t.TempDir(), "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	binary := filepath.Join(binDir, "bulle-test-tool")
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := PrepareCommandExecutable(Policy{
+		Command:      []string{"bulle-test-tool"},
+		ReadOnlyExec: []string{binDir},
+		Env:          map[string]string{},
+	})
+	if err != nil {
+		t.Fatalf("PrepareCommandExecutable returned error: %v", err)
+	}
+	if got.Command[0] != binary {
+		t.Fatalf("Command[0] = %q, want executable root match %q", got.Command[0], binary)
+	}
+	if _, ok := got.Env["PATH"]; ok {
+		t.Fatalf("Env[PATH] is set, want executable root lookup without exporting PATH")
+	}
+}
+
+func TestPrepareCommandExecutableFallsBackToExecutableRootsWhenPolicyPATHMisses(t *testing.T) {
+	root := t.TempDir()
+	allowedBin := filepath.Join(root, "allowed", "bin")
+	deniedBin := filepath.Join(root, "denied", "bin")
+	for _, dir := range []string{allowedBin, deniedBin} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	allowedTool := filepath.Join(allowedBin, "bulle-test-tool")
+	if err := os.WriteFile(allowedTool, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := PrepareCommandExecutable(Policy{
+		Command:      []string{"bulle-test-tool"},
+		ReadOnlyExec: []string{allowedBin},
+		Env:          map[string]string{"PATH": deniedBin},
+	})
+	if err != nil {
+		t.Fatalf("PrepareCommandExecutable returned error: %v", err)
+	}
+	if got.Command[0] != allowedTool {
+		t.Fatalf("Command[0] = %q, want executable root fallback %q", got.Command[0], allowedTool)
+	}
+}
+
 func TestPrepareCommandExecutableResolvesRelativeCommandFromProjectPath(t *testing.T) {
 	root := t.TempDir()
 	launcher := filepath.Join(root, "launcher")
