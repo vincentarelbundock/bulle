@@ -1,8 +1,11 @@
 package cli
 
 import (
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/vincentarelbundock/bulle/internal/config"
 )
 
 func TestParseRunWithProjectCommandAndFlags(t *testing.T) {
@@ -117,13 +120,10 @@ func TestParseNoWorkspaceFlag(t *testing.T) {
 	}
 }
 
-func TestParseNoNetworkFlag(t *testing.T) {
-	opts, err := Parse([]string{"bulle", "--no-network", "--", "codex"})
-	if err != nil {
-		t.Fatalf("Parse returned error: %v", err)
-	}
-	if !opts.NoNetwork {
-		t.Fatalf("NoNetwork = false, want true")
+func TestParseRejectsNoNetworkFlag(t *testing.T) {
+	_, err := Parse([]string{"bulle", "--no-network", "--", "codex"})
+	if err == nil {
+		t.Fatal("Parse returned nil error, want --no-network rejection")
 	}
 }
 
@@ -131,13 +131,18 @@ func TestParseProfileForms(t *testing.T) {
 	for _, args := range [][]string{
 		{"bulle", "-p", "codex", "."},
 		{"bulle", "--profile=codex", "."},
+		{"bulle", "--profile", "codex,offline", "."},
 	} {
 		opts, err := Parse(args)
 		if err != nil {
 			t.Fatalf("Parse(%#v) returned error: %v", args, err)
 		}
-		if opts.Profile != "codex" {
-			t.Fatalf("Parse(%#v) Profile = %q, want codex", args, opts.Profile)
+		wantProfile := "codex"
+		if strings.Contains(args[1], ",") || len(args) > 2 && strings.Contains(args[2], ",") {
+			wantProfile = "codex,offline"
+		}
+		if opts.Profile != wantProfile {
+			t.Fatalf("Parse(%#v) Profile = %q, want %q", args, opts.Profile, wantProfile)
 		}
 		if opts.ProjectPath != "." {
 			t.Fatalf("Parse(%#v) ProjectPath = %q, want .", args, opts.ProjectPath)
@@ -161,6 +166,25 @@ func TestParseDefaultsProjectPathToCurrentDirectory(t *testing.T) {
 	}
 }
 
+func TestProfileNamesSortsAlphabeticallyAndOmitsDefault(t *testing.T) {
+	cfg := config.Config{
+		Profiles: map[string]config.Profile{
+			"default":  {},
+			"late":     {},
+			"early":    {},
+			"hidden":   {},
+			"custom-b": {},
+			"custom-a": {},
+		},
+	}
+
+	got := ProfileNames(cfg)
+	want := []string{"custom-a", "custom-b", "early", "hidden", "late"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ProfileNames = %#v, want %#v", got, want)
+	}
+}
+
 func TestUsageShowsProfileShortFlag(t *testing.T) {
 	if !strings.Contains(Usage(), "-p, --profile NAME") {
 		t.Fatalf("Usage() does not show profile short flag:\n%s", Usage())
@@ -171,8 +195,8 @@ func TestUsageShowsProfileShortFlag(t *testing.T) {
 	if !strings.Contains(Usage(), "--no-workspace") {
 		t.Fatalf("Usage() does not show --no-workspace:\n%s", Usage())
 	}
-	if !strings.Contains(Usage(), "--no-network") {
-		t.Fatalf("Usage() does not show --no-network:\n%s", Usage())
+	if strings.Contains(Usage(), "--no-network") {
+		t.Fatalf("Usage() still shows --no-network:\n%s", Usage())
 	}
 	if !strings.Contains(Usage(), "--list-profiles") {
 		t.Fatalf("Usage() does not show --list-profiles:\n%s", Usage())
@@ -186,7 +210,7 @@ func TestUsageShowsProfileShortFlag(t *testing.T) {
 	if !strings.Contains(Usage(), "macOS uses configured runtime roots") {
 		t.Fatalf("Usage() does not explain macOS --add-libs behavior:\n%s", Usage())
 	}
-	for _, profile := range []string{"tool", "claude", "codex", "pi", "opencode"} {
+	for _, profile := range []string{"tool", "network", "offline", "macos-dns", "macos-certs", "keychain", "claude", "codex", "pi", "opencode"} {
 		if !strings.Contains(Usage(), profile) {
 			t.Fatalf("Usage() does not show built-in profile %q:\n%s", profile, Usage())
 		}

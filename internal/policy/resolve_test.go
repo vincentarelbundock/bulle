@@ -15,7 +15,7 @@ func TestResolveRejectsHomeProject(t *testing.T) {
 	opts := cli.Options{ProjectPath: home}
 	_, err := Resolve(Inputs{
 		Options:   opts,
-		Global:    config.Config{DefaultProfile: "default", Profiles: map[string]config.Profile{"default": {}}},
+		Global:    config.Config{Profiles: map[string]config.Profile{"default": {}}},
 		ParentEnv: map[string]string{"HOME": home, "PATH": "/usr/bin"},
 		Home:      home,
 		Tmp:       t.TempDir(),
@@ -25,37 +25,41 @@ func TestResolveRejectsHomeProject(t *testing.T) {
 	}
 }
 
-func TestResolveRejectsReservedPathVarOverride(t *testing.T) {
+func TestResolveRejectsUnknownPathVariable(t *testing.T) {
 	root := t.TempDir()
 	project := filepath.Join(root, "project")
 	if err := os.Mkdir(project, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cfg := config.Config{
-		DefaultProfile: "default",
-		Vars:           map[string]string{"HOME": filepath.Join(root, "fake-home")},
-		Profiles:       map[string]config.Profile{"default": {}},
-	}
+	cfg := config.Config{Profiles: map[string]config.Profile{"default": {Settings: config.Settings{PathSettings: config.PathSettings{ReadWrite: []string{"$CACHE"}}}}}}
 
 	_, err := Resolve(Inputs{Options: cli.Options{ProjectPath: project}, Global: cfg, ParentEnv: map[string]string{}, Home: root, Tmp: t.TempDir()})
 	if err == nil {
-		t.Fatalf("Resolve succeeded, want reserved var rejection")
+		t.Fatalf("Resolve succeeded, want unknown path variable rejection")
 	}
 }
 
-func TestResolveNetworkModeFromConfigAndCLI(t *testing.T) {
+func TestResolveNetworkCapabilityFromConfigAndCLI(t *testing.T) {
 	root := t.TempDir()
 	project := filepath.Join(root, "project")
 	if err := os.Mkdir(project, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	cfg := config.Config{
-		DefaultProfile: "default",
 		Profiles: map[string]config.Profile{"default": {
-			Settings: config.Settings{Network: "none"},
+			Settings: config.Settings{Allow: []string{"network"}},
 		}},
 	}
 	got, err := Resolve(Inputs{Options: cli.Options{ProjectPath: project}, Global: cfg, ParentEnv: map[string]string{}, Home: root, Tmp: root})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if got.Network != NetworkFull {
+		t.Fatalf("Network = %q, want full", got.Network)
+	}
+
+	cfg.Profiles["default"] = config.Profile{Settings: config.Settings{Deny: []string{"network"}}}
+	got, err = Resolve(Inputs{Options: cli.Options{ProjectPath: project}, Global: cfg, ParentEnv: map[string]string{}, Home: root, Tmp: root})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
@@ -63,31 +67,31 @@ func TestResolveNetworkModeFromConfigAndCLI(t *testing.T) {
 		t.Fatalf("Network = %q, want none", got.Network)
 	}
 
-	cfg.Profiles["default"] = config.Profile{Settings: config.Settings{Network: "full"}}
-	got, err = Resolve(Inputs{Options: cli.Options{ProjectPath: project, Flags: cli.Flags{NoNetwork: true}}, Global: cfg, ParentEnv: map[string]string{}, Home: root, Tmp: root})
+	cfg.Profiles["default"] = config.Profile{Settings: config.Settings{Allow: []string{"network"}}}
+	cfg.Profiles["offline"] = config.Profile{Settings: config.Settings{Deny: []string{"network"}}}
+	got, err = Resolve(Inputs{Options: cli.Options{ProjectPath: project, Flags: cli.Flags{Profile: "default,offline"}}, Global: cfg, ParentEnv: map[string]string{}, Home: root, Tmp: root})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
 	if got.Network != NetworkNone {
-		t.Fatalf("Network with --no-network = %q, want none", got.Network)
+		t.Fatalf("Network with offline overlay = %q, want none", got.Network)
 	}
 }
 
-func TestResolveRejectsInvalidNetworkMode(t *testing.T) {
+func TestResolveRejectsInvalidCapability(t *testing.T) {
 	root := t.TempDir()
 	project := filepath.Join(root, "project")
 	if err := os.Mkdir(project, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	cfg := config.Config{
-		DefaultProfile: "default",
 		Profiles: map[string]config.Profile{"default": {
-			Settings: config.Settings{Network: "maybe"},
+			Settings: config.Settings{Allow: []string{"clipboard"}},
 		}},
 	}
 	_, err := Resolve(Inputs{Options: cli.Options{ProjectPath: project}, Global: cfg, ParentEnv: map[string]string{}, Home: root, Tmp: root})
 	if err == nil {
-		t.Fatalf("Resolve succeeded, want invalid network mode error")
+		t.Fatalf("Resolve succeeded, want invalid capability error")
 	}
 }
 
@@ -98,7 +102,6 @@ func TestResolveSkipsMissingReadGrants(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := config.Config{
-		DefaultProfile: "default",
 		Profiles: map[string]config.Profile{"default": {
 			Settings: config.Settings{PathSettings: config.PathSettings{
 				ReadOnly:     []string{filepath.Join(root, "missing-ro")},
@@ -133,7 +136,6 @@ func TestResolveMergesDefaultsConfigAndCLI(t *testing.T) {
 	}
 	opts := cli.Options{ProjectPath: project, Command: []string{"bash"}, Flags: cli.Flags{ReadOnly: []string{cache}, ReadOnlyExec: []string{"/usr/bin"}, Env: []string{"PATH"}}}
 	cfg := config.Config{
-		DefaultProfile: "default",
 		Profiles: map[string]config.Profile{"default": {
 			Settings: config.Settings{
 				PathSettings: config.PathSettings{ReadWrite: []string{"$WORKSPACE"}},
@@ -169,7 +171,7 @@ func TestResolveMergesDefaultsConfigAndCLI(t *testing.T) {
 
 func TestResolveAlwaysUsesRuntimeBackend(t *testing.T) {
 	project := t.TempDir()
-	cfg := config.Config{DefaultProfile: "default", Profiles: map[string]config.Profile{"default": {}}}
+	cfg := config.Config{Profiles: map[string]config.Profile{"default": {}}}
 	got, err := Resolve(Inputs{Options: cli.Options{ProjectPath: project}, Global: cfg, ParentEnv: map[string]string{}, Home: t.TempDir(), Tmp: t.TempDir()})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
@@ -513,7 +515,7 @@ func TestResolveClaudeProfileDoesNotFollowUnlistedConfigSymlinkTargets(t *testin
 	}
 }
 
-func TestResolveClaudeProfileDoesNotAllowKeychain(t *testing.T) {
+func TestResolveClaudeProfileDoesNotGrantCodexMachLookup(t *testing.T) {
 	root := t.TempDir()
 	project := filepath.Join(root, "project")
 	tmp := filepath.Join(root, "tmp")
@@ -547,8 +549,8 @@ func TestResolveClaudeProfileDoesNotAllowKeychain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if got.AllowKeychain {
-		t.Fatalf("AllowKeychain = true, want false")
+	if containsString(got.MachLookup, "com.apple.SecurityServer") {
+		t.Fatalf("MachLookup = %#v, did not want SecurityServer", got.MachLookup)
 	}
 	keychains := filepath.Join(root, "Library", "Keychains")
 	realKeychains, err := filepath.EvalSymlinks(keychains)
@@ -615,17 +617,104 @@ func TestResolveBuiltInAgentProfiles(t *testing.T) {
 			if name == "codex" && got.Env["CODEX_CONNECTORS_TOKEN"] != "connector-secret" {
 				t.Fatalf("codex Env[CODEX_CONNECTORS_TOKEN] = %q", got.Env["CODEX_CONNECTORS_TOKEN"])
 			}
-			if name == "codex" && !got.AllowKeychain {
-				t.Fatalf("AllowKeychain = false, want true")
+			if name == "codex" && !containsString(got.MachLookup, "com.apple.SecurityServer") {
+				t.Fatalf("MachLookup = %#v, want SecurityServer", got.MachLookup)
 			}
-			if name != "codex" && got.AllowKeychain {
-				t.Fatalf("AllowKeychain = true, want false")
+			if name != "codex" && containsString(got.MachLookup, "com.apple.SecurityServer") {
+				t.Fatalf("MachLookup = %#v, did not want SecurityServer", got.MachLookup)
 			}
 		})
 	}
 }
 
-func TestResolveConfiguredDefaultProfileDoesNotUseCommandProfile(t *testing.T) {
+func TestResolveOfflineProfileListDropsNetworkMachLookupBundle(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("macOS Mach lookup behavior")
+	}
+	root := t.TempDir()
+	project := filepath.Join(root, "project")
+	tmp := filepath.Join(root, "tmp")
+	for _, path := range []string{project, filepath.Join(tmp, "bulle", "tmp")} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := Resolve(Inputs{
+		Options:   cli.Options{ProjectPath: project, Command: []string{"agent"}, Flags: cli.Flags{Profile: "tool,offline"}},
+		Global:    config.DefaultConfig(),
+		ParentEnv: map[string]string{"PATH": "/usr/bin"},
+		Home:      root,
+		Tmp:       tmp,
+	})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if got.Network != NetworkNone {
+		t.Fatalf("Network = %q, want none", got.Network)
+	}
+	for _, denied := range []string{
+		"com.apple.SystemConfiguration.DNSConfiguration",
+		"com.apple.SystemConfiguration.configd",
+		"com.apple.system.opendirectoryd.libinfo",
+		"com.apple.trustd.agent",
+	} {
+		if containsString(got.MachLookup, denied) {
+			t.Fatalf("MachLookup = %#v, did not want network service %q with offline overlay", got.MachLookup, denied)
+		}
+	}
+}
+
+func TestResolveOfflineProfileDropsNetworkMachLookupBundleButKeepsKeychain(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("macOS Mach lookup behavior")
+	}
+	root := t.TempDir()
+	project := filepath.Join(root, "project")
+	tmp := filepath.Join(root, "tmp")
+	for _, path := range []string{
+		project,
+		filepath.Join(tmp, "bulle", "tmp"),
+		filepath.Join(root, ".codex"),
+		filepath.Join(root, "Library", "Keychains"),
+		filepath.Join(root, "Library", "Preferences"),
+	} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cfg := config.DefaultConfig()
+	cfg.Profiles["codex-offline"] = config.Profile{Inherits: config.Inherits("codex", "offline")}
+
+	got, err := Resolve(Inputs{
+		Options:   cli.Options{ProjectPath: project, Command: []string{"agent"}, Flags: cli.Flags{Profile: "codex-offline"}},
+		Global:    cfg,
+		ParentEnv: map[string]string{"HOME": root, "PATH": "/usr/bin", "USER": "vincent", "SHELL": "/bin/zsh"},
+		Home:      root,
+		Tmp:       tmp,
+	})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if got.Network != NetworkNone {
+		t.Fatalf("Network = %q, want none", got.Network)
+	}
+	if !containsString(got.MachLookup, "com.apple.SecurityServer") {
+		t.Fatalf("MachLookup = %#v, want keychain service retained", got.MachLookup)
+	}
+	for _, denied := range []string{
+		"com.apple.SystemConfiguration.DNSConfiguration",
+		"com.apple.SystemConfiguration.configd",
+		"com.apple.system.opendirectoryd.libinfo",
+		"com.apple.trustd.agent",
+	} {
+		if containsString(got.MachLookup, denied) {
+			t.Fatalf("MachLookup = %#v, did not want network service %q in offline profile", got.MachLookup, denied)
+		}
+	}
+}
+
+func TestResolveDefaultProfileDoesNotUseCommandProfile(t *testing.T) {
 	root := t.TempDir()
 	project := filepath.Join(root, "project")
 	tmp := filepath.Join(root, "tmp")
@@ -636,9 +725,6 @@ func TestResolveConfiguredDefaultProfileDoesNotUseCommandProfile(t *testing.T) {
 		}
 	}
 	cfg := config.DefaultConfig()
-	cfg.DefaultProfile = "strict"
-	cfg.Profiles["strict"] = config.Profile{Inherits: "default"}
-
 	got, err := Resolve(Inputs{
 		Options:   cli.Options{ProjectPath: project, Command: []string{"codex"}},
 		Global:    cfg,
@@ -668,9 +754,8 @@ func TestResolveDefersPATHSanitizationForAddExecCommandLookup(t *testing.T) {
 		}
 	}
 	cfg := config.Config{
-		DefaultProfile: "default",
 		Profiles: map[string]config.Profile{"default": {
-			Settings: config.Settings{ReplaceEnv: true, Env: []string{"PATH"}},
+			Settings: config.Settings{Env: []string{"PATH"}},
 		}},
 	}
 
@@ -704,15 +789,13 @@ func TestResolveSanitizesPATHToExecutableRoots(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := config.Config{
-		DefaultProfile: "default",
 		Profiles: map[string]config.Profile{"default": {
 			Settings: config.Settings{
 				PathSettings: config.PathSettings{
 					ReadWrite:    []string{"$WORKSPACE"},
 					ReadOnlyExec: []string{allowedBin},
 				},
-				ReplaceEnv: true,
-				Env:        []string{"PATH"},
+				Env: []string{"PATH"},
 			},
 		}},
 	}
@@ -746,11 +829,9 @@ func TestResolveSanitizesPATHRejectsSymlinkEscape(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := config.Config{
-		DefaultProfile: "default",
 		Profiles: map[string]config.Profile{"default": {
 			Settings: config.Settings{
 				PathSettings: config.PathSettings{ReadOnlyExec: []string{allowed}},
-				ReplaceEnv:   true,
 				Env:          []string{"PATH"},
 			},
 		}},
@@ -801,6 +882,41 @@ func TestResolvePassesExplicitSecretEnvWithoutDenyList(t *testing.T) {
 	}
 	if got.Env["OPENAI_API_KEY"] != "secret" {
 		t.Fatalf("Env = %#v, want OPENAI_API_KEY", got.Env)
+	}
+}
+
+func TestResolveAddExecDoesNotIncludeMacOSRuntimeRootsWithoutToolDefaults(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("macOS runtime roots are platform-specific")
+	}
+	root := t.TempDir()
+	project := filepath.Join(root, "project")
+	tmp := filepath.Join(root, "tmp")
+	for _, path := range []string{project, filepath.Join(tmp, "bulle", "tmp")} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := Resolve(Inputs{
+		Options: cli.Options{
+			ProjectPath: project,
+			Command:     []string{"tool"},
+			Flags:       cli.Flags{AddExec: true},
+		},
+		Global:    config.DefaultConfig(),
+		ParentEnv: map[string]string{"HOME": root, "PATH": "/usr/bin"},
+		Home:      root,
+		Tmp:       tmp,
+	})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if containsString(got.ReadOnly, "/System/Library") {
+		t.Fatalf("ReadOnly = %#v, did not want macOS runtime roots from --add-exec alone", got.ReadOnly)
+	}
+	if containsString(got.ReadOnlyExec, "/usr/lib") {
+		t.Fatalf("ReadOnlyExec = %#v, did not want macOS runtime roots from --add-exec alone", got.ReadOnlyExec)
 	}
 }
 

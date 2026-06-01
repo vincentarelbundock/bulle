@@ -1,0 +1,5 @@
+title = "macOS Certificates"
+description = "macOS certificate trust service lookup"
+
+[macos]
+mach_lookup = ["com.apple.trustd.agent"]

@@ -25,6 +25,7 @@ func BuildSeatbeltProfile(p policy.Policy) string {
 	metadataOnlyPaths = append(metadataOnlyPaths, "/var", "/tmp", "/private/tmp")
 	writeLiteralRule(&b, "file-read-metadata", metadataOnlyPaths)
 	writeSubpathRule(&b, "file-read-metadata", []string{"/tmp", "/private/tmp"})
+	writeLiteralRule(&b, "file-read*", symlinkPathComponents(appendPaths(readPaths, readWritePaths)))
 	writeSeatbeltPathRules(&b, "file-read*", readPaths, false)
 	writeSeatbeltPathRules(&b, "file-read* file-write*", readWritePaths, true)
 	writeSeatbeltPathRules(&b, "file-read* file-map-executable", execPaths, false)
@@ -37,19 +38,7 @@ func BuildSeatbeltProfile(p policy.Policy) string {
 	ttyPaths := ttyDevicePaths()
 	writeLiteralRule(&b, "file-read* file-write*", ttyPaths)
 	writeLiteralRule(&b, "file-ioctl", append([]string{"/dev/tty", "/dev/null"}, ttyPaths...))
-	machLookups := []string{
-		"com.apple.SystemConfiguration.DNSConfiguration",
-		"com.apple.SystemConfiguration.configd",
-		"com.apple.trustd.agent",
-		"com.apple.system.opendirectoryd.libinfo",
-	}
-	if p.AllowKeychain {
-		// allow_keychain gates macOS service access, not file access. The
-		// Keychain database paths themselves belong in normal profile path
-		// lists such as rw/rwx.
-		machLookups = append(machLookups, "com.apple.SecurityServer", "com.apple.securityd", "com.apple.securityd.xpc")
-	}
-	writeMachLookupRule(&b, machLookups)
+	writeMachLookupRule(&b, p.MachLookup)
 	if p.Network != policy.NetworkNone {
 		b.WriteString("\n(allow network*)\n")
 	}

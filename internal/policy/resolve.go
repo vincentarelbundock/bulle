@@ -26,21 +26,26 @@ func Resolve(in Inputs) (Policy, error) {
 	if err != nil {
 		return Policy{}, err
 	}
+	addExec := boolValue(profile.AddExec) || in.Options.AddExec
+	addLibs := boolValue(profile.AddLibs) || in.Options.AddLibs
+	platformDefaults := cfg.Platform.ForCurrentPlatform()
 	defaults := Policy{}
 	usesToolDefaults := profileUsesToolDefaults(profileName, cfg)
 	if usesToolDefaults {
 		defaults = platformToolPolicy(cfg)
-	} else if profile.AddLibs || in.Options.AddLibs {
+	} else if addLibs {
 		defaults = platformLibsPolicy(cfg)
 	}
 	p := defaults
 	p.Backend = backend
 	p.ProjectPath = in.Options.ProjectPath
 	p.Command = in.Options.Command
-	p.AddExec = profile.AddExec || in.Options.AddExec
-	p.AddLibs = profile.AddLibs || in.Options.AddLibs
-	p.AllowKeychain = boolValue(profile.AllowKeychain)
-	p.Network, err = resolveNetworkMode(profile.Network, in.Options.NoNetwork)
+	p.AddExec = addExec
+	p.AddLibs = addLibs
+	p.MachLookup = append(p.MachLookup, platformDefaults.MachLookup...)
+	p.MachLookup = append(p.MachLookup, profile.MachLookup...)
+	p.MachLookup = removeDeniedMachLookups(p.MachLookup, profile.DenyMachLookup)
+	p.Network, err = resolveNetworkCapability(profile.Allow, profile.Deny)
 	if err != nil {
 		return Policy{}, err
 	}
@@ -54,10 +59,7 @@ func Resolve(in Inputs) (Policy, error) {
 	p.ReadWriteExec = append(p.ReadWriteExec, profile.ReadWriteExec...)
 	p.ReadWriteExec = append(p.ReadWriteExec, in.Options.ReadWriteExec...)
 
-	vars, err := pathVars(p.ProjectPath, in.Home, in.Tmp, cfg.Vars)
-	if err != nil {
-		return Policy{}, err
-	}
+	vars := pathVars(p.ProjectPath, in.Home, in.Tmp)
 	p.ProjectPath, err = resolveProjectPath(p.ProjectPath, vars)
 	if err != nil {
 		return Policy{}, err
@@ -99,6 +101,26 @@ func Resolve(in Inputs) (Policy, error) {
 	return p, nil
 }
 
+func removeDeniedMachLookups(values []string, denied []string) []string {
+	if len(values) == 0 || len(denied) == 0 {
+		return values
+	}
+	blocked := map[string]bool{}
+	for _, value := range denied {
+		name := strings.TrimSpace(value)
+		if name != "" {
+			blocked[name] = true
+		}
+	}
+	out := values[:0]
+	for _, value := range values {
+		if !blocked[strings.TrimSpace(value)] {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
 func addToolTempEnv(env map[string]string, tmp string) {
 	for _, key := range []string{"BUN_TMPDIR", "TMPDIR", "TMP", "TEMP"} {
 		if _, ok := env[key]; !ok {
@@ -115,43 +137,50 @@ func sandboxTmpDir(tmp string) string {
 	return filepath.Clean(path)
 }
 
-func pathVars(workspace, home, tmp string, configured map[string]string) (bpaths.Vars, error) {
-	vars := bpaths.Vars{"WORKSPACE": workspace, "HOME": home, "TMPDIR": tmp, "TMP": tmp}
-	for key, value := range configured {
-		if isReservedPathVar(key) {
-			return nil, fmt.Errorf("path variable %s is reserved and cannot be overridden", key)
-		}
-		vars[key] = value
-	}
-	return vars, nil
-}
-
-func isReservedPathVar(key string) bool {
-	switch key {
-	case "WORKSPACE", "HOME", "TMPDIR", "TMP":
-		return true
-	default:
-		return false
-	}
+func pathVars(workspace, home, tmp string) bpaths.Vars {
+	return bpaths.Vars{"WORKSPACE": workspace, "HOME": home, "TMPDIR": tmp, "TMP": tmp}
 }
 
 func boolValue(value *bool) bool {
 	return value != nil && *value
 }
 
-func resolveNetworkMode(value string, noNetwork bool) (NetworkMode, error) {
-	if noNetwork {
+const CapabilityNetwork = "network"
+
+func resolveNetworkCapability(allow []string, deny []string) (NetworkMode, error) {
+	if err := validateCapabilities(allow, deny); err != nil {
+		return "", err
+	}
+	if containsCapability(deny, CapabilityNetwork) {
 		return NetworkNone, nil
 	}
-	if value == "" {
+	if containsCapability(allow, CapabilityNetwork) {
 		return NetworkFull, nil
 	}
-	switch NetworkMode(value) {
-	case NetworkFull, NetworkNone:
-		return NetworkMode(value), nil
-	default:
-		return "", fmt.Errorf("invalid network mode %q: want full or none", value)
+	return NetworkNone, nil
+}
+
+func validateCapabilities(lists ...[]string) error {
+	for _, list := range lists {
+		for _, name := range list {
+			switch strings.TrimSpace(name) {
+			case "", CapabilityNetwork:
+				continue
+			default:
+				return fmt.Errorf("unsupported capability %q", name)
+			}
+		}
 	}
+	return nil
+}
+
+func containsCapability(values []string, want string) bool {
+	for _, value := range values {
+		if strings.TrimSpace(value) == want {
+			return true
+		}
+	}
+	return false
 }
 
 func profileUsesToolDefaults(name string, cfg config.Config) bool {
@@ -160,22 +189,33 @@ func profileUsesToolDefaults(name string, cfg config.Config) bool {
 
 func profileUsesNamedProfile(name string, cfg config.Config, want string) bool {
 	if name == "" {
-		name = cfg.DefaultProfile
+		name = "default"
 	}
-	seen := map[string]bool{}
-	for name != "" {
-		if name == want {
+	for _, selected := range strings.Split(name, ",") {
+		if profileUsesNamedProfileRecursive(strings.TrimSpace(selected), cfg, want, map[string]bool{}) {
 			return true
 		}
-		if seen[name] {
-			return false
+	}
+	return false
+}
+
+func profileUsesNamedProfileRecursive(name string, cfg config.Config, want string, seen map[string]bool) bool {
+	if name == want {
+		return true
+	}
+	if seen[name] {
+		return false
+	}
+	seen[name] = true
+	defer delete(seen, name)
+	profile, ok := cfg.Profiles[name]
+	if !ok {
+		return false
+	}
+	for _, parentName := range profile.Inherits.Names {
+		if profileUsesNamedProfileRecursive(parentName, cfg, want, seen) {
+			return true
 		}
-		seen[name] = true
-		profile, ok := cfg.Profiles[name]
-		if !ok {
-			return false
-		}
-		name = profile.Inherits
 	}
 	return false
 }
@@ -261,8 +301,9 @@ func sanitizePATH(value string, execRoots []string) string {
 }
 
 func platformToolPolicy(cfg config.Config) Policy {
-	p := platformLibsPolicy(cfg)
-	exec := policyFromPathSettings(cfg.Platform.Exec)
+	platform := cfg.Platform.ForCurrentPlatform()
+	p := policyFromPathSettings(platform.Libs)
+	exec := policyFromPathSettings(platform.Exec)
 	p.ReadOnly = append(exec.ReadOnly, p.ReadOnly...)
 	p.ReadOnlyExec = append(exec.ReadOnlyExec, p.ReadOnlyExec...)
 	p.ReadWrite = append(exec.ReadWrite, p.ReadWrite...)
@@ -271,7 +312,8 @@ func platformToolPolicy(cfg config.Config) Policy {
 }
 
 func platformLibsPolicy(cfg config.Config) Policy {
-	return policyFromPathSettings(cfg.Platform.Libs)
+	platform := cfg.Platform.ForCurrentPlatform()
+	return policyFromPathSettings(platform.Libs)
 }
 
 func policyFromPathSettings(s config.PathSettings) Policy {

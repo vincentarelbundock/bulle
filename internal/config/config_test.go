@@ -1,27 +1,28 @@
 package config
 
 import (
+	"bytes"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
+	"testing/fstest"
 )
 
-func TestLoadTOMLProfileInheritanceAndEnv(t *testing.T) {
+func TestLoadTOMLProfileInheritanceEnvAndMachLookup(t *testing.T) {
 	data := []byte(`
 default_app = "claude"
-default_profile = "secrets"
-network = "none"
-
 [profiles.default]
 rw = ["$WORKSPACE"]
 ro = ["$HOME/.cache/uv"]
 env = ["PATH"]
+deny = ["network"]
 
 [profiles.secrets]
 inherits = "default"
 env = ["OPENAI_API_KEY"]
-network = "full"
-allow_keychain = true
+allow = ["network"]
+mach_lookup = ["com.example.agent"]
 `)
 	cfg, err := LoadBytes(data)
 	if err != nil {
@@ -31,48 +32,168 @@ allow_keychain = true
 	if err != nil {
 		t.Fatalf("ResolveProfile returned error: %v", err)
 	}
+	if !reflect.DeepEqual(cfg.Profiles["secrets"].Inherits.Names, []string{"default"}) {
+		t.Fatalf("Inherits = %#v, want default", cfg.Profiles["secrets"].Inherits)
+	}
 	if len(profile.ReadWrite) != 1 || profile.ReadWrite[0] != "$WORKSPACE" {
 		t.Fatalf("ReadWrite = %#v", profile.ReadWrite)
 	}
 	if !contains(profile.Env, "PATH") || !contains(profile.Env, "OPENAI_API_KEY") {
 		t.Fatalf("Env = %#v", profile.Env)
 	}
-	if profile.AllowKeychain == nil || !*profile.AllowKeychain {
-		t.Fatalf("AllowKeychain = %#v, want true", profile.AllowKeychain)
+	if !contains(profile.MachLookup, "com.example.agent") {
+		t.Fatalf("MachLookup = %#v, want com.example.agent", profile.MachLookup)
 	}
-	if profile.Network != "full" {
-		t.Fatalf("Network = %q, want child override full", profile.Network)
+	if !contains(profile.Allow, "network") || contains(profile.Deny, "network") {
+		t.Fatalf("capabilities = allow %#v deny %#v, want network allowed", profile.Allow, profile.Deny)
 	}
 }
 
-func TestReplaceLists(t *testing.T) {
-	parent := Profile{Settings: Settings{PathSettings: PathSettings{ReadOnly: []string{"a"}, ReadOnlyExec: []string{"bin"}}, Env: []string{"PATH"}}}
-	child := Profile{Settings: Settings{PathSettings: PathSettings{ReplaceReadOnly: true, ReadOnly: []string{"b"}}, ReplaceEnv: true, Env: []string{"TERM"}}}
+func TestLoadRejectsDefaultProfileAndVars(t *testing.T) {
+	for name, data := range map[string]string{
+		"default_profile": `default_profile = "tool"`,
+		"vars": `[vars]
+CACHE = "$HOME/.cache"
+`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := LoadBytes([]byte(data))
+			if err == nil {
+				t.Fatalf("LoadBytes succeeded, want %s rejected", name)
+			}
+		})
+	}
+}
+
+func TestLoadTOMLProfileMultipleInheritanceMergesSequentially(t *testing.T) {
+	data := []byte(`
+[profiles.base]
+ro = ["/base"]
+env = ["PATH=/bin"]
+
+[profiles.extra]
+rw = ["/extra"]
+env = ["PATH=/opt/bin", "TERM"]
+
+[profiles.agent]
+inherits = ["base", "extra"]
+env = ["PATH=/agent/bin"]
+`)
+	cfg, err := LoadBytes(data)
+	if err != nil {
+		t.Fatalf("LoadBytes returned error: %v", err)
+	}
+	profile, err := cfg.ResolveProfile("agent")
+	if err != nil {
+		t.Fatalf("ResolveProfile returned error: %v", err)
+	}
+	if !contains(profile.ReadOnly, "/base") || !contains(profile.ReadWrite, "/extra") {
+		t.Fatalf("profile paths = %#v", profile.PathSettings)
+	}
+	if contains(profile.Env, "PATH=/bin") || contains(profile.Env, "PATH=/opt/bin") || !contains(profile.Env, "PATH=/agent/bin") || !contains(profile.Env, "TERM") {
+		t.Fatalf("Env = %#v", profile.Env)
+	}
+}
+
+func TestMergeProfilesPromotesPathRightsAndSupersedesEnv(t *testing.T) {
+	parent := Profile{Settings: Settings{
+		PathSettings: PathSettings{ReadOnlyExec: []string{"/tool"}},
+		Env:          []string{"PATH=/bin", "TERM"},
+		MachLookup:   []string{"com.example.parent"},
+	}}
+	child := Profile{Settings: Settings{
+		PathSettings: PathSettings{ReadOnly: []string{"/prefs"}, ReadWrite: []string{"/tool"}},
+		Env:          []string{"PATH=/custom/bin", "HOME"},
+		MachLookup:   []string{"com.example.parent", "com.example.child"},
+	}}
 	got := MergeProfiles(parent, child)
-	if len(got.ReadOnly) != 1 || got.ReadOnly[0] != "b" {
-		t.Fatalf("ReadOnly = %#v", got.ReadOnly)
+	if !contains(got.ReadWriteExec, "/tool") || contains(got.ReadOnlyExec, "/tool") || contains(got.ReadWrite, "/tool") {
+		t.Fatalf("PathSettings = %#v, want /tool promoted to rwx", got.PathSettings)
 	}
-	if len(got.ReadOnlyExec) != 1 || got.ReadOnlyExec[0] != "bin" {
-		t.Fatalf("ReadOnlyExec = %#v", got.ReadOnlyExec)
+	if !contains(got.ReadOnly, "/prefs") {
+		t.Fatalf("ReadOnly = %#v, want /prefs", got.ReadOnly)
 	}
-	if len(got.Env) != 1 || got.Env[0] != "TERM" {
+	if contains(got.Env, "PATH=/bin") || !contains(got.Env, "PATH=/custom/bin") || !contains(got.Env, "TERM") || !contains(got.Env, "HOME") {
 		t.Fatalf("Env = %#v", got.Env)
 	}
-}
-
-func TestMergeProfilesAllowsChildToOverrideNetwork(t *testing.T) {
-	got := MergeProfiles(Profile{Settings: Settings{Network: "none"}}, Profile{Settings: Settings{Network: "full"}})
-	if got.Network != "full" {
-		t.Fatalf("Network = %q, want full", got.Network)
+	if !reflect.DeepEqual(got.MachLookup, []string{"com.example.parent", "com.example.child"}) {
+		t.Fatalf("MachLookup = %#v", got.MachLookup)
 	}
 }
 
-func TestMergeProfilesAllowsChildToDisableKeychain(t *testing.T) {
+func TestMergeProfilesAllowsChildToOverrideCapabilities(t *testing.T) {
+	got := MergeProfiles(Profile{Settings: Settings{Allow: []string{"network"}}}, Profile{Settings: Settings{Deny: []string{"network"}}})
+	if contains(got.Allow, "network") || !contains(got.Deny, "network") {
+		t.Fatalf("capabilities = allow %#v deny %#v, want network denied", got.Allow, got.Deny)
+	}
+
+	got = MergeProfiles(Profile{Settings: Settings{Deny: []string{"network"}}}, Profile{Settings: Settings{Allow: []string{"network"}}})
+	if !contains(got.Allow, "network") || contains(got.Deny, "network") {
+		t.Fatalf("capabilities = allow %#v deny %#v, want network allowed", got.Allow, got.Deny)
+	}
+}
+
+func TestMergeProfilesAllowsChildToDenyMachLookup(t *testing.T) {
+	got := MergeProfiles(Profile{Settings: Settings{MachLookup: []string{"com.example.dns", "com.example.keychain"}}}, Profile{Settings: Settings{DenyMachLookup: []string{"com.example.dns"}}})
+	if contains(got.MachLookup, "com.example.dns") || !contains(got.DenyMachLookup, "com.example.dns") || !contains(got.MachLookup, "com.example.keychain") {
+		t.Fatalf("MachLookup = %#v DenyMachLookup = %#v, want dns denied and keychain retained", got.MachLookup, got.DenyMachLookup)
+	}
+
+	got = MergeProfiles(Profile{Settings: Settings{DenyMachLookup: []string{"com.example.dns"}}}, Profile{Settings: Settings{MachLookup: []string{"com.example.dns"}}})
+	if !contains(got.MachLookup, "com.example.dns") || contains(got.DenyMachLookup, "com.example.dns") {
+		t.Fatalf("MachLookup = %#v DenyMachLookup = %#v, want child allow to supersede deny", got.MachLookup, got.DenyMachLookup)
+	}
+}
+
+func TestMergeProfilesAllowsChildToDisableBooleanSetting(t *testing.T) {
 	yes := true
 	no := false
-	got := MergeProfiles(Profile{Settings: Settings{AllowKeychain: &yes}}, Profile{Settings: Settings{AllowKeychain: &no}})
-	if got.AllowKeychain == nil || *got.AllowKeychain {
-		t.Fatalf("AllowKeychain = %#v, want false", got.AllowKeychain)
+	got := MergeProfiles(Profile{Settings: Settings{AddExec: &yes}}, Profile{Settings: Settings{AddExec: &no}})
+	if got.AddExec == nil || *got.AddExec {
+		t.Fatalf("AddExec = %#v, want false", got.AddExec)
+	}
+}
+
+func TestEffectiveProfileMergesCommaSeparatedProfilesSequentially(t *testing.T) {
+	cfg := Config{Profiles: map[string]Profile{
+		"default": {},
+		"agent": {
+			Settings: Settings{
+				DefaultApp: "agent",
+				Env:        []string{"PATH=/bin"},
+				Allow:      []string{"network"},
+			},
+		},
+		"offline": {
+			Settings: Settings{
+				Env:  []string{"PATH=/offline", "TERM"},
+				Deny: []string{"network"},
+			},
+		},
+	}}
+
+	profile, name, _, err := EffectiveProfile(cfg, "agent, offline")
+	if err != nil {
+		t.Fatalf("EffectiveProfile returned error: %v", err)
+	}
+	if name != "agent,offline" {
+		t.Fatalf("name = %q, want normalized comma profile list", name)
+	}
+	if profile.DefaultApp != "agent" {
+		t.Fatalf("DefaultApp = %q, want agent", profile.DefaultApp)
+	}
+	if contains(profile.Allow, "network") || !contains(profile.Deny, "network") {
+		t.Fatalf("capabilities = allow %#v deny %#v, want offline to override network", profile.Allow, profile.Deny)
+	}
+	if contains(profile.Env, "PATH=/bin") || !contains(profile.Env, "PATH=/offline") || !contains(profile.Env, "TERM") {
+		t.Fatalf("Env = %#v, want later profile env to override by key", profile.Env)
+	}
+}
+
+func TestEffectiveProfileRejectsEmptyCommaProfile(t *testing.T) {
+	_, _, _, err := EffectiveProfile(Config{Profiles: map[string]Profile{"default": {}}}, "tool,,offline")
+	if err == nil || !strings.Contains(err.Error(), "empty profile") {
+		t.Fatalf("error = %v, want empty profile rejection", err)
 	}
 }
 
@@ -107,7 +228,7 @@ func TestMergeConfigsPreservesProfileInheritanceForPartialOverrides(t *testing.T
 	parent := Config{
 		Profiles: map[string]Profile{
 			"agent": {
-				Inherits: "tool",
+				Inherits: Inherits("tool"),
 				Settings: Settings{
 					PathSettings: PathSettings{ReadWrite: []string{"state"}},
 				},
@@ -125,12 +246,117 @@ func TestMergeConfigsPreservesProfileInheritanceForPartialOverrides(t *testing.T
 	}
 
 	got := MergeConfigs(parent, child)
-	if got.Profiles["agent"].Inherits != "tool" {
-		t.Fatalf("Inherits = %q, want tool", got.Profiles["agent"].Inherits)
+	if !reflect.DeepEqual(got.Profiles["agent"].Inherits.Names, []string{"tool"}) {
+		t.Fatalf("Inherits = %#v, want tool", got.Profiles["agent"].Inherits)
 	}
 	profile := got.Profiles["agent"]
 	if !contains(profile.ReadWrite, "state") || !contains(profile.ReadOnly, "prefs") {
 		t.Fatalf("profile paths = %#v", profile.PathSettings)
+	}
+}
+
+func TestBuiltInProfilesLiveInSeparateFiles(t *testing.T) {
+	data, err := defaultConfigFS.ReadFile("defaults.toml")
+	if err != nil {
+		t.Fatalf("ReadFile(defaults.toml) returned error: %v", err)
+	}
+	if bytes.Contains(data, []byte("[profiles.")) {
+		t.Fatalf("defaults.toml still contains profile tables")
+	}
+	if bytes.Contains(data, []byte("default_profile")) {
+		t.Fatalf("defaults.toml still contains default_profile")
+	}
+
+	entries, err := defaultConfigFS.ReadDir("profiles")
+	if err != nil {
+		t.Fatalf("ReadDir(profiles) returned error: %v", err)
+	}
+	files := map[string]bool{}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			t.Fatalf("profiles/%s is a directory, want individual TOML files", entry.Name())
+		}
+		path := "profiles/" + entry.Name()
+		data, err := defaultConfigFS.ReadFile(path)
+		if err != nil {
+			t.Fatalf("ReadFile(%s) returned error: %v", path, err)
+		}
+		if bytes.Contains(data, []byte("[profiles.")) {
+			t.Fatalf("%s still contains nested profile tables", path)
+		}
+		files[entry.Name()] = true
+	}
+	for _, want := range []string{
+		"default.toml",
+		"tool.toml",
+		"network.toml",
+		"offline.toml",
+		"macos-dns.toml",
+		"macos-certs.toml",
+		"keychain.toml",
+		"codex.toml",
+		"claude.toml",
+		"opencode.toml",
+		"pi.toml",
+	} {
+		if !files[want] {
+			t.Fatalf("profiles/%s missing in embedded defaults", want)
+		}
+	}
+}
+
+func TestLoadDefaultConfigReadsSingleProfileFileSpec(t *testing.T) {
+	cfg, err := loadDefaultConfigFromFS(fstest.MapFS{
+		"defaults.toml": {Data: []byte(``)},
+		"profiles/tool.toml": {Data: []byte(`title = "Tool"
+description = "General command support"
+inherits = "network"
+env = ["PATH"]
+
+[macos]
+ro = ["$HOME/Library/Preferences"]
+`)},
+	})
+	if err != nil {
+		t.Fatalf("loadDefaultConfigFromFS returned error: %v", err)
+	}
+	meta := cfg.ProfileMetadata["tool"]
+	if meta.Title != "Tool" || meta.Description != "General command support" {
+		t.Fatalf("metadata = %#v", meta)
+	}
+	profile := cfg.Profiles["tool"]
+	if !reflect.DeepEqual(profile.Inherits.Names, []string{"network"}) || !contains(profile.Env, "PATH") || !contains(profile.MacOS.ReadOnly, "$HOME/Library/Preferences") {
+		t.Fatalf("profile = %#v", profile)
+	}
+}
+
+func TestLoadDefaultConfigRejectsRemovedProfileMetadataFields(t *testing.T) {
+	for name, data := range map[string]string{
+		"category": `category = "base"`,
+		"hidden":   `hidden = true`,
+		"order":    `order = 10`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := loadDefaultConfigFromFS(fstest.MapFS{
+				"defaults.toml":      {Data: []byte(``)},
+				"profiles/tool.toml": {Data: []byte(data)},
+			})
+			if err == nil || !strings.Contains(err.Error(), "profiles/tool.toml") {
+				t.Fatalf("error = %v, want removed metadata field rejection", err)
+			}
+		})
+	}
+}
+
+func TestLoadDefaultConfigRejectsNestedProfileFileTables(t *testing.T) {
+	_, err := loadDefaultConfigFromFS(fstest.MapFS{
+		"defaults.toml": {Data: []byte(``)},
+		"profiles/tool.toml": {Data: []byte(`[profiles.tool]
+env = ["PATH"]
+`)},
+	})
+	if err == nil || !strings.Contains(err.Error(), "profiles/tool.toml") {
+		t.Fatalf("error = %v, want nested profile table rejection", err)
 	}
 }
 
@@ -169,8 +395,84 @@ func TestDefaultConfigIncludesToolProfile(t *testing.T) {
 	if contains(profile.Env, "HOME") || contains(profile.Env, "USER") || contains(profile.Env, "LOGNAME") {
 		t.Fatalf("tool env should stay minimal, got %#v", profile.Env)
 	}
-	if !profile.AddExec || !profile.AddLibs {
+	if profile.AddExec == nil || !*profile.AddExec || profile.AddLibs == nil || !*profile.AddLibs {
 		t.Fatalf("AddExec = %v, AddLibs = %v", profile.AddExec, profile.AddLibs)
+	}
+	if !contains(profile.Allow, "network") || contains(profile.Deny, "network") {
+		t.Fatalf("capabilities = allow %#v deny %#v, want network allowed", profile.Allow, profile.Deny)
+	}
+}
+
+func TestDefaultConfigIncludesCapabilityBundles(t *testing.T) {
+	cfg := DefaultConfig()
+
+	network, ok := cfg.Profiles["network"]
+	if !ok {
+		t.Fatalf("network profile missing")
+	}
+	if !reflect.DeepEqual(network.Inherits.Names, []string{"macos-dns", "macos-certs"}) {
+		t.Fatalf("network Inherits = %#v, want macos DNS and cert bundles", network.Inherits)
+	}
+	if !contains(network.Allow, "network") || contains(network.Deny, "network") {
+		t.Fatalf("network capabilities = allow %#v deny %#v, want network allowed", network.Allow, network.Deny)
+	}
+
+	offline, ok := cfg.Profiles["offline"]
+	if !ok {
+		t.Fatalf("offline profile missing")
+	}
+	for _, want := range []string{
+		"com.apple.SystemConfiguration.DNSConfiguration",
+		"com.apple.trustd.agent",
+	} {
+		if !contains(offline.MacOS.DenyMachLookup, want) {
+			t.Fatalf("offline DenyMachLookup = %#v, want %q", offline.MacOS.DenyMachLookup, want)
+		}
+	}
+
+	dns, ok := cfg.Profiles["macos-dns"]
+	if !ok {
+		t.Fatalf("macos-dns profile missing")
+	}
+	for _, want := range []string{
+		"com.apple.SystemConfiguration.DNSConfiguration",
+		"com.apple.SystemConfiguration.configd",
+		"com.apple.system.opendirectoryd.libinfo",
+	} {
+		if !contains(dns.MacOS.MachLookup, want) {
+			t.Fatalf("macos-dns MachLookup = %#v, want %q", dns.MacOS.MachLookup, want)
+		}
+	}
+
+	certs, ok := cfg.Profiles["macos-certs"]
+	if !ok {
+		t.Fatalf("macos-certs profile missing")
+	}
+	if !contains(certs.MacOS.MachLookup, "com.apple.trustd.agent") {
+		t.Fatalf("macos-certs MachLookup = %#v, want trustd", certs.MacOS.MachLookup)
+	}
+
+	keychain, ok := cfg.Profiles["keychain"]
+	if !ok {
+		t.Fatalf("keychain profile missing")
+	}
+	for _, want := range []string{
+		"$HOME/Library/Keychains",
+		"/Library/Keychains",
+		"/Library/Security",
+	} {
+		if !contains(keychain.MacOS.ReadOnly, want) {
+			t.Fatalf("keychain ReadOnly = %#v, want %q", keychain.MacOS.ReadOnly, want)
+		}
+	}
+	for _, want := range []string{
+		"com.apple.SecurityServer",
+		"com.apple.securityd",
+		"com.apple.securityd.xpc",
+	} {
+		if !contains(keychain.MacOS.MachLookup, want) {
+			t.Fatalf("keychain MachLookup = %#v, want %q", keychain.MacOS.MachLookup, want)
+		}
 	}
 }
 
@@ -179,11 +481,12 @@ func TestDefaultConfigIncludesAgentProfiles(t *testing.T) {
 	for name, tt := range map[string]struct {
 		app       string
 		statePath string
+		inherits  []string
 	}{
-		"codex":    {app: "codex", statePath: "$HOME/.codex"},
-		"claude":   {app: "claude", statePath: "$HOME/.claude"},
-		"opencode": {app: "opencode", statePath: "$HOME/.config/opencode"},
-		"pi":       {app: "pi", statePath: "$HOME/.pi"},
+		"codex":    {app: "codex", statePath: "$HOME/.codex", inherits: []string{"tool", "keychain"}},
+		"claude":   {app: "claude", statePath: "$HOME/.claude", inherits: []string{"tool"}},
+		"opencode": {app: "opencode", statePath: "$HOME/.config/opencode", inherits: []string{"tool"}},
+		"pi":       {app: "pi", statePath: "$HOME/.pi", inherits: []string{"tool"}},
 	} {
 		profile, err := cfg.ResolveProfile(name)
 		if err != nil {
@@ -192,8 +495,8 @@ func TestDefaultConfigIncludesAgentProfiles(t *testing.T) {
 		if profile.DefaultApp != tt.app {
 			t.Fatalf("profile %q DefaultApp = %q, want %q", name, profile.DefaultApp, tt.app)
 		}
-		if cfg.Profiles[name].Inherits != "tool" {
-			t.Fatalf("profile %q Inherits = %q, want tool", name, cfg.Profiles[name].Inherits)
+		if !reflect.DeepEqual(cfg.Profiles[name].Inherits.Names, tt.inherits) {
+			t.Fatalf("profile %q Inherits = %#v, want %#v", name, cfg.Profiles[name].Inherits, tt.inherits)
 		}
 		if contains(profile.ReadWrite, "$WORKSPACE") {
 			t.Fatalf("profile %q should rely on automatic workspace grant, got ReadWrite: %#v", name, profile.ReadWrite)
@@ -210,16 +513,27 @@ func TestDefaultConfigIncludesAgentProfiles(t *testing.T) {
 	}
 }
 
-func TestCodexProfileSupportsAppMCP(t *testing.T) {
+func TestCodexProfileSupportsAppMCPOnMacOS(t *testing.T) {
 	cfg := DefaultConfig()
 	profile, err := cfg.ResolveProfile("codex")
 	if err != nil {
 		t.Fatalf("ResolveProfile returned error: %v", err)
 	}
-	if profile.AllowKeychain == nil || !*profile.AllowKeychain {
-		t.Fatalf("codex AllowKeychain = %#v, want true", profile.AllowKeychain)
-	}
 	assertMacOSPreferencesDefault(t, "codex", profile)
+	hasSecurity := contains(profile.MachLookup, "com.apple.SecurityServer")
+	hasKeychainRO := contains(profile.ReadOnly, "$HOME/Library/Keychains")
+	if runtime.GOOS == "darwin" {
+		if !hasSecurity {
+			t.Fatalf("codex MachLookup = %#v, want SecurityServer on darwin", profile.MachLookup)
+		}
+		if !hasKeychainRO {
+			t.Fatalf("codex ReadOnly = %#v, want user keychain on darwin", profile.ReadOnly)
+		}
+	} else {
+		if hasSecurity || hasKeychainRO {
+			t.Fatalf("codex macOS grants leaked on %s: ro=%#v mach=%#v", runtime.GOOS, profile.ReadOnly, profile.MachLookup)
+		}
+	}
 	if contains(profile.ReadWrite, "$HOME/Library/Keychains") {
 		t.Fatalf("codex ReadWrite = %#v, did not want $HOME/Library/Keychains", profile.ReadWrite)
 	}
@@ -231,13 +545,10 @@ func TestClaudeProfileDoesNotAllowKeychainByDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveProfile returned error: %v", err)
 	}
-	if profile.AllowKeychain != nil && *profile.AllowKeychain {
-		t.Fatalf("claude AllowKeychain = %#v, want false", profile.AllowKeychain)
+	if contains(profile.MachLookup, "com.apple.SecurityServer") || contains(profile.ReadOnly, "$HOME/Library/Keychains") {
+		t.Fatalf("claude keychain grants = ro %#v mach %#v, want none", profile.ReadOnly, profile.MachLookup)
 	}
 	assertMacOSPreferencesDefault(t, "claude", profile)
-	if contains(profile.ReadWrite, "$HOME/Library/Keychains") {
-		t.Fatalf("claude ReadWrite = %#v, did not want $HOME/Library/Keychains", profile.ReadWrite)
-	}
 }
 
 func TestClaudeProfileAllowsTopLevelClaudeState(t *testing.T) {
@@ -295,30 +606,47 @@ func TestTopLevelConfigSettings(t *testing.T) {
 	data := []byte(`
 rw = ["$WORKSPACE/.venv"]
 env = ["PYTHONPATH"]
-network = "none"
+deny = ["network"]
 `)
 	cfg, err := LoadBytes(data)
 	if err != nil {
 		t.Fatalf("LoadBytes returned error: %v", err)
 	}
 	top := cfg.TopLevelProfile()
-	if !contains(top.ReadWrite, "$WORKSPACE/.venv") || !contains(top.Env, "PYTHONPATH") || top.Network != "none" {
+	if !contains(top.ReadWrite, "$WORKSPACE/.venv") || !contains(top.Env, "PYTHONPATH") || !contains(top.Deny, "network") {
 		t.Fatalf("top = %#v", top)
 	}
 }
 
-func TestPlatformSettingsArePathOnly(t *testing.T) {
+func TestPlatformSettingsApplyByPlatform(t *testing.T) {
+	cfg := DefaultConfig()
+	macOS := cfg.Platform.ForPlatform("macos")
+	if !contains(macOS.Exec.ReadOnlyExec, "/opt/homebrew/bin") {
+		t.Fatalf("macOS exec defaults = %#v", macOS.Exec.ReadOnlyExec)
+	}
+	if len(macOS.MachLookup) != 0 {
+		t.Fatalf("macOS platform MachLookup = %#v, want profile bundles to own Mach services", macOS.MachLookup)
+	}
+	linux := cfg.Platform.ForPlatform("linux")
+	if contains(linux.Exec.ReadOnlyExec, "/opt/homebrew/bin") {
+		t.Fatalf("linux exec defaults leaked macOS path: %#v", linux.Exec.ReadOnlyExec)
+	}
+	if len(linux.MachLookup) != 0 {
+		t.Fatalf("linux MachLookup = %#v, want none", linux.MachLookup)
+	}
+}
+
+func TestPlatformExecAndLibsSettingsArePathOnly(t *testing.T) {
 	settingsType := reflect.TypeOf(PlatformSettings{}.Exec)
 	for _, field := range []string{
 		"DefaultApp",
 		"Env",
-		"ReplaceEnv",
+		"MachLookup",
 		"AddExec",
 		"AddLibs",
-		"AllowKeychain",
 	} {
 		if _, ok := settingsType.FieldByName(field); ok {
-			t.Fatalf("PlatformSettings.Exec exposes profile-only field %s", field)
+			t.Fatalf("PlatformSettings.Exec exposes non-path field %s", field)
 		}
 	}
 }

@@ -1,0 +1,15 @@
+title = "Claude"
+description = "Claude Code app state, config, and login support"
+inherits = "tool"
+default_app = "claude"
+env = ["HOME", "USER", "TERM", "LANG", "SHELL"]
+rw = [
+  "$HOME/.claude.json",
+]
+rwx = [
+  "$HOME/.claude",
+  "$HOME/.local/share/claude",
+]
+
+[macos]
+ro = ["$HOME/Library/Preferences"]

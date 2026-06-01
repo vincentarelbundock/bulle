@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 var ttyDevicePattern = regexp.MustCompile(`^/dev/ttys[0-9]+$`)
@@ -94,6 +95,60 @@ func ancestorDirs(paths []string) []string {
 				out = append(out, dirs[i])
 			}
 		}
+	}
+	return out
+}
+
+func symlinkPathComponents(paths []string) []string {
+	seenOutput := map[string]bool{}
+	seenVisits := map[string]bool{}
+	out := []string{}
+
+	var visit func(string)
+	visit = func(path string) {
+		clean := filepath.Clean(path)
+		if !filepath.IsAbs(clean) || seenVisits[clean] {
+			return
+		}
+		seenVisits[clean] = true
+
+		trimmed := strings.TrimPrefix(clean, string(filepath.Separator))
+		if trimmed == "" {
+			return
+		}
+		parts := strings.Split(trimmed, string(filepath.Separator))
+		prefix := string(filepath.Separator)
+		for i, part := range parts {
+			prefix = filepath.Join(prefix, part)
+			info, err := os.Lstat(prefix)
+			if err != nil {
+				return
+			}
+			if info.Mode()&os.ModeSymlink == 0 {
+				continue
+			}
+			if !seenOutput[prefix] {
+				seenOutput[prefix] = true
+				out = append(out, prefix)
+			}
+			target, err := os.Readlink(prefix)
+			if err != nil {
+				return
+			}
+			if !filepath.IsAbs(target) {
+				target = filepath.Join(filepath.Dir(prefix), target)
+			}
+			expanded := filepath.Clean(target)
+			if remaining := parts[i+1:]; len(remaining) > 0 {
+				expanded = filepath.Join(append([]string{expanded}, remaining...)...)
+			}
+			visit(expanded)
+			return
+		}
+	}
+
+	for _, path := range paths {
+		visit(path)
 	}
 	return out
 }

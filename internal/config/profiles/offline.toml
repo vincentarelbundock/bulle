@@ -1,0 +1,11 @@
+title = "Offline"
+description = "deny network socket access"
+deny = ["network"]
+
+[macos]
+deny_mach_lookup = [
+  "com.apple.SystemConfiguration.DNSConfiguration",
+  "com.apple.SystemConfiguration.configd",
+  "com.apple.system.opendirectoryd.libinfo",
+  "com.apple.trustd.agent",
+]

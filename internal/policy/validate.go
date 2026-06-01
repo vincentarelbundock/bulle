@@ -20,13 +20,16 @@ func PrepareCommandExecutable(p Policy) (Policy, error) {
 	out.Command = append([]string{}, p.Command...)
 	command := p.Command[0]
 	execRoots := executableLookupRoots(append(append([]string{}, p.ReadOnlyExec...), p.ReadWriteExec...))
-	policyPATH := p.Env["PATH"]
+	policyPATH, hasPolicyPATH := p.Env["PATH"]
 	binary, err := lookPath(command, policyPATH, p.ProjectPath)
 	if err != nil {
-		binary, err = lookExecutableRoots(command, execRoots)
+		binary, err = lookExecutableRoots(command, execRoots, p.AddExec)
+	}
+	if err != nil && p.AddExec && !hasPolicyPATH {
+		binary, err = lookPath(command, os.Getenv("PATH"), p.ProjectPath)
 	}
 	if err != nil {
-		return out, fmt.Errorf("%w before sandbox setup: %q is not on policy PATH or executable roots. Add --env PATH with matching --rox/--rwx roots, add a --rox/--rwx root containing the command, choose a profile, or pass an explicit executable path after --", ErrCommandNotFound, command)
+		return out, fmt.Errorf("%w before sandbox setup: %q is not on policy PATH, parent PATH, or executable roots. Add --env PATH with matching --rox/--rwx roots, add a --rox/--rwx root containing the command, choose a profile, or pass an explicit executable path after --", ErrCommandNotFound, command)
 	}
 	binary = filepath.Clean(binary)
 	out.Command[0] = binary
@@ -95,7 +98,7 @@ func lookPath(command string, policyPATH string, projectPath string) (string, er
 	return "", ErrCommandNotFound
 }
 
-func lookExecutableRoots(command string, execRoots []string) (string, error) {
+func lookExecutableRoots(command string, execRoots []string, allowSymlinkEscape bool) (string, error) {
 	if strings.Contains(command, string(filepath.Separator)) {
 		return "", ErrCommandNotFound
 	}
@@ -111,8 +114,10 @@ func lookExecutableRoots(command string, execRoots []string) (string, error) {
 		} else if filepath.Base(root) != command {
 			continue
 		}
-		if isExecutableFile(candidate) && bpaths.IsWithinAnyRootResolvingSymlinks(candidate, roots) {
-			return filepath.Clean(candidate), nil
+		if isExecutableFile(candidate) {
+			if allowSymlinkEscape || bpaths.IsWithinAnyRootResolvingSymlinks(candidate, roots) {
+				return filepath.Clean(candidate), nil
+			}
 		}
 	}
 	return "", ErrCommandNotFound

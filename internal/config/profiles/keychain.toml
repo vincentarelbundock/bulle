@@ -1,0 +1,14 @@
+title = "Keychain"
+description = "macOS Keychain file and service access"
+
+[macos]
+ro = [
+  "$HOME/Library/Keychains",
+  "/Library/Keychains",
+  "/Library/Security",
+]
+mach_lookup = [
+  "com.apple.SecurityServer",
+  "com.apple.securityd",
+  "com.apple.securityd.xpc",
+]

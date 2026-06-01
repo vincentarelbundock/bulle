@@ -86,17 +86,17 @@ func TestLinuxLandlockClosesInheritedFileDescriptors(t *testing.T) {
 	}
 }
 
-func TestLinuxNoNetworkDeniesSocketCreation(t *testing.T) {
+func TestLinuxOfflineProfileDeniesSocketCreation(t *testing.T) {
 	bin := filepath.Join(t.TempDir(), "bulle")
 	buildBulleForIntegration(t, bin)
 	probe := filepath.Join(t.TempDir(), "network-probe")
 	buildLinuxNetworkProbe(t, probe)
 	project := t.TempDir()
 
-	cmd := exec.Command(bin, project, "--no-network", "--add-exec", "--", probe)
+	cmd := exec.Command(bin, project, "--profile", "offline", "--add-exec", "--", probe)
 	out, err := cmd.CombinedOutput()
 	if err == nil {
-		t.Fatalf("network probe succeeded with --no-network, output: %s", string(out))
+		t.Fatalf("network probe succeeded with offline profile, output: %s", string(out))
 	}
 }
 

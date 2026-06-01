@@ -31,7 +31,7 @@ func writeProfilePermissionSummary(profileName string, p policy.Policy, w io.Wri
 	fmt.Fprintf(w, "  network: %s\n", formatNetwork(view.Network))
 	fmt.Fprintf(w, "  add_exec: %s\n", formatEnabled(view.AddExec))
 	fmt.Fprintf(w, "  add_libs: %s\n", formatEnabled(view.AddLibs))
-	fmt.Fprintf(w, "  keychain: %s\n", formatEnabled(view.AllowKeychain))
+	fmt.Fprintf(w, "  mach_lookup: %s\n", formatInlineList(view.MachLookup))
 }
 
 func preRunSessionPaste(opts cli.Options, p policy.Policy) string {

@@ -55,10 +55,10 @@ func TestWriteProfilePermissionSummaryFormatsPolicy(t *testing.T) {
 			"OPENAI_API_KEY": "openai-secret-value",
 			"PATH":           "path-secret-value",
 		},
-		AddExec:       true,
-		AddLibs:       false,
-		AllowKeychain: true,
-		Network:       policy.NetworkNone,
+		AddExec:    true,
+		AddLibs:    false,
+		MachLookup: []string{"com.apple.SecurityServer"},
+		Network:    policy.NetworkNone,
 	}
 
 	writeProfilePermissionSummary("agent", p, &stderr)
@@ -77,7 +77,7 @@ func TestWriteProfilePermissionSummaryFormatsPolicy(t *testing.T) {
 	assertContains(t, got, "  network: none\n")
 	assertContains(t, got, "  add_exec: enabled\n")
 	assertContains(t, got, "  add_libs: disabled\n")
-	assertContains(t, got, "  keychain: enabled\n")
+	assertContains(t, got, "  mach_lookup: com.apple.SecurityServer\n")
 	assertNotContains(t, got, "openai-secret-value")
 	assertNotContains(t, got, "path-secret-value")
 }
@@ -158,7 +158,7 @@ func TestWriteProfilePermissionSummaryShowsNoneForEmptyGroups(t *testing.T) {
 	assertContains(t, got, "    rwx: none\n")
 	assertContains(t, got, "  environment: none\n")
 	assertContains(t, got, "  network: full\n")
-	assertContains(t, got, "  keychain: disabled\n")
+	assertContains(t, got, "  mach_lookup: none\n")
 }
 
 func TestWriteProfilePermissionSummaryRecognizesUserSpecificRuntimeTmp(t *testing.T) {
@@ -209,11 +209,11 @@ func TestGroupSiblingPathsDeduplicatesNames(t *testing.T) {
 func TestPreRunSessionPasteIncludesProfileSummaryWithoutKeychainWarning(t *testing.T) {
 	opts := cli.Options{Flags: cli.Flags{Profile: "claude"}}
 	p := policy.Policy{
-		Backend:       policy.BackendMacOSSeatbelt,
-		ProjectPath:   "/tmp/project",
-		Command:       []string{"claude"},
-		Env:           map[string]string{"PATH": "/bin"},
-		AllowKeychain: true,
+		Backend:     policy.BackendMacOSSeatbelt,
+		ProjectPath: "/tmp/project",
+		Command:     []string{"claude"},
+		Env:         map[string]string{"PATH": "/bin"},
+		MachLookup:  []string{"com.apple.SecurityServer"},
 	}
 
 	got := preRunSessionPaste(opts, p)

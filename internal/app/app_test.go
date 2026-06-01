@@ -111,7 +111,7 @@ func TestRunListProfilesPrintsBuiltInProfiles(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
 	}
-	for _, want := range []string{"tool\n", "claude\n", "codex\n", "pi\n", "opencode\n"} {
+	for _, want := range []string{"tool\n", "network\n", "offline\n", "macos-dns\n", "macos-certs\n", "keychain\n", "claude\n", "codex\n", "pi\n", "opencode\n"} {
 		if !bytes.Contains(stdout.Bytes(), []byte(want)) {
 			t.Fatalf("stdout = %s, want profile %q", stdout.String(), want)
 		}
@@ -265,8 +265,8 @@ func TestRunUsesDefaultAppFromConfig(t *testing.T) {
 	tmp := t.TempDir()
 	cfg := filepath.Join(tmp, "config.toml")
 	if err := os.WriteFile(cfg, []byte(`
-default_app = "echo hi"
-default_profile = "tool"
+default_app = "/bin/echo hi"
+rox = ["/bin"]
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -314,8 +314,8 @@ func TestRunParsesQuotedDefaultApp(t *testing.T) {
 	tmp := t.TempDir()
 	cfg := filepath.Join(tmp, "config.toml")
 	if err := os.WriteFile(cfg, []byte(`
-default_app = "echo 'hello world'"
-default_profile = "tool"
+default_app = "/bin/echo 'hello world'"
+rox = ["/bin"]
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +337,6 @@ func TestRunRejectsInvalidDefaultApp(t *testing.T) {
 	cfg := filepath.Join(tmp, "config.toml")
 	if err := os.WriteFile(cfg, []byte(`
 default_app = "echo 'unterminated"
-default_profile = "tool"
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -438,18 +437,18 @@ func TestRunPolicyPrintsHumanReadableSummaryByDefault(t *testing.T) {
 	}
 }
 
-func TestRunPolicyIncludesNoNetwork(t *testing.T) {
+func TestRunPolicyIncludesOfflineProfileOverlay(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
 
-	code := Run([]string{"bulle", "--profile", "tool", "--no-network", tmp, "--policy=json", "--", "echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--profile", "tool,offline", tmp, "--policy=json", "--", "echo", "hi"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
 	}
 	if !bytes.Contains(stdout.Bytes(), []byte(`"network":"none"`)) {
-		t.Fatalf("stdout missing no-network policy: %s", stdout.String())
+		t.Fatalf("stdout missing offline policy: %s", stdout.String())
 	}
 }
 

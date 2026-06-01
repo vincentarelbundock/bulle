@@ -35,15 +35,12 @@ Environment flags (no variables are passed unless requested):
   --env NAME        pass NAME from the current environment, if it is set
   --env NAME=VALUE  set NAME to VALUE inside the sandbox
 
-Network flags:
-  --no-network      deny network access for this invocation
-
 Configuration:
   --config PATH     path to a configuration file
 
 Profiles:
   -p, --profile NAME
-                    named profile from the configuration file
+                    named profile from the configuration file; comma-separated names merge left to right
   --list-profiles  list available profiles and exit
 `
 
@@ -69,26 +66,8 @@ Examples:
   bulle . --profile secrets --env OPENAI_API_KEY -- codex
   bulle . --rox /bin --policy=json -- /bin/bash
   bulle --profile codex --policy
-  bulle --profile codex --no-network
+  bulle --profile codex,offline
 `
-
-var (
-	profileDescriptions = map[string]string{
-		"tool":     "general local command support (PATH, executables, libs)",
-		"claude":   "Claude Code app state, config, and login support",
-		"codex":    "Codex app state, config, network, MCP, and login support",
-		"pi":       "Pi app state and config support",
-		"opencode": "OpenCode app state and config support",
-	}
-
-	profileSortOrder = map[string]int{
-		"tool":     0,
-		"claude":   1,
-		"codex":    2,
-		"pi":       3,
-		"opencode": 4,
-	}
-)
 
 // Usage returns the full help text printed for --help and the help subcommand.
 func Usage() string {
@@ -100,13 +79,13 @@ func profileUsage() string {
 	names := ProfileNames(cfg)
 	var b strings.Builder
 	for _, name := range names {
-		fmt.Fprintf(&b, "  %-17s %s\n", name, profileDescription(name, cfg.Profiles[name]))
+		fmt.Fprintf(&b, "  %-17s %s\n", name, profileDescription(name, cfg))
 	}
 	return b.String()
 }
 
 // ProfileNames returns user-facing profile names in the same stable order used
-// by help output: built-ins first, then custom names alphabetically.
+// by help output: alphabetically.
 func ProfileNames(cfg config.Config) []string {
 	var names []string
 	for name := range cfg.Profiles {
@@ -114,26 +93,16 @@ func ProfileNames(cfg config.Config) []string {
 			names = append(names, name)
 		}
 	}
-	sort.Slice(names, func(i, j int) bool {
-		leftOrder, leftPreferred := profileSortOrder[names[i]]
-		rightOrder, rightPreferred := profileSortOrder[names[j]]
-		if leftPreferred && rightPreferred {
-			return leftOrder < rightOrder
-		}
-		if leftPreferred != rightPreferred {
-			return leftPreferred
-		}
-		return names[i] < names[j]
-	})
+	sort.Strings(names)
 	return names
 }
 
-func profileDescription(name string, profile config.Profile) string {
-	if description, ok := profileDescriptions[name]; ok {
+func profileDescription(name string, cfg config.Config) string {
+	if description := cfg.ProfileMetadata[name].Description; description != "" {
 		return description
 	}
-	if profile.DefaultApp != "" {
+	if profile := cfg.Profiles[name]; profile.DefaultApp != "" {
 		return profile.DefaultApp + " app support"
 	}
-	return "built-in profile"
+	return "custom profile"
 }

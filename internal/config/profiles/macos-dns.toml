@@ -1,0 +1,9 @@
+title = "macOS DNS"
+description = "macOS DNS and directory service lookups"
+
+[macos]
+mach_lookup = [
+  "com.apple.SystemConfiguration.DNSConfiguration",
+  "com.apple.SystemConfiguration.configd",
+  "com.apple.system.opendirectoryd.libinfo",
+]

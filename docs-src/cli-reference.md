@@ -37,21 +37,23 @@ Environment flags (no variables are passed unless requested):
   --env NAME        pass NAME from the current environment, if it is set
   --env NAME=VALUE  set NAME to VALUE inside the sandbox
 
-Network flags:
-  --no-network      deny network access for this invocation
-
 Configuration:
   --config PATH     path to a configuration file
 
 Profiles:
   -p, --profile NAME
-                    named profile from the configuration file
+                    named profile from the configuration file; comma-separated names merge left to right
   --list-profiles  list available profiles and exit
-  tool              general local command support (PATH, executables, libs)
   claude            Claude Code app state, config, and login support
   codex             Codex app state, config, network, MCP, and login support
-  pi                Pi app state and config support
+  keychain          macOS Keychain file and service access
+  macos-certs       macOS certificate trust service lookup
+  macos-dns         macOS DNS and directory service lookups
+  network           network socket access capability
+  offline           deny network socket access
   opencode          OpenCode app state and config support
+  pi                Pi app state and config support
+  tool              general local command support (PATH, executables, libs)
 
 Executable discovery:
   --add-exec        add the resolved command executable to the sandbox
@@ -74,5 +76,5 @@ Examples:
   bulle . --profile secrets --env OPENAI_API_KEY -- codex
   bulle . --rox /bin --policy=json -- /bin/bash
   bulle --profile codex --policy
-  bulle --profile codex --no-network
+  bulle --profile codex,offline
 ~~~

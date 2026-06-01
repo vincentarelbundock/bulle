@@ -1,7 +1,6 @@
 package policy
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -121,6 +120,36 @@ func TestPrepareCommandExecutableFallsBackToExecutableRootsWhenPolicyPATHMisses(
 	}
 }
 
+func TestPrepareCommandExecutableWithAddExecUsesParentPATHForLookupOnly(t *testing.T) {
+	binDir := filepath.Join(t.TempDir(), "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	binary := filepath.Join(binDir, "bulle-test-tool")
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir)
+
+	got, err := PrepareCommandExecutable(Policy{
+		Command: []string{"bulle-test-tool"},
+		AddExec: true,
+		Env:     map[string]string{},
+	})
+	if err != nil {
+		t.Fatalf("PrepareCommandExecutable returned error: %v", err)
+	}
+	if got.Command[0] != binary {
+		t.Fatalf("Command[0] = %q, want parent PATH executable %q", got.Command[0], binary)
+	}
+	if !contains(got.ReadOnlyExec, binary) {
+		t.Fatalf("ReadOnlyExec = %#v, want %q", got.ReadOnlyExec, binary)
+	}
+	if _, ok := got.Env["PATH"]; ok {
+		t.Fatalf("Env[PATH] is set, want parent PATH lookup without exporting PATH")
+	}
+}
+
 func TestPrepareCommandExecutableResolvesRelativeCommandFromProjectPath(t *testing.T) {
 	root := t.TempDir()
 	launcher := filepath.Join(root, "launcher")
@@ -234,26 +263,39 @@ func TestPrepareCommandExecutableRejectsSymlinkEscapeWithoutAddExec(t *testing.T
 	}
 }
 
-func TestPrepareCommandExecutableRejectsBareCommandWithoutPolicyPATH(t *testing.T) {
-	binDir := filepath.Join(t.TempDir(), "bin")
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
+func TestPrepareCommandExecutableWithAddExecAllowsExecutableRootSymlinkTarget(t *testing.T) {
+	root := t.TempDir()
+	allowedBin := filepath.Join(root, "allowed", "bin")
+	outsideBin := filepath.Join(root, "outside", "bin")
+	for _, path := range []string{allowedBin, outsideBin} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	target := filepath.Join(outsideBin, "bulle-test-tool")
+	link := filepath.Join(allowedBin, "bulle-test-tool")
+	if err := os.WriteFile(target, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	binary := filepath.Join(binDir, "bulle-test-tool")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := os.Symlink(target, link); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PATH", binDir)
 
-	_, err := PrepareCommandExecutable(Policy{
-		Command: []string{"bulle-test-tool"},
-		AddExec: true,
-		Env:     map[string]string{},
+	got, err := PrepareCommandExecutable(Policy{
+		Command:      []string{"bulle-test-tool"},
+		AddExec:      true,
+		ReadOnlyExec: []string{allowedBin},
+		Env:          map[string]string{},
 	})
-	if err == nil {
-		t.Fatalf("PrepareCommandExecutable succeeded, want missing policy PATH error")
+	if err != nil {
+		t.Fatalf("PrepareCommandExecutable returned error: %v", err)
 	}
-	if !errors.Is(err, ErrCommandNotFound) {
-		t.Fatalf("err = %v, want ErrCommandNotFound", err)
+	if got.Command[0] != link {
+		t.Fatalf("Command[0] = %q, want symlink path %q", got.Command[0], link)
+	}
+	for _, want := range []string{link, target} {
+		if !contains(got.ReadOnlyExec, want) {
+			t.Fatalf("ReadOnlyExec = %#v, want %q", got.ReadOnlyExec, want)
+		}
 	}
 }

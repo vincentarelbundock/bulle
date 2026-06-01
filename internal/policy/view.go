@@ -23,7 +23,7 @@ func NewView(p Policy) View {
 		EnvKeys:       envKeys,
 		AddExec:       p.AddExec,
 		AddLibs:       p.AddLibs,
-		AllowKeychain: p.AllowKeychain,
+		MachLookup:    append([]string{}, p.MachLookup...),
 		Network:       network,
 	}
 }

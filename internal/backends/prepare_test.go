@@ -84,6 +84,68 @@ func TestPreparePolicyAddsRealShebangScriptDirectoryForImports(t *testing.T) {
 	}
 }
 
+func TestPreparePolicyDoesNotAddMacOSBundleRootForShebangScriptWithAddLibs(t *testing.T) {
+	framework, link := makeFrameworkShebangScript(t)
+
+	got, err := PreparePolicy(policy.Policy{
+		Backend: policy.BackendMacOSSeatbelt,
+		Command: []string{link},
+		AddExec: true,
+		AddLibs: true,
+		Env:     map[string]string{},
+	})
+	if err != nil {
+		t.Fatalf("PreparePolicy returned error: %v", err)
+	}
+	if containsString(got.ReadOnlyExec, framework) {
+		t.Fatalf("ReadOnlyExec = %#v, did not want bundle root %q from AddLibs", got.ReadOnlyExec, framework)
+	}
+}
+
+func TestPreparePolicyDoesNotAddMacOSBundleRootForShebangScriptWithoutAddLibs(t *testing.T) {
+	framework, link := makeFrameworkShebangScript(t)
+
+	got, err := PreparePolicy(policy.Policy{
+		Backend: policy.BackendMacOSSeatbelt,
+		Command: []string{link},
+		AddExec: true,
+		Env:     map[string]string{},
+	})
+	if err != nil {
+		t.Fatalf("PreparePolicy returned error: %v", err)
+	}
+	if containsString(got.ReadOnlyExec, framework) {
+		t.Fatalf("ReadOnlyExec = %#v, did not want bundle root %q without AddLibs", got.ReadOnlyExec, framework)
+	}
+}
+
+func makeFrameworkShebangScript(t *testing.T) (framework string, link string) {
+	t.Helper()
+	root := t.TempDir()
+	binDir := filepath.Join(root, "bin")
+	framework = filepath.Join(root, "R.framework")
+	resourceBin := filepath.Join(framework, "Versions", "1.0", "Resources", "bin")
+	interpreterDir := filepath.Join(root, "interp")
+	for _, dir := range []string{binDir, resourceBin, interpreterDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	interpreter := filepath.Join(interpreterDir, "sh")
+	if err := os.WriteFile(interpreter, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join(resourceBin, "R")
+	if err := os.WriteFile(script, []byte("#!"+interpreter+"\n. ../etc/ldpaths\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link = filepath.Join(binDir, "R")
+	if err := os.Symlink(script, link); err != nil {
+		t.Fatal(err)
+	}
+	return framework, link
+}
+
 func TestPreparePolicyRejectsDisallowedShebangInterpreterWithoutAddExec(t *testing.T) {
 	root := t.TempDir()
 	allowed := filepath.Join(root, "allowed")

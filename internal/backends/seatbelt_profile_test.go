@@ -15,6 +15,12 @@ func TestSeatbeltProfileMapsReadWriteAndExec(t *testing.T) {
 		ReadWrite:    []string{project},
 		ReadOnly:     []string{"/usr/share"},
 		ReadOnlyExec: []string{"/usr/bin"},
+		MachLookup: []string{
+			"com.apple.SystemConfiguration.DNSConfiguration",
+			"com.apple.SystemConfiguration.configd",
+			"com.apple.trustd.agent",
+			"com.apple.system.opendirectoryd.libinfo",
+		},
 	}
 	sbpl := BuildSeatbeltProfile(p)
 	for _, want := range []string{
@@ -137,22 +143,58 @@ func TestSeatbeltProfileAllowsOnlyRequiredDeviceFiles(t *testing.T) {
 	}
 }
 
-func TestSeatbeltProfileAllowsKeychainOnlyWhenRequested(t *testing.T) {
-	withoutKeychain := BuildSeatbeltProfile(policy.Policy{})
-	for _, name := range []string{"com.apple.SecurityServer", "com.apple.securityd"} {
-		if strings.Contains(withoutKeychain, name) {
-			t.Fatalf("profile allows %s without keychain opt-in:\n%s", name, withoutKeychain)
+func TestSeatbeltProfileAllowsSymlinkComponentsForPathResolution(t *testing.T) {
+	root := t.TempDir()
+	binDir := filepath.Join(root, "bin")
+	framework := filepath.Join(root, "Framework.framework")
+	versions := filepath.Join(framework, "Versions")
+	realBin := filepath.Join(versions, "1.0", "Resources", "bin")
+	for _, path := range []string{binDir, realBin} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
 		}
 	}
+	launcher := filepath.Join(binDir, "tool")
+	resourceLink := filepath.Join(framework, "Resources")
+	currentLink := filepath.Join(versions, "Current")
+	target := filepath.Join(realBin, "tool")
+	if err := os.WriteFile(target, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("1.0", currentLink); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("Versions", "Current", "Resources"), resourceLink); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(framework, "Resources", "bin", "tool"), launcher); err != nil {
+		t.Fatal(err)
+	}
 
-	withKeychain := BuildSeatbeltProfile(policy.Policy{AllowKeychain: true})
+	sbpl := BuildSeatbeltProfile(policy.Policy{ReadOnlyExec: []string{launcher, target}})
+	for _, want := range []string{resourceLink, currentLink} {
+		if !strings.Contains(sbpl, `(literal "`+want+`")`) {
+			t.Fatalf("profile missing symlink component %q:\n%s", want, sbpl)
+		}
+	}
+}
+
+func TestSeatbeltProfileAllowsConfiguredMachLookups(t *testing.T) {
+	withoutMachLookup := BuildSeatbeltProfile(policy.Policy{})
+	if strings.Contains(withoutMachLookup, "com.apple.SecurityServer") {
+		t.Fatalf("profile allows SecurityServer without explicit mach_lookup:\n%s", withoutMachLookup)
+	}
+
+	withMachLookup := BuildSeatbeltProfile(policy.Policy{MachLookup: []string{
+		"com.apple.SecurityServer",
+		"com.apple.securityd",
+	}})
 	for _, want := range []string{
 		`(global-name "com.apple.SecurityServer")`,
 		`(global-name "com.apple.securityd")`,
-		`(global-name "com.apple.securityd.xpc")`,
 	} {
-		if !strings.Contains(withKeychain, want) {
-			t.Fatalf("profile missing keychain permission %q:\n%s", want, withKeychain)
+		if !strings.Contains(withMachLookup, want) {
+			t.Fatalf("profile missing mach lookup %q:\n%s", want, withMachLookup)
 		}
 	}
 }

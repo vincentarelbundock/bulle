@@ -1,0 +1,7 @@
+title = "Tool"
+description = "general local command support (PATH, executables, libs)"
+inherits = "network"
+rw = ["$TMP/bulle/tmp"]
+env = ["PATH"]
+add_exec = true
+add_libs = true

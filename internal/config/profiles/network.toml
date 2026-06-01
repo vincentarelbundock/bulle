@@ -1,0 +1,4 @@
+title = "Network"
+description = "network socket access capability"
+inherits = ["macos-dns", "macos-certs"]
+allow = ["network"]

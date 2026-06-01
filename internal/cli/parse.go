@@ -57,7 +57,7 @@ type runCLI struct {
 }
 
 type Flags struct {
-	Profile string `name:"profile" short:"p" placeholder:"NAME" help:"Named profile from the configuration file."`
+	Profile string `name:"profile" short:"p" placeholder:"NAME" help:"Named profile, or comma-separated profiles merged left to right."`
 	Config  string `name:"config" placeholder:"PATH" help:"Path to a configuration file."`
 
 	ReadOnly      []string `name:"ro" placeholder:"PATH" help:"Grant read-only access."`
@@ -73,7 +73,6 @@ type Flags struct {
 	AddExec      bool `name:"add-exec" help:"Add the resolved command executable to the sandbox."`
 	AddLibs      bool `name:"add-libs" help:"Add runtime library access for executables."`
 	NoWorkspace  bool `name:"no-workspace" help:"Do not automatically grant the workspace read-write access."`
-	NoNetwork    bool `name:"no-network" help:"Deny network access for this invocation."`
 	ListProfiles bool `name:"list-profiles" help:"List available profiles and exit."`
 	Policy       bool `name:"policy" help:"Print the resolved policy and exit."`
 }

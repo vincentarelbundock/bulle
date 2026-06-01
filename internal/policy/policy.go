@@ -26,8 +26,8 @@ type Policy struct {
 	AddLibs bool
 	Backend BackendName
 
-	AllowKeychain bool
-	Network       NetworkMode
+	MachLookup []string
+	Network    NetworkMode
 }
 
 type View struct {
@@ -41,6 +41,6 @@ type View struct {
 	EnvKeys       []string    `json:"env_keys"`
 	AddExec       bool        `json:"add_exec"`
 	AddLibs       bool        `json:"add_libs"`
-	AllowKeychain bool        `json:"allow_keychain"`
+	MachLookup    []string    `json:"mach_lookup"`
 	Network       NetworkMode `json:"network"`
 }
