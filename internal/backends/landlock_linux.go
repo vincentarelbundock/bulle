@@ -29,5 +29,8 @@ func (landlockBackend) Run(p policy.Policy) error {
 	if err := applyLandlockFilesystem(p); err != nil {
 		return err
 	}
+	if err := applyLinuxNetworkPolicy(p); err != nil {
+		return err
+	}
 	return syscall.Exec(p.Command[0], p.Command, envSlice(p.Env))
 }

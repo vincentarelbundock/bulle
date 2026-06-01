@@ -86,6 +86,51 @@ func TestLinuxLandlockClosesInheritedFileDescriptors(t *testing.T) {
 	}
 }
 
+func TestLinuxNoNetworkDeniesSocketCreation(t *testing.T) {
+	bin := filepath.Join(t.TempDir(), "bulle")
+	buildBulleForIntegration(t, bin)
+	probe := filepath.Join(t.TempDir(), "network-probe")
+	buildLinuxNetworkProbe(t, probe)
+	project := t.TempDir()
+
+	cmd := exec.Command(bin, project, "--no-network", "--add-exec", "--", probe)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("network probe succeeded with --no-network, output: %s", string(out))
+	}
+}
+
+func buildLinuxNetworkProbe(t *testing.T, bin string) {
+	t.Helper()
+	src := filepath.Join(t.TempDir(), "main.go")
+	code := `package main
+
+import (
+	"fmt"
+	"os"
+	"syscall"
+)
+
+func main() {
+	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(13)
+	}
+	_ = syscall.Close(fd)
+}
+`
+	if err := os.WriteFile(src, []byte(code), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("go", "build", "-o", bin, src)
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("build network probe: %v, output: %s", err, string(out))
+	}
+}
+
 func TestLinuxLandlockRunsDynamicBinaryWithAddLibs(t *testing.T) {
 	bin := filepath.Join(t.TempDir(), "bulle")
 	buildBulleForIntegration(t, bin)

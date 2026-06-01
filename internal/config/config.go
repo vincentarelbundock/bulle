@@ -30,6 +30,7 @@ type Profile struct {
 
 type Settings struct {
 	DefaultApp string `toml:"default_app"`
+	Network    string `toml:"network"`
 
 	PathSettings `toml:",inline"`
 

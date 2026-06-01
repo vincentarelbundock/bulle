@@ -1,10 +1,14 @@
 package policy
 
 type BackendName string
+type NetworkMode string
 
 const (
 	BackendLinuxLandlock BackendName = "linux-landlock"
 	BackendMacOSSeatbelt BackendName = "macos-seatbelt"
+
+	NetworkFull NetworkMode = "full"
+	NetworkNone NetworkMode = "none"
 )
 
 type Policy struct {
@@ -23,6 +27,7 @@ type Policy struct {
 	Backend BackendName
 
 	AllowKeychain bool
+	Network       NetworkMode
 }
 
 type View struct {
@@ -37,4 +42,5 @@ type View struct {
 	AddExec       bool        `json:"add_exec"`
 	AddLibs       bool        `json:"add_libs"`
 	AllowKeychain bool        `json:"allow_keychain"`
+	Network       NetworkMode `json:"network"`
 }

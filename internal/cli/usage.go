@@ -12,7 +12,7 @@ const usageBeforeProfiles = `bulle runs local coding agents inside a controlled 
 
 It exposes one CLI and one policy model across Linux and macOS. Linux uses an
 embedded Landlock backend; macOS uses a generated Seatbelt profile. The sandbox
-restricts filesystem and environment access; it does not restrict the network.
+restricts filesystem and environment access, and can optionally deny network access.
 
 Usage:
   bulle [flags] [workspace] [-- command [args...]]
@@ -34,6 +34,9 @@ explicitly with --rox or --rwx):
 Environment flags (no variables are passed unless requested):
   --env NAME        pass NAME from the current environment, if it is set
   --env NAME=VALUE  set NAME to VALUE inside the sandbox
+
+Network flags:
+  --no-network      deny network access for this invocation
 
 Configuration:
   --config PATH     path to a configuration file
@@ -63,6 +66,7 @@ Examples:
   bulle --profile codex --ro ~/.cache/uv
   bulle . --profile secrets --env OPENAI_API_KEY -- codex
   bulle . --rox /bin --policy -- /bin/bash
+  bulle --profile codex --no-network
 `
 
 var (

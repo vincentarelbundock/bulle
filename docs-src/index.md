@@ -10,7 +10,7 @@ hide:
 
 <p align="center" style="font-size: 1.2em;"><strong>A simple sandbox for dangerous tools like coding agents</strong></p>
 
-`bulle` is an easy-to-use sandbox for running local commands while exposing only the essential parts of your machine. It allows you to run tools you don't fully trust, without handing over all your files and secrets. `bulle` sandboxes are especially helpful when running LLM coding agents or untrusted scripts.
+`bulle` is an easy-to-use sandbox for running local commands while exposing only the essential parts of your machine. It allows you to run tools you don't fully trust, without handing over all your files or secrets, and with an option to deny network access. `bulle` sandboxes are especially helpful when running LLM coding agents or untrusted scripts.
 
 On macOS and Linux, you can spin up an agent with restricted permissions using this simple command:
 
@@ -36,7 +36,7 @@ Sandboxes are not limited to agents. You can use `bulle` to run any command with
 
 !!! warning "`bulle` is not sufficient when"
 
-    - a command should not send readable code over the network;
+    - the command needs network access but should not send readable code to a specific service;
     - the command itself needs secrets or paths you cannot afford to leak;
     - you need CPU, memory, disk, or time limits;
     - you are running code from hostile parties and need a separate machine boundary, not just local OS rules.
@@ -118,6 +118,27 @@ bulle --rox /usr/bin/printenv --env HELLO=WORLD -- /usr/bin/printenv HELLO
 
 This is important for secrets. A command cannot read `OPENAI_API_KEY`, `GITHUB_TOKEN`, or similar variables unless you explicitly pass them.
 
+## Network
+
+Network access is allowed by default for compatibility with coding agents and package managers. Use `--no-network` when a command should not create network sockets:
+
+```bash
+bulle --no-network --rox /bin -- /bin/ls
+bulle --profile codex --no-network
+```
+
+Profiles and top-level config can set the default network mode for repeated workflows:
+
+```toml
+[profiles.offline]
+inherits = "tool"
+network = "none"
+```
+
+Use a top-level `network = "none"` when every profile loaded from that config should default to offline mode.
+
+The supported modes are `full` and `none`. On macOS, `none` omits network permissions from the generated Seatbelt profile. On Linux, `none` installs a seccomp filter that denies socket-related system calls for the sandboxed process and its children. This also blocks local Unix sockets. It cannot revoke access to an already-inherited standard input, output, or error file descriptor if one of those descriptors is connected to a socket.
+
 ## Profiles
 
 Coding agents often need shells, package managers, language runtimes, caches, config files, and app storage. Profiles collect those repeated path and environment grants in one named bundle.
@@ -130,7 +151,7 @@ bulle --profile claude --ro README.qmd --rw ~/Desktop --env GITHUB_TOKEN
 
 Profiles live in the global `bulle` config file. By default, `bulle` reads `config.toml` from the operating system's user config directory, under a `bulle` subdirectory: on Linux and other XDG systems this is usually `$XDG_CONFIG_HOME/bulle/config.toml` or `~/.config/bulle/config.toml`; on macOS it is usually `~/Library/Application Support/bulle/config.toml`. Use `--config PATH` to load a different global config file. `bulle` does not read project-local config files.
 
-A profile can define a default app, filesystem grants, environment variables, and inheritance:
+A profile can define a default app, filesystem grants, environment variables, network mode, and inheritance:
 
 ```toml
 default_profile = "tool"
@@ -144,6 +165,7 @@ add_libs = true
 [profiles.agent]
 inherits = "tool"
 default_app = "codex"
+network = "full"
 rw = ["$HOME/.cache/example-agent"]
 env = ["HOME", "USER", "TERM", "LANG", "SHELL", "OPENAI_API_KEY"]
 ```
@@ -174,11 +196,12 @@ bulle --policy ~/Desktop --rox /bin -- /bin/ls
   "env_keys": [],
   "add_exec": false,
   "add_libs": false,
-  "allow_keychain": false
+  "allow_keychain": false,
+  "network": "full"
 }
 ```
 
-In this example, `workspace_path` is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to `/home/user/Desktop`, shown in the `rw` array. The `command` field is the command that would be executed, and the `ro`, `rox`, `rw`, and `rwx` arrays show the readable, executable, writable, and writable-executable path grants. The `env_keys` array lists environment variables that would be passed into the sandbox. The `backend` value depends on your operating system.
+In this example, `workspace_path` is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to `/home/user/Desktop`, shown in the `rw` array. The `command` field is the command that would be executed, and the `ro`, `rox`, `rw`, and `rwx` arrays show the readable, executable, writable, and writable-executable path grants. The `env_keys` array lists environment variables that would be passed into the sandbox. The `network` field shows the resolved network mode. The `backend` value depends on your operating system.
 
 ## Executables and libraries
 
@@ -200,15 +223,15 @@ Profiles can enable these conveniences with `add_exec = true` and `add_libs = tr
 
 ## How it works
 
-`bulle` builds a policy before the command starts. The policy is assembled from the workspace, selected profile, command-line flags, selected environment variables, executable discovery, and runtime library defaults. Paths are resolved before sandbox setup, and `--policy` prints the resulting policy without running the command.
+`bulle` builds a policy before the command starts. The policy is assembled from the workspace, selected profile, command-line flags, selected environment variables, network mode, executable discovery, and runtime library defaults. Paths are resolved before sandbox setup, and `--policy` prints the resulting policy without running the command.
 
 ### Linux
 
-On Linux, `bulle` applies the policy with [Landlock](https://docs.kernel.org/userspace-api/landlock.html). Landlock is a kernel feature, not a package to install; basic filesystem sandboxing requires Linux 5.13 or later with Landlock enabled. The Linux backend restricts filesystem access for the process and its children according to the resolved read, write, and execute grants.
+On Linux, `bulle` applies the policy with [Landlock](https://docs.kernel.org/userspace-api/landlock.html). Landlock is a kernel feature, not a package to install; basic filesystem sandboxing requires Linux 5.13 or later with Landlock enabled. The Linux backend restricts filesystem access for the process and its children according to the resolved read, write, and execute grants. When network mode is `none`, it also installs a seccomp filter before `exec` to deny socket-related system calls.
 
 ### macOS
 
-On macOS, `bulle` generates a [Seatbelt](https://www.unix.com/man_page/osx/5/sandbox/) profile and runs the command with `/usr/bin/sandbox-exec`. The macOS backend maps the same policy model to Seatbelt rules, including filesystem rules, network allowance, and selected Mach service access such as Keychain support when a profile enables it. This is useful for local workflows, but its behavior is not identical to Linux Landlock.
+On macOS, `bulle` generates a [Seatbelt](https://www.unix.com/man_page/osx/5/sandbox/) profile and runs the command with `/usr/bin/sandbox-exec`. The macOS backend maps the same policy model to Seatbelt rules, including filesystem rules, optional network allowance, and selected Mach service access such as Keychain support when a profile enables it. This is useful for local workflows, but its behavior is not identical to Linux Landlock.
 
 ## License and attribution
 

@@ -320,11 +320,29 @@ func TestRunPolicyPrintsResolvedPolicy(t *testing.T) {
 	if !bytes.Contains(stdout.Bytes(), []byte(`"workspace_path"`)) {
 		t.Fatalf("stdout = %s", stdout.String())
 	}
+	if !bytes.Contains(stdout.Bytes(), []byte(`"network":"full"`)) {
+		t.Fatalf("stdout missing network mode: %s", stdout.String())
+	}
 	if bytes.Contains(stdout.Bytes(), []byte(`"metadata"`)) {
 		t.Fatalf("stdout looks like backend plan, want policy: %s", stdout.String())
 	}
 	if bytes.Contains(stderr.Bytes(), []byte("bulle profile")) {
 		t.Fatalf("stderr contains profile summary during --policy output: %s", stderr.String())
+	}
+}
+
+func TestRunPolicyIncludesNoNetwork(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	tmp := t.TempDir()
+
+	code := Run([]string{"bulle", "--profile", "tool", "--no-network", tmp, "--policy", "--", "echo", "hi"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte(`"network":"none"`)) {
+		t.Fatalf("stdout missing no-network policy: %s", stdout.String())
 	}
 }
 

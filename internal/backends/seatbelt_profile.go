@@ -50,6 +50,8 @@ func BuildSeatbeltProfile(p policy.Policy) string {
 		machLookups = append(machLookups, "com.apple.SecurityServer", "com.apple.securityd", "com.apple.securityd.xpc")
 	}
 	writeMachLookupRule(&b, machLookups)
-	b.WriteString("\n(allow network*)\n")
+	if p.Network != policy.NetworkNone {
+		b.WriteString("\n(allow network*)\n")
+	}
 	return b.String()
 }

@@ -10,6 +10,7 @@ func TestLoadTOMLProfileInheritanceAndEnv(t *testing.T) {
 	data := []byte(`
 default_app = "claude"
 default_profile = "secrets"
+network = "none"
 
 [profiles.default]
 rw = ["$WORKSPACE"]
@@ -19,6 +20,7 @@ env = ["PATH"]
 [profiles.secrets]
 inherits = "default"
 env = ["OPENAI_API_KEY"]
+network = "full"
 allow_keychain = true
 `)
 	cfg, err := LoadBytes(data)
@@ -38,6 +40,9 @@ allow_keychain = true
 	if profile.AllowKeychain == nil || !*profile.AllowKeychain {
 		t.Fatalf("AllowKeychain = %#v, want true", profile.AllowKeychain)
 	}
+	if profile.Network != "full" {
+		t.Fatalf("Network = %q, want child override full", profile.Network)
+	}
 }
 
 func TestReplaceLists(t *testing.T) {
@@ -52,6 +57,13 @@ func TestReplaceLists(t *testing.T) {
 	}
 	if len(got.Env) != 1 || got.Env[0] != "TERM" {
 		t.Fatalf("Env = %#v", got.Env)
+	}
+}
+
+func TestMergeProfilesAllowsChildToOverrideNetwork(t *testing.T) {
+	got := MergeProfiles(Profile{Settings: Settings{Network: "none"}}, Profile{Settings: Settings{Network: "full"}})
+	if got.Network != "full" {
+		t.Fatalf("Network = %q, want full", got.Network)
 	}
 }
 
@@ -283,13 +295,14 @@ func TestTopLevelConfigSettings(t *testing.T) {
 	data := []byte(`
 rw = ["$WORKSPACE/.venv"]
 env = ["PYTHONPATH"]
+network = "none"
 `)
 	cfg, err := LoadBytes(data)
 	if err != nil {
 		t.Fatalf("LoadBytes returned error: %v", err)
 	}
 	top := cfg.TopLevelProfile()
-	if !contains(top.ReadWrite, "$WORKSPACE/.venv") || !contains(top.Env, "PYTHONPATH") {
+	if !contains(top.ReadWrite, "$WORKSPACE/.venv") || !contains(top.Env, "PYTHONPATH") || top.Network != "none" {
 		t.Fatalf("top = %#v", top)
 	}
 }

@@ -40,6 +40,10 @@ func Resolve(in Inputs) (Policy, error) {
 	p.AddExec = profile.AddExec || in.Options.AddExec
 	p.AddLibs = profile.AddLibs || in.Options.AddLibs
 	p.AllowKeychain = boolValue(profile.AllowKeychain)
+	p.Network, err = resolveNetworkMode(profile.Network, in.Options.NoNetwork)
+	if err != nil {
+		return Policy{}, err
+	}
 
 	p.ReadOnly = append(p.ReadOnly, profile.ReadOnly...)
 	p.ReadOnly = append(p.ReadOnly, in.Options.ReadOnly...)
@@ -133,6 +137,21 @@ func isReservedPathVar(key string) bool {
 
 func boolValue(value *bool) bool {
 	return value != nil && *value
+}
+
+func resolveNetworkMode(value string, noNetwork bool) (NetworkMode, error) {
+	if noNetwork {
+		return NetworkNone, nil
+	}
+	if value == "" {
+		return NetworkFull, nil
+	}
+	switch NetworkMode(value) {
+	case NetworkFull, NetworkNone:
+		return NetworkMode(value), nil
+	default:
+		return "", fmt.Errorf("invalid network mode %q: want full or none", value)
+	}
 }
 
 func profileUsesToolDefaults(name string, cfg config.Config) bool {

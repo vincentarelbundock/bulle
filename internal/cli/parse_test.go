@@ -57,6 +57,16 @@ func TestParseNoWorkspaceFlag(t *testing.T) {
 	}
 }
 
+func TestParseNoNetworkFlag(t *testing.T) {
+	opts, err := Parse([]string{"bulle", "--no-network", "--", "codex"})
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if !opts.NoNetwork {
+		t.Fatalf("NoNetwork = false, want true")
+	}
+}
+
 func TestParseProfileForms(t *testing.T) {
 	for _, args := range [][]string{
 		{"bulle", "-p", "codex", "."},
@@ -100,6 +110,9 @@ func TestUsageShowsProfileShortFlag(t *testing.T) {
 	}
 	if !strings.Contains(Usage(), "--no-workspace") {
 		t.Fatalf("Usage() does not show --no-workspace:\n%s", Usage())
+	}
+	if !strings.Contains(Usage(), "--no-network") {
+		t.Fatalf("Usage() does not show --no-network:\n%s", Usage())
 	}
 	if !strings.Contains(Usage(), "macOS uses configured runtime roots") {
 		t.Fatalf("Usage() does not explain macOS --add-libs behavior:\n%s", Usage())

@@ -58,6 +58,7 @@ func TestWriteProfilePermissionSummaryFormatsPolicy(t *testing.T) {
 		AddExec:       true,
 		AddLibs:       false,
 		AllowKeychain: true,
+		Network:       policy.NetworkNone,
 	}
 
 	writeProfilePermissionSummary("agent", p, &stderr)
@@ -73,6 +74,7 @@ func TestWriteProfilePermissionSummaryFormatsPolicy(t *testing.T) {
 	assertContains(t, got, "    rw: /write\n")
 	assertContains(t, got, "    rwx: /exec\n")
 	assertContains(t, got, "  environment: OPENAI_API_KEY, PATH\n")
+	assertContains(t, got, "  network: none\n")
 	assertContains(t, got, "  add_exec: enabled\n")
 	assertContains(t, got, "  add_libs: disabled\n")
 	assertContains(t, got, "  keychain: enabled\n")
@@ -155,6 +157,7 @@ func TestWriteProfilePermissionSummaryShowsNoneForEmptyGroups(t *testing.T) {
 	assertContains(t, got, "    rw: none\n")
 	assertContains(t, got, "    rwx: none\n")
 	assertContains(t, got, "  environment: none\n")
+	assertContains(t, got, "  network: full\n")
 	assertContains(t, got, "  keychain: disabled\n")
 }
 

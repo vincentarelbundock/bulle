@@ -34,6 +34,13 @@ func TestSeatbeltProfileMapsReadWriteAndExec(t *testing.T) {
 	}
 }
 
+func TestSeatbeltProfileOmitsNetworkWhenDenied(t *testing.T) {
+	sbpl := BuildSeatbeltProfile(policy.Policy{Network: policy.NetworkNone})
+	if strings.Contains(sbpl, "(allow network*)") {
+		t.Fatalf("profile allows network when network is none:\n%s", sbpl)
+	}
+}
+
 func TestSeatbeltProfileAllowsAncestorDirectories(t *testing.T) {
 	p := policy.Policy{
 		ReadWrite:    []string{"/Users/vincent/Downloads/try"},

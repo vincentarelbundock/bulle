@@ -65,6 +65,7 @@ func MergeProfiles(parent Profile, child Profile) Profile {
 func MergeSettings(parent Settings, child Settings) Settings {
 	out := cloneSettings(parent)
 	out.DefaultApp = choose(child.DefaultApp, parent.DefaultApp)
+	out.Network = choose(child.Network, parent.Network)
 	out.PathSettings = MergePathSettings(parent.PathSettings, child.PathSettings)
 	out.Env = mergeList(parent.Env, child.Env, child.ReplaceEnv)
 	out.AddExec = child.AddExec || parent.AddExec
@@ -166,6 +167,7 @@ func cloneProfile(p Profile) Profile {
 func cloneSettings(s Settings) Settings {
 	return Settings{
 		DefaultApp:    s.DefaultApp,
+		Network:       s.Network,
 		PathSettings:  clonePathSettings(s.PathSettings),
 		Env:           cloneList(s.Env),
 		ReplaceEnv:    s.ReplaceEnv,

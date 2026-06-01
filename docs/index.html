@@ -415,6 +415,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#network" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Network
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#profiles" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -521,7 +532,7 @@
 
 <p align="center" style="font-size: 1.2em;"><strong>A simple sandbox for dangerous tools like coding agents</strong></p>
 
-<p><code>bulle</code> is an easy-to-use sandbox for running local commands while exposing only the essential parts of your machine. It allows you to run tools you don't fully trust, without handing over all your files and secrets. <code>bulle</code> sandboxes are especially helpful when running LLM coding agents or untrusted scripts.</p>
+<p><code>bulle</code> is an easy-to-use sandbox for running local commands while exposing only the essential parts of your machine. It allows you to run tools you don't fully trust, without handing over all your files or secrets, and with an option to deny network access. <code>bulle</code> sandboxes are especially helpful when running LLM coding agents or untrusted scripts.</p>
 <p>On macOS and Linux, you can spin up an agent with restricted permissions using this simple command:</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>/path/to/project<span class="w"> </span>--profile<span class="w"> </span>claude
 </code></pre></div>
@@ -544,7 +555,7 @@
 <div class="admonition warning">
 <p class="admonition-title"><code>bulle</code> is not sufficient when</p>
 <ul>
-<li>a command should not send readable code over the network;</li>
+<li>the command needs network access but should not send readable code to a specific service;</li>
 <li>the command itself needs secrets or paths you cannot afford to leak;</li>
 <li>you need CPU, memory, disk, or time limits;</li>
 <li>you are running code from hostile parties and need a separate machine boundary, not just local OS rules.</li>
@@ -594,13 +605,25 @@ or pass an explicit executable path after --
 bulle<span class="w"> </span>--rox<span class="w"> </span>/usr/bin/printenv<span class="w"> </span>--env<span class="w"> </span><span class="nv">HELLO</span><span class="o">=</span>WORLD<span class="w"> </span>--<span class="w"> </span>/usr/bin/printenv<span class="w"> </span>HELLO
 </code></pre></div>
 <p>This is important for secrets. A command cannot read <code>OPENAI_API_KEY</code>, <code>GITHUB_TOKEN</code>, or similar variables unless you explicitly pass them.</p>
+<h2 id="network">Network<a class="headerlink" href="#network" title="Permanent link">&para;</a></h2>
+<p>Network access is allowed by default for compatibility with coding agents and package managers. Use <code>--no-network</code> when a command should not create network sockets:</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--no-network<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--<span class="w"> </span>/bin/ls
+bulle<span class="w"> </span>--profile<span class="w"> </span>codex<span class="w"> </span>--no-network
+</code></pre></div>
+<p>Profiles and top-level config can set the default network mode for repeated workflows:</p>
+<div class="language-toml highlight"><pre><span></span><code><span class="k">[profiles.offline]</span>
+<span class="n">inherits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;tool&quot;</span>
+<span class="n">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;none&quot;</span>
+</code></pre></div>
+<p>Use a top-level <code>network = "none"</code> when every profile loaded from that config should default to offline mode.</p>
+<p>The supported modes are <code>full</code> and <code>none</code>. On macOS, <code>none</code> omits network permissions from the generated Seatbelt profile. On Linux, <code>none</code> installs a seccomp filter that denies socket-related system calls for the sandboxed process and its children. This also blocks local Unix sockets. It cannot revoke access to an already-inherited standard input, output, or error file descriptor if one of those descriptors is connected to a socket.</p>
 <h2 id="profiles">Profiles<a class="headerlink" href="#profiles" title="Permanent link">&para;</a></h2>
 <p>Coding agents often need shells, package managers, language runtimes, caches, config files, and app storage. Profiles collect those repeated path and environment grants in one named bundle.</p>
 <p>You can still add one-off permissions to a profile with the same path and environment flags:</p>
 <div class="language-sh highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>claude<span class="w"> </span>--ro<span class="w"> </span>README.qmd<span class="w"> </span>--rw<span class="w"> </span>~/Desktop<span class="w"> </span>--env<span class="w"> </span>GITHUB_TOKEN
 </code></pre></div>
 <p>Profiles live in the global <code>bulle</code> config file. By default, <code>bulle</code> reads <code>config.toml</code> from the operating system's user config directory, under a <code>bulle</code> subdirectory: on Linux and other XDG systems this is usually <code>$XDG_CONFIG_HOME/bulle/config.toml</code> or <code>~/.config/bulle/config.toml</code>; on macOS it is usually <code>~/Library/Application Support/bulle/config.toml</code>. Use <code>--config PATH</code> to load a different global config file. <code>bulle</code> does not read project-local config files.</p>
-<p>A profile can define a default app, filesystem grants, environment variables, and inheritance:</p>
+<p>A profile can define a default app, filesystem grants, environment variables, network mode, and inheritance:</p>
 <div class="language-toml highlight"><pre><span></span><code><span class="n">default_profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;tool&quot;</span>
 
 <span class="k">[profiles.tool]</span>
@@ -612,6 +635,7 @@ bulle<span class="w"> </span>--rox<span class="w"> </span>/usr/bin/printenv<span
 <span class="k">[profiles.agent]</span>
 <span class="n">inherits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;tool&quot;</span>
 <span class="n">default_app</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;codex&quot;</span>
+<span class="n">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;full&quot;</span>
 <span class="n">rw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;$HOME/.cache/example-agent&quot;</span><span class="p">]</span>
 <span class="n">env</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;HOME&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;USER&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;TERM&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;LANG&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SHELL&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;OPENAI_API_KEY&quot;</span><span class="p">]</span>
 </code></pre></div>
@@ -635,10 +659,11 @@ bulle<span class="w"> </span>--rox<span class="w"> </span>/usr/bin/printenv<span
 <span class="w">  </span><span class="nt">&quot;env_keys&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
 <span class="w">  </span><span class="nt">&quot;add_exec&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">&quot;add_libs&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;allow_keychain&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+<span class="w">  </span><span class="nt">&quot;allow_keychain&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;network&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;full&quot;</span>
 <span class="p">}</span>
 </code></pre></div>
-<p>In this example, <code>workspace_path</code> is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to <code>/home/user/Desktop</code>, shown in the <code>rw</code> array. The <code>command</code> field is the command that would be executed, and the <code>ro</code>, <code>rox</code>, <code>rw</code>, and <code>rwx</code> arrays show the readable, executable, writable, and writable-executable path grants. The <code>env_keys</code> array lists environment variables that would be passed into the sandbox. The <code>backend</code> value depends on your operating system.</p>
+<p>In this example, <code>workspace_path</code> is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to <code>/home/user/Desktop</code>, shown in the <code>rw</code> array. The <code>command</code> field is the command that would be executed, and the <code>ro</code>, <code>rox</code>, <code>rw</code>, and <code>rwx</code> arrays show the readable, executable, writable, and writable-executable path grants. The <code>env_keys</code> array lists environment variables that would be passed into the sandbox. The <code>network</code> field shows the resolved network mode. The <code>backend</code> value depends on your operating system.</p>
 <h2 id="executables-and-libraries">Executables and libraries<a class="headerlink" href="#executables-and-libraries" title="Permanent link">&para;</a></h2>
 <p>For quick local commands, <code>--add-exec</code> can save you from spelling out executable grants by hand. It resolves the command before the sandbox starts and adds the executable to the policy:</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--add-exec<span class="w"> </span>--<span class="w"> </span>/bin/ls
@@ -649,11 +674,11 @@ bulle<span class="w"> </span>--rox<span class="w"> </span>/usr/bin/printenv<span
 <p>These flags are conveniences for executables and runtime libraries. They do not add app state files, config directories, caches, secrets, or shell environment variables. Use profiles for agents and other tools that need a larger, repeatable policy.</p>
 <p>Profiles can enable these conveniences with <code>add_exec = true</code> and <code>add_libs = true</code>. Boolean capabilities are inherited with OR semantics: once a parent enables one, a child profile cannot disable it. Use a different parent profile when you need a stricter variant.</p>
 <h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
-<p><code>bulle</code> builds a policy before the command starts. The policy is assembled from the workspace, selected profile, command-line flags, selected environment variables, executable discovery, and runtime library defaults. Paths are resolved before sandbox setup, and <code>--policy</code> prints the resulting policy without running the command.</p>
+<p><code>bulle</code> builds a policy before the command starts. The policy is assembled from the workspace, selected profile, command-line flags, selected environment variables, network mode, executable discovery, and runtime library defaults. Paths are resolved before sandbox setup, and <code>--policy</code> prints the resulting policy without running the command.</p>
 <h3 id="linux">Linux<a class="headerlink" href="#linux" title="Permanent link">&para;</a></h3>
-<p>On Linux, <code>bulle</code> applies the policy with <a href="https://docs.kernel.org/userspace-api/landlock.html">Landlock</a>. Landlock is a kernel feature, not a package to install; basic filesystem sandboxing requires Linux 5.13 or later with Landlock enabled. The Linux backend restricts filesystem access for the process and its children according to the resolved read, write, and execute grants.</p>
+<p>On Linux, <code>bulle</code> applies the policy with <a href="https://docs.kernel.org/userspace-api/landlock.html">Landlock</a>. Landlock is a kernel feature, not a package to install; basic filesystem sandboxing requires Linux 5.13 or later with Landlock enabled. The Linux backend restricts filesystem access for the process and its children according to the resolved read, write, and execute grants. When network mode is <code>none</code>, it also installs a seccomp filter before <code>exec</code> to deny socket-related system calls.</p>
 <h3 id="macos">macOS<a class="headerlink" href="#macos" title="Permanent link">&para;</a></h3>
-<p>On macOS, <code>bulle</code> generates a <a href="https://www.unix.com/man_page/osx/5/sandbox/">Seatbelt</a> profile and runs the command with <code>/usr/bin/sandbox-exec</code>. The macOS backend maps the same policy model to Seatbelt rules, including filesystem rules, network allowance, and selected Mach service access such as Keychain support when a profile enables it. This is useful for local workflows, but its behavior is not identical to Linux Landlock.</p>
+<p>On macOS, <code>bulle</code> generates a <a href="https://www.unix.com/man_page/osx/5/sandbox/">Seatbelt</a> profile and runs the command with <code>/usr/bin/sandbox-exec</code>. The macOS backend maps the same policy model to Seatbelt rules, including filesystem rules, optional network allowance, and selected Mach service access such as Keychain support when a profile enables it. This is useful for local workflows, but its behavior is not identical to Linux Landlock.</p>
 <h2 id="license-and-attribution">License and attribution<a class="headerlink" href="#license-and-attribution" title="Permanent link">&para;</a></h2>
 <p><code>bulle</code> is distributed under the MIT License. See <a href="LICENSES/bulle-MIT.txt">LICENSES/bulle-MIT.txt</a>.</p>
 <p>Thank you to <a href="https://github.com/Zouuup/landrun">Landrun</a>, an excellent, compact Go implementation of practical Landlock sandboxing. The Linux sandbox backend and filesystem permission model owe a clear debt to Landrun's design, and portions of the Linux backend and ELF dependency discovery are derived from or inspired by Landrun. See <a href="LICENSES/landrun-MIT.txt">LICENSES/landrun-MIT.txt</a> for the full third-party notice and license.</p>

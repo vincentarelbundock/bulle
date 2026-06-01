@@ -43,6 +43,54 @@ func TestResolveRejectsReservedPathVarOverride(t *testing.T) {
 	}
 }
 
+func TestResolveNetworkModeFromConfigAndCLI(t *testing.T) {
+	root := t.TempDir()
+	project := filepath.Join(root, "project")
+	if err := os.Mkdir(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Config{
+		DefaultProfile: "default",
+		Profiles: map[string]config.Profile{"default": {
+			Settings: config.Settings{Network: "none"},
+		}},
+	}
+	got, err := Resolve(Inputs{Options: cli.Options{ProjectPath: project}, Global: cfg, ParentEnv: map[string]string{}, Home: root, Tmp: root})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if got.Network != NetworkNone {
+		t.Fatalf("Network = %q, want none", got.Network)
+	}
+
+	cfg.Profiles["default"] = config.Profile{Settings: config.Settings{Network: "full"}}
+	got, err = Resolve(Inputs{Options: cli.Options{ProjectPath: project, Flags: cli.Flags{NoNetwork: true}}, Global: cfg, ParentEnv: map[string]string{}, Home: root, Tmp: root})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if got.Network != NetworkNone {
+		t.Fatalf("Network with --no-network = %q, want none", got.Network)
+	}
+}
+
+func TestResolveRejectsInvalidNetworkMode(t *testing.T) {
+	root := t.TempDir()
+	project := filepath.Join(root, "project")
+	if err := os.Mkdir(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Config{
+		DefaultProfile: "default",
+		Profiles: map[string]config.Profile{"default": {
+			Settings: config.Settings{Network: "maybe"},
+		}},
+	}
+	_, err := Resolve(Inputs{Options: cli.Options{ProjectPath: project}, Global: cfg, ParentEnv: map[string]string{}, Home: root, Tmp: root})
+	if err == nil {
+		t.Fatalf("Resolve succeeded, want invalid network mode error")
+	}
+}
+
 func TestResolveSkipsMissingReadGrants(t *testing.T) {
 	root := t.TempDir()
 	project := filepath.Join(root, "project")

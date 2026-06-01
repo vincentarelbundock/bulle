@@ -3,6 +3,10 @@ package policy
 import "sort"
 
 func NewView(p Policy) View {
+	network := p.Network
+	if network == "" {
+		network = NetworkFull
+	}
 	envKeys := make([]string, 0, len(p.Env))
 	for key := range p.Env {
 		envKeys = append(envKeys, key)
@@ -20,5 +24,6 @@ func NewView(p Policy) View {
 		AddExec:       p.AddExec,
 		AddLibs:       p.AddLibs,
 		AllowKeychain: p.AllowKeychain,
+		Network:       network,
 	}
 }

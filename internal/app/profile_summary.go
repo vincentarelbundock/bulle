@@ -28,6 +28,7 @@ func writeProfilePermissionSummary(profileName string, p policy.Policy, w io.Wri
 	writePermissionGroup(w, "rw", view.ReadWrite, paths)
 	writePermissionGroup(w, "rwx", view.ReadWriteExec, paths)
 	fmt.Fprintf(w, "  environment: %s\n", formatInlineList(view.EnvKeys))
+	fmt.Fprintf(w, "  network: %s\n", formatNetwork(view.Network))
 	fmt.Fprintf(w, "  add_exec: %s\n", formatEnabled(view.AddExec))
 	fmt.Fprintf(w, "  add_libs: %s\n", formatEnabled(view.AddLibs))
 	fmt.Fprintf(w, "  keychain: %s\n", formatEnabled(view.AllowKeychain))
@@ -310,6 +311,13 @@ func isSafeCommandArgRune(r rune) bool {
 	default:
 		return false
 	}
+}
+
+func formatNetwork(value policy.NetworkMode) string {
+	if value == "" {
+		return string(policy.NetworkFull)
+	}
+	return string(value)
 }
 
 func formatEnabled(value bool) string {
