@@ -16,6 +16,7 @@ import (
 	"github.com/vincentarelbundock/bulle/internal/cli"
 	"github.com/vincentarelbundock/bulle/internal/config"
 	"github.com/vincentarelbundock/bulle/internal/policy"
+	"github.com/vincentarelbundock/bulle/internal/supervisor"
 )
 
 const (
@@ -25,6 +26,7 @@ const (
 	ExitBackendMissing   = 3
 	ExitPolicyValidation = 4
 	ExitSandboxSetup     = 5
+	ExitTimedOut         = 124
 	ExitNotExecutable    = 126
 	ExitNotFound         = 127
 )
@@ -142,6 +144,17 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return ExitOK
 	}
 	p.Command = commandWithSessionPermissions(opts.Profile, p.Command, preRunSessionPaste(opts, p))
+	if p.Timeout > 0 {
+		if err := supervisor.Run(p, supervisor.Options{
+			Timeout: p.Timeout,
+			Stdin:   os.Stdin,
+			Stdout:  os.Stdout,
+			Stderr:  os.Stderr,
+		}); err != nil {
+			return exitCodeForSupervisorError(err, stderr)
+		}
+		return ExitOK
+	}
 	if err := backend.Run(p); err != nil {
 		fmt.Fprintln(stderr, err)
 		if isCommandExitError(err) {
@@ -210,6 +223,23 @@ func parentEnv() map[string]string {
 func isCommandExitError(err error) bool {
 	var exitErr *exec.ExitError
 	return errors.As(err, &exitErr)
+}
+
+func exitCodeForSupervisorError(err error, stderr io.Writer) int {
+	var timeoutErr *supervisor.TimeoutError
+	if errors.As(err, &timeoutErr) {
+		fmt.Fprintf(stderr, "bulle: command timed out after %s\n", timeoutErr.Duration)
+		return ExitTimedOut
+	}
+	var exitErr *supervisor.ExitError
+	if errors.As(err, &exitErr) {
+		if exitErr.Code > 0 {
+			return exitErr.Code
+		}
+		return ExitCommandFailed
+	}
+	fmt.Fprintln(stderr, err)
+	return ExitSandboxSetup
 }
 
 func runtimeTempRoot(base string) string {

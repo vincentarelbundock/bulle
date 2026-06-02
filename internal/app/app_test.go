@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -10,10 +11,18 @@ import (
 	"strconv"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/vincentarelbundock/bulle/internal/elfdeps"
 	"github.com/vincentarelbundock/bulle/internal/policy"
+	"github.com/vincentarelbundock/bulle/internal/supervisor"
 )
+
+func TestRunDefinesTimeoutExitCode(t *testing.T) {
+	if ExitTimedOut != 124 {
+		t.Fatalf("ExitTimedOut = %d, want 124", ExitTimedOut)
+	}
+}
 
 func TestRunReturnsUsageErrorWhenCommandMissing(t *testing.T) {
 	var stdout bytes.Buffer
@@ -621,6 +630,21 @@ func TestRunPolicyJSONOmitsTimeoutWhenUnset(t *testing.T) {
 	}
 }
 
+func TestRunPolicySummaryIncludesTimeoutWhenConfigured(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	tmp := t.TempDir()
+
+	code := Run([]string{"bulle", "--timeout", "250ms", "--profile", "tool", tmp, "--policy", "--", "echo", "hi"}, &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte("  timeout: 250ms\n")) {
+		t.Fatalf("stdout missing timeout: %s", stdout.String())
+	}
+}
+
 func TestRunPolicyPrintsHumanReadableSummaryByDefault(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -657,6 +681,58 @@ func TestRunPolicyPrintsHumanReadableSummaryByDefault(t *testing.T) {
 		t.Fatalf("stdout contains command output: %s", stdout.String())
 	}
 	if stderr.String() != "" {
+		t.Fatalf("stderr = %s", stderr.String())
+	}
+}
+
+func TestExitCodeForSupervisorTimeoutError(t *testing.T) {
+	var stderr bytes.Buffer
+
+	code := exitCodeForSupervisorError(&supervisor.TimeoutError{Duration: 250 * time.Millisecond}, &stderr)
+
+	if code != ExitTimedOut {
+		t.Fatalf("exit code = %d, want %d", code, ExitTimedOut)
+	}
+	if !bytes.Contains(stderr.Bytes(), []byte("bulle: command timed out after 250ms\n")) {
+		t.Fatalf("stderr = %s", stderr.String())
+	}
+}
+
+func TestExitCodeForSupervisorExitError(t *testing.T) {
+	var stderr bytes.Buffer
+
+	code := exitCodeForSupervisorError(&supervisor.ExitError{Code: 7}, &stderr)
+
+	if code != 7 {
+		t.Fatalf("exit code = %d, want 7", code)
+	}
+	if stderr.String() != "" {
+		t.Fatalf("stderr = %s", stderr.String())
+	}
+}
+
+func TestExitCodeForSupervisorZeroExitError(t *testing.T) {
+	var stderr bytes.Buffer
+
+	code := exitCodeForSupervisorError(&supervisor.ExitError{Code: 0}, &stderr)
+
+	if code != ExitCommandFailed {
+		t.Fatalf("exit code = %d, want %d", code, ExitCommandFailed)
+	}
+	if stderr.String() != "" {
+		t.Fatalf("stderr = %s", stderr.String())
+	}
+}
+
+func TestExitCodeForSupervisorGenericError(t *testing.T) {
+	var stderr bytes.Buffer
+
+	code := exitCodeForSupervisorError(errors.New("setup failed"), &stderr)
+
+	if code != ExitSandboxSetup {
+		t.Fatalf("exit code = %d, want %d", code, ExitSandboxSetup)
+	}
+	if !bytes.Contains(stderr.Bytes(), []byte("setup failed\n")) {
 		t.Fatalf("stderr = %s", stderr.String())
 	}
 }
