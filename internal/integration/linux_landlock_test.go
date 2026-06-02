@@ -11,18 +11,6 @@ import (
 	"time"
 )
 
-func linuxROXPathArgs(paths ...string) []string {
-	args := []string{}
-	for _, path := range paths {
-		args = append(args, "--rox", path)
-	}
-	return args
-}
-
-func linuxRuntimeROXPathArgs(extra ...string) []string {
-	return linuxROXPathArgs(append([]string{"/bin", "/usr/bin", "/lib", "/lib64", "/usr/lib", "/usr/lib64"}, extra...)...)
-}
-
 func TestLinuxLandlockDeniesOutsideRead(t *testing.T) {
 	bin := filepath.Join(t.TempDir(), "bulle")
 	buildBulleForIntegration(t, bin)
@@ -31,7 +19,7 @@ func TestLinuxLandlockDeniesOutsideRead(t *testing.T) {
 	if err := os.WriteFile(outside, []byte("secret"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	args := append([]string{project, "--rw", project}, linuxRuntimeROXPathArgs()...)
+	args := append([]string{project, "--rw", project}, linuxRuntimePathArgs()...)
 	args = append(args, "--env", "PATH", "--", "cat", outside)
 	cmd := exec.Command(bin, args...)
 	out, err := cmd.CombinedOutput()
@@ -48,7 +36,7 @@ func TestLinuxLandlockRunsScriptWithAddExecShebangInterpreter(t *testing.T) {
 	if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf shebang-ok\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	args := append([]string{project, "--add-exec"}, linuxRuntimeROXPathArgs()...)
+	args := append([]string{project, "--add-exec"}, linuxRuntimePathArgs()...)
 	args = append(args, "--", "./hello")
 	cmd := exec.Command(bin, args...)
 	out, err := cmd.CombinedOutput()
@@ -74,7 +62,7 @@ func TestLinuxLandlockClosesInheritedFileDescriptors(t *testing.T) {
 	}
 	defer secret.Close()
 
-	args := append([]string{project}, linuxRuntimeROXPathArgs()...)
+	args := append([]string{project}, linuxRuntimePathArgs()...)
 	args = append(args, "--", "/bin/sh", "-c", "cat <&3")
 	cmd := exec.Command(bin, args...)
 	cmd.ExtraFiles = []*os.File{secret}
@@ -156,7 +144,7 @@ func TestLinuxLandlockRunsFromProjectPath(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	args := append([]string{project, "--rw", project}, linuxRuntimeROXPathArgs()...)
+	args := append([]string{project, "--rw", project}, linuxRuntimePathArgs()...)
 	args = append(args, "--", "/bin/pwd")
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = other
@@ -177,7 +165,7 @@ func TestLinuxLandlockTimeoutExits124(t *testing.T) {
 	bin := filepath.Join(t.TempDir(), "bulle")
 	buildBulleForIntegration(t, bin)
 	project := t.TempDir()
-	args := append([]string{"--timeout", "100ms", project}, linuxRuntimeROXPathArgs()...)
+	args := append([]string{"--timeout", "100ms", project}, linuxRuntimePathArgs()...)
 	args = append(args, "--", "/bin/sleep", "5")
 
 	start := time.Now()
@@ -210,7 +198,7 @@ func TestLinuxLandlockTimeoutKillsBackgroundChild(t *testing.T) {
 	armed := filepath.Join(project, "armed")
 	survived := filepath.Join(project, "survived")
 	script := "(printf armed > " + shellQuote(armed) + "; sleep " + childDelaySeconds + "; printf survived > " + shellQuote(survived) + ") & wait"
-	args := append([]string{"--timeout", timeoutDuration, project, "--rw", project}, linuxRuntimeROXPathArgs()...)
+	args := append([]string{"--timeout", timeoutDuration, project, "--rw", project}, linuxRuntimePathArgs()...)
 	args = append(args, "--", "/bin/sh", "-c", script)
 
 	cmd := exec.Command(bin, args...)
@@ -234,7 +222,7 @@ func TestLinuxLandlockTimeoutZeroBehavesLikeNoTimeout(t *testing.T) {
 	bin := filepath.Join(t.TempDir(), "bulle")
 	buildBulleForIntegration(t, bin)
 	project := t.TempDir()
-	args := append([]string{"--timeout", "0", project}, linuxRuntimeROXPathArgs()...)
+	args := append([]string{"--timeout", "0", project}, linuxRuntimePathArgs()...)
 	args = append(args, "--", "/usr/bin/true")
 
 	cmd := exec.Command(bin, args...)
