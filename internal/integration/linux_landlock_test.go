@@ -198,13 +198,19 @@ func TestLinuxLandlockTimeoutExits124(t *testing.T) {
 }
 
 func TestLinuxLandlockTimeoutKillsBackgroundChild(t *testing.T) {
+	const (
+		timeoutDuration   = "500ms"
+		childDelaySeconds = "3"
+		childDelay        = 3 * time.Second
+	)
+
 	bin := filepath.Join(t.TempDir(), "bulle")
 	buildBulleForIntegration(t, bin)
 	project := t.TempDir()
 	armed := filepath.Join(project, "armed")
 	survived := filepath.Join(project, "survived")
-	script := "(printf armed > " + shellQuote(armed) + "; sleep 1; printf survived > " + shellQuote(survived) + ") & wait"
-	args := append([]string{"--timeout", "100ms", project, "--rw", project}, linuxRuntimeROXPathArgs()...)
+	script := "(printf armed > " + shellQuote(armed) + "; sleep " + childDelaySeconds + "; printf survived > " + shellQuote(survived) + ") & wait"
+	args := append([]string{"--timeout", timeoutDuration, project, "--rw", project}, linuxRuntimeROXPathArgs()...)
 	args = append(args, "--", "/bin/sh", "-c", script)
 
 	cmd := exec.Command(bin, args...)
@@ -218,7 +224,7 @@ func TestLinuxLandlockTimeoutKillsBackgroundChild(t *testing.T) {
 	if _, err := os.Stat(armed); err != nil {
 		t.Fatalf("background child did not write setup marker: %v, output: %s", err, string(out))
 	}
-	time.Sleep(1200 * time.Millisecond)
+	time.Sleep(childDelay + 200*time.Millisecond)
 	if _, err := os.Stat(survived); !os.IsNotExist(err) {
 		t.Fatalf("background child wrote marker after timeout: %v, output: %s", err, string(out))
 	}
