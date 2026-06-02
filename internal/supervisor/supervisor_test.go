@@ -103,6 +103,64 @@ func TestRunKillsProcessGroupAfterRunnerExitsOnTimeout(t *testing.T) {
 	}
 }
 
+func TestRunSendsSIGCONTAfterForegroundHandoff(t *testing.T) {
+	restoreGetIoctl := ioctlGetForegroundProcessGroup
+	restoreSetIoctl := ioctlSetForegroundProcessGroup
+	restoreWithSIGTTOUBlocked := withSIGTTOUBlocked
+	restoreContinueProcessGroup := continueProcessGroup
+	t.Cleanup(func() {
+		ioctlGetForegroundProcessGroup = restoreGetIoctl
+		ioctlSetForegroundProcessGroup = restoreSetIoctl
+		withSIGTTOUBlocked = restoreWithSIGTTOUBlocked
+		continueProcessGroup = restoreContinueProcessGroup
+	})
+
+	const parentPGID = 42
+	var foregroundPGIDs []int
+	ioctlGetForegroundProcessGroup = func(fd int) (int, error) {
+		return parentPGID, nil
+	}
+	ioctlSetForegroundProcessGroup = func(fd int, pgid int) error {
+		foregroundPGIDs = append(foregroundPGIDs, pgid)
+		return nil
+	}
+	withSIGTTOUBlocked = func(fn func() error) error {
+		return fn()
+	}
+	continued := make(chan int, 1)
+	continueProcessGroup = func(pgid int, sig syscall.Signal) error {
+		if sig != syscall.SIGCONT {
+			t.Fatalf("continue signal = %v, want SIGCONT", sig)
+		}
+		continued <- pgid
+		return nil
+	}
+
+	script := helperScript(t, "exit 0\n")
+	err := Run(policy.Policy{}, Options{Executable: script, Timeout: 5 * time.Second, GracePeriod: 10 * time.Millisecond})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if len(foregroundPGIDs) < 2 {
+		t.Fatalf("foreground pgid changes = %v, want child handoff and parent restore", foregroundPGIDs)
+	}
+	childPGID := foregroundPGIDs[0]
+	if childPGID <= 0 || childPGID == parentPGID {
+		t.Fatalf("child foreground pgid = %d, parent pgid = %d", childPGID, parentPGID)
+	}
+	if got := foregroundPGIDs[len(foregroundPGIDs)-1]; got != parentPGID {
+		t.Fatalf("restored foreground pgid = %d, want %d", got, parentPGID)
+	}
+	select {
+	case got := <-continued:
+		if got != childPGID {
+			t.Fatalf("SIGCONT pgid = %d, want child pgid %d", got, childPGID)
+		}
+	default:
+		t.Fatal("child process group was not continued after foreground handoff")
+	}
+}
+
 func TestTimeoutIncludesTerminalRestoreError(t *testing.T) {
 	restoreErr := errors.New("restore failed")
 	err := finishWithRestore(&TimeoutError{Duration: 50 * time.Millisecond}, &foregroundTerminal{
@@ -249,6 +307,63 @@ func TestRunReturnsShellStatusForForwardedSignal(t *testing.T) {
 		t.Fatalf("ExitError.Code = %d, want %d", exitErr.Code, 128+int(syscall.SIGTERM))
 	}
 	fake.waitForStop(t)
+}
+
+func TestRunReturnsActualSignalWhenForwardedSignalDiffers(t *testing.T) {
+	restoreNotifier := supervisorSignalNotifier
+	fake := newFakeSignalNotifier()
+	supervisorSignalNotifier = fake
+	t.Cleanup(func() {
+		supervisorSignalNotifier = restoreNotifier
+	})
+
+	dir := t.TempDir()
+	ready := filepath.Join(dir, "ready")
+	script := helperScript(t,
+		"trap '' TERM\n"+
+			"printf ready > "+shellQuote(ready)+"\n"+
+			"sleep 0.2\n"+
+			"kill -QUIT $$\n"+
+			"sleep 5\n",
+	)
+	errc := make(chan error, 1)
+	go func() {
+		errc <- Run(policy.Policy{}, Options{Executable: script, Timeout: 5 * time.Second, GracePeriod: 10 * time.Millisecond})
+	}()
+
+	signalc := fake.waitForNotify(t)
+	waitForFile(t, ready)
+	signalc <- syscall.SIGTERM
+
+	var err error
+	select {
+	case err = <-errc:
+	case <-time.After(time.Second):
+		t.Fatal("Run did not return after child SIGQUIT")
+	}
+	var exitErr *ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("Run error = %T %[1]v, want ExitError", err)
+	}
+	want := 128 + int(syscall.SIGQUIT)
+	if exitErr.Code != want {
+		t.Fatalf("ExitError.Code = %d, want %d", exitErr.Code, want)
+	}
+	fake.waitForStop(t)
+}
+
+func TestRunPrefersChildExitWhenPolicyWriteFails(t *testing.T) {
+	script := helperScriptWithoutPolicyRead(t, "exit 7\n")
+	large := strings.Repeat("x", 10*1024*1024)
+
+	err := Run(policy.Policy{Env: map[string]string{"BIG": large}}, Options{Executable: script, Timeout: 5 * time.Second, GracePeriod: 10 * time.Millisecond})
+	var exitErr *ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("Run error = %T %[1]v, want ExitError", err)
+	}
+	if exitErr.Code != 7 {
+		t.Fatalf("ExitError.Code = %d, want 7", exitErr.Code)
+	}
 }
 
 func helperScript(t *testing.T, body string) string {

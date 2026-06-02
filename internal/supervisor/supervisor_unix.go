@@ -30,6 +30,7 @@ var ioctlSetForegroundProcessGroup = func(fd int, pgid int) error {
 }
 
 var withSIGTTOUBlocked = blockSIGTTOU
+var continueProcessGroup = killProcessGroup
 
 type signalNotifier interface {
 	Notify(chan<- os.Signal, ...os.Signal)
@@ -125,6 +126,7 @@ func Run(p policy.Policy, opts Options) error {
 			_ = cmd.Wait()
 			return finishWithRestore(err, term)
 		}
+		_ = continueProcessGroup(pgid, syscall.SIGCONT)
 	}
 	forwarder.setTarget(pgid)
 
@@ -172,12 +174,12 @@ func Run(p policy.Policy, opts Options) error {
 			select {
 			case waitErr := <-waitDone:
 				waitDone = nil
-				return finishWait(waitErr, term, forwarder.forwardedSignal())
+				return finishWriteError(err, waitErr, term, forwarder.forwardedSignal())
 			default:
 				_ = killProcessGroup(pgid, syscall.SIGKILL)
 				_ = closeWrite()
-				<-waitDone
-				return finishWithRestore(err, term)
+				waitErr := <-waitDone
+				return finishWriteError(err, waitErr, term, forwarder.forwardedSignal())
 			}
 		case <-timer.C:
 			_ = closeWrite()
@@ -240,6 +242,14 @@ func finishWait(err error, term *foregroundTerminal, forwarded syscall.Signal) e
 	return finishWithRestore(waitError(err, forwarded), term)
 }
 
+func finishWriteError(writeErr error, waitErr error, term *foregroundTerminal, forwarded syscall.Signal) error {
+	childErr := waitError(waitErr, forwarded)
+	if childErr != nil {
+		return finishWithRestore(childErr, term)
+	}
+	return finishWithRestore(writeErr, term)
+}
+
 func finishWithRestore(err error, term *foregroundTerminal) error {
 	if term == nil {
 		return err
@@ -262,10 +272,10 @@ func waitError(err error, forwarded syscall.Signal) error {
 	if errors.As(err, &exitErr) {
 		code := exitErr.ExitCode()
 		if code < 0 {
-			if forwarded != 0 {
-				code = 128 + int(forwarded)
-			} else if status, ok := exitErr.Sys().(syscall.WaitStatus); ok && status.Signaled() {
+			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok && status.Signaled() {
 				code = 128 + int(status.Signal())
+			} else if forwarded != 0 {
+				code = 128 + int(forwarded)
 			} else {
 				code = 1
 			}
