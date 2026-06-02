@@ -226,10 +226,19 @@ func isCommandExitError(err error) bool {
 }
 
 func exitCodeForSupervisorError(err error, stderr io.Writer) int {
+	var restoreErr *supervisor.TerminalRestoreError
+	hasRestoreErr := errors.As(err, &restoreErr)
 	var timeoutErr *supervisor.TimeoutError
 	if errors.As(err, &timeoutErr) {
 		fmt.Fprintf(stderr, "bulle: command timed out after %s\n", timeoutErr.Duration)
+		if hasRestoreErr {
+			fmt.Fprintln(stderr, restoreErr)
+		}
 		return ExitTimedOut
+	}
+	if hasRestoreErr {
+		fmt.Fprintln(stderr, restoreErr)
+		return ExitSandboxSetup
 	}
 	var exitErr *supervisor.ExitError
 	if errors.As(err, &exitErr) {

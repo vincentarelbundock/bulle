@@ -698,6 +698,26 @@ func TestExitCodeForSupervisorTimeoutError(t *testing.T) {
 	}
 }
 
+func TestExitCodeForSupervisorTimeoutWithTerminalRestoreError(t *testing.T) {
+	var stderr bytes.Buffer
+	err := errors.Join(
+		&supervisor.TimeoutError{Duration: 250 * time.Millisecond},
+		&supervisor.TerminalRestoreError{Err: errors.New("restore failed")},
+	)
+
+	code := exitCodeForSupervisorError(err, &stderr)
+
+	if code != ExitTimedOut {
+		t.Fatalf("exit code = %d, want %d", code, ExitTimedOut)
+	}
+	if !bytes.Contains(stderr.Bytes(), []byte("bulle: command timed out after 250ms\n")) {
+		t.Fatalf("stderr = %s", stderr.String())
+	}
+	if !bytes.Contains(stderr.Bytes(), []byte("restore failed\n")) {
+		t.Fatalf("stderr = %s", stderr.String())
+	}
+}
+
 func TestExitCodeForSupervisorExitError(t *testing.T) {
 	var stderr bytes.Buffer
 
@@ -720,6 +740,23 @@ func TestExitCodeForSupervisorZeroExitError(t *testing.T) {
 		t.Fatalf("exit code = %d, want %d", code, ExitCommandFailed)
 	}
 	if stderr.String() != "" {
+		t.Fatalf("stderr = %s", stderr.String())
+	}
+}
+
+func TestExitCodeForSupervisorExitWithTerminalRestoreError(t *testing.T) {
+	var stderr bytes.Buffer
+	err := errors.Join(
+		&supervisor.ExitError{Code: 7},
+		&supervisor.TerminalRestoreError{Err: errors.New("restore failed")},
+	)
+
+	code := exitCodeForSupervisorError(err, &stderr)
+
+	if code != ExitSandboxSetup {
+		t.Fatalf("exit code = %d, want %d", code, ExitSandboxSetup)
+	}
+	if !bytes.Contains(stderr.Bytes(), []byte("restore failed\n")) {
 		t.Fatalf("stderr = %s", stderr.String())
 	}
 }

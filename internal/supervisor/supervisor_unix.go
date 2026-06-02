@@ -258,6 +258,7 @@ func finishWithRestore(err error, term *foregroundTerminal) error {
 	if restoreErr == nil {
 		return err
 	}
+	restoreErr = &TerminalRestoreError{Err: restoreErr}
 	if err == nil {
 		return restoreErr
 	}
@@ -306,7 +307,7 @@ type signalForwarder struct {
 func startSignalForwarder() *signalForwarder {
 	forwarder := newSignalForwarder(killProcessGroup)
 	signals := make(chan os.Signal, 4)
-	supervisorSignalNotifier.Notify(signals, os.Interrupt, syscall.SIGQUIT, syscall.SIGTERM)
+	supervisorSignalNotifier.Notify(signals, os.Interrupt, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM)
 	forwarder.signals = signals
 	go func() {
 		for {

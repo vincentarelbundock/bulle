@@ -178,6 +178,10 @@ func TestTimeoutIncludesTerminalRestoreError(t *testing.T) {
 	if !errors.Is(err, restoreErr) {
 		t.Fatalf("error = %v, want joined restore error %v", err, restoreErr)
 	}
+	var terminalErr *TerminalRestoreError
+	if !errors.As(err, &terminalErr) {
+		t.Fatalf("error = %T %[1]v, want TerminalRestoreError", err)
+	}
 }
 
 func TestSignalForwarderQueuesSignalsBeforeTargetIsSet(t *testing.T) {
@@ -206,6 +210,23 @@ func TestSignalForwarderQueuesSignalsBeforeTargetIsSet(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("queued signal was not forwarded after target was set")
+	}
+}
+
+func TestStartSignalForwarderSubscribesToHangup(t *testing.T) {
+	restoreNotifier := supervisorSignalNotifier
+	fake := newFakeSignalNotifier()
+	supervisorSignalNotifier = fake
+	t.Cleanup(func() {
+		supervisorSignalNotifier = restoreNotifier
+	})
+
+	forwarder := startSignalForwarder()
+	defer forwarder.stop()
+	fake.waitForNotify(t)
+
+	if !fake.notifiedSignal(syscall.SIGHUP) {
+		t.Fatalf("signal notifier did not subscribe to SIGHUP; got %v", fake.notified)
 	}
 }
 
@@ -422,8 +443,9 @@ func waitForFile(t *testing.T, path string) {
 }
 
 type fakeSignalNotifier struct {
-	ready   chan chan<- os.Signal
-	stopped chan struct{}
+	ready    chan chan<- os.Signal
+	stopped  chan struct{}
+	notified []os.Signal
 }
 
 func newFakeSignalNotifier() *fakeSignalNotifier {
@@ -433,7 +455,8 @@ func newFakeSignalNotifier() *fakeSignalNotifier {
 	}
 }
 
-func (f *fakeSignalNotifier) Notify(signals chan<- os.Signal, _ ...os.Signal) {
+func (f *fakeSignalNotifier) Notify(signals chan<- os.Signal, notified ...os.Signal) {
+	f.notified = append([]os.Signal(nil), notified...)
 	f.ready <- signals
 }
 
@@ -459,4 +482,13 @@ func (f *fakeSignalNotifier) waitForStop(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("signal notifier was not stopped")
 	}
+}
+
+func (f *fakeSignalNotifier) notifiedSignal(want syscall.Signal) bool {
+	for _, sig := range f.notified {
+		if got, ok := sig.(syscall.Signal); ok && got == want {
+			return true
+		}
+	}
+	return false
 }
