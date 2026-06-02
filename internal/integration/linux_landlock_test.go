@@ -199,9 +199,9 @@ func TestLinuxLandlockTimeoutExits124(t *testing.T) {
 
 func TestLinuxLandlockTimeoutKillsBackgroundChild(t *testing.T) {
 	const (
-		timeoutDuration   = "500ms"
-		childDelaySeconds = "3"
-		childDelay        = 3 * time.Second
+		timeoutDuration   = "1s"
+		childDelaySeconds = "4"
+		childDelay        = 4 * time.Second
 	)
 
 	bin := filepath.Join(t.TempDir(), "bulle")
@@ -235,7 +235,7 @@ func TestLinuxLandlockTimeoutZeroBehavesLikeNoTimeout(t *testing.T) {
 	buildBulleForIntegration(t, bin)
 	project := t.TempDir()
 	args := append([]string{"--timeout", "0", project}, linuxRuntimeROXPathArgs()...)
-	args = append(args, "--", "/bin/true")
+	args = append(args, "--", "/usr/bin/true")
 
 	cmd := exec.Command(bin, args...)
 	out, err := cmd.CombinedOutput()
