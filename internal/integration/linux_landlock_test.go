@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func linuxROXPathArgs(paths ...string) []string {
@@ -170,4 +171,77 @@ func TestLinuxLandlockRunsFromProjectPath(t *testing.T) {
 	if got := strings.TrimSpace(string(out)); got != want {
 		t.Fatalf("pwd = %q, want %q", got, want)
 	}
+}
+
+func TestLinuxLandlockTimeoutExits124(t *testing.T) {
+	bin := filepath.Join(t.TempDir(), "bulle")
+	buildBulleForIntegration(t, bin)
+	project := t.TempDir()
+	args := append([]string{"--timeout", "100ms", project}, linuxRuntimeROXPathArgs()...)
+	args = append(args, "--", "/bin/sleep", "5")
+
+	start := time.Now()
+	cmd := exec.Command(bin, args...)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("sleep succeeded, want timeout, output: %s", string(out))
+	}
+	if exitErr, ok := err.(*exec.ExitError); !ok || exitErr.ExitCode() != 124 {
+		t.Fatalf("sleep exit = %v, want exit code 124, output: %s", err, string(out))
+	}
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Fatalf("timeout took %v, want under 2s, output: %s", elapsed, string(out))
+	}
+	if !strings.Contains(string(out), "command timed out after 100ms") {
+		t.Fatalf("timeout output = %q, want timeout message", string(out))
+	}
+}
+
+func TestLinuxLandlockTimeoutKillsBackgroundChild(t *testing.T) {
+	bin := filepath.Join(t.TempDir(), "bulle")
+	buildBulleForIntegration(t, bin)
+	project := t.TempDir()
+	marker := filepath.Join(project, "survived")
+	script := "(sleep 1; printf survived > " + shellQuote(marker) + ") & wait"
+	args := append([]string{"--timeout", "100ms", project, "--rw", project}, linuxRuntimeROXPathArgs()...)
+	args = append(args, "--", "/bin/sh", "-c", script)
+
+	cmd := exec.Command(bin, args...)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("shell succeeded, want timeout, output: %s", string(out))
+	}
+	if exitErr, ok := err.(*exec.ExitError); !ok || exitErr.ExitCode() != 124 {
+		t.Fatalf("shell exit = %v, want exit code 124, output: %s", err, string(out))
+	}
+	time.Sleep(1200 * time.Millisecond)
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("background child wrote marker after timeout: %v", err)
+	}
+}
+
+func TestLinuxLandlockTimeoutZeroBehavesLikeNoTimeout(t *testing.T) {
+	bin := filepath.Join(t.TempDir(), "bulle")
+	buildBulleForIntegration(t, bin)
+	project := t.TempDir()
+	args := append([]string{"--timeout", "0", project}, linuxRuntimeROXPathArgs()...)
+	args = append(args, "--", "/bin/true")
+
+	cmd := exec.Command(bin, args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("true failed: %v, output: %s", err, string(out))
+	}
+}
+
+func shellQuote(value string) string {
+	out := "'"
+	for _, r := range value {
+		if r == '\'' {
+			out += "'\\''"
+			continue
+		}
+		out += string(r)
+	}
+	return out + "'"
 }
