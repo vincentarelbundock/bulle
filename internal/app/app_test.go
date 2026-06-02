@@ -27,6 +27,34 @@ func TestRunReturnsUsageErrorWhenCommandMissing(t *testing.T) {
 	}
 }
 
+func TestRunPreparedPolicyRejectsMissingFD(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"bulle", "__run-prepared-policy"}, &stdout, &stderr)
+
+	if code != ExitSandboxSetup {
+		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitSandboxSetup, stderr.String())
+	}
+	if !bytes.Contains(stderr.Bytes(), []byte("usage: bulle __run-prepared-policy --policy-fd FD")) {
+		t.Fatalf("stderr = %s", stderr.String())
+	}
+}
+
+func TestRunPreparedPolicyRejectsInvalidFD(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"bulle", "__run-prepared-policy", "--policy-fd", "not-a-number"}, &stdout, &stderr)
+
+	if code != ExitSandboxSetup {
+		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitSandboxSetup, stderr.String())
+	}
+	if !bytes.Contains(stderr.Bytes(), []byte(`invalid policy fd "not-a-number"`)) {
+		t.Fatalf("stderr = %s", stderr.String())
+	}
+}
+
 func TestRunDefaultsWorkspacePathToCurrentDirectory(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

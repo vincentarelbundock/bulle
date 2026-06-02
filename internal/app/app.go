@@ -34,6 +34,10 @@ const (
 var Version = "dev"
 
 func Run(args []string, stdout io.Writer, stderr io.Writer) int {
+	if isPreparedPolicyRunner(args) {
+		return runPreparedPolicy(args, stdout, stderr)
+	}
+
 	opts, err := cli.Parse(args)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
