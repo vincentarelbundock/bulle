@@ -42,16 +42,71 @@ func TestRunReturnsUsageErrorWhenCommandMissing(t *testing.T) {
 }
 
 func TestRunPreparedPolicyRejectsMissingFD(t *testing.T) {
-	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"bulle", "__run-prepared-policy"}, &stdout, &stderr)
+	code := runPreparedPolicy([]string{"bulle", "__run-prepared-policy"}, &stderr)
 
 	if code != ExitSandboxSetup {
 		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitSandboxSetup, stderr.String())
 	}
 	if !bytes.Contains(stderr.Bytes(), []byte("usage: bulle __run-prepared-policy --policy-fd FD")) {
 		t.Fatalf("stderr = %s", stderr.String())
+	}
+}
+
+func TestRunDoesNotTreatIncompletePreparedPolicyInvocationAsRunner(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"bulle", "__run-prepared-policy", "--policy-fd"}, &stdout, &stderr)
+
+	if code != ExitConfigError {
+		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitConfigError, stderr.String())
+	}
+	if bytes.Contains(stderr.Bytes(), []byte("usage: bulle __run-prepared-policy --policy-fd FD")) {
+		t.Fatalf("public CLI invocation was handled as hidden runner: %s", stderr.String())
+	}
+}
+
+func TestRunPreparedPolicyDoesNotShadowWorkspacePath(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	root := t.TempDir()
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldwd); err != nil {
+			t.Fatalf("restore working directory: %v", err)
+		}
+	})
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	project := filepath.Join(root, preparedPolicyRunnerCommand)
+	if err := os.Mkdir(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	truePath := "/bin/true"
+	if _, err := os.Stat(truePath); err != nil {
+		truePath = "/usr/bin/true"
+	}
+	truePath, err = filepath.EvalSymlinks(truePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	code := Run([]string{"bulle", preparedPolicyRunnerCommand, "--rox", filepath.Dir(truePath), "--policy=summary", "--", truePath}, &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitOK, stderr.String())
+	}
+	if bytes.Contains(stderr.Bytes(), []byte("usage: bulle __run-prepared-policy --policy-fd FD")) {
+		t.Fatalf("workspace path was handled as hidden runner: %s", stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte("bulle profile")) {
+		t.Fatalf("stdout = %s", stdout.String())
 	}
 }
 

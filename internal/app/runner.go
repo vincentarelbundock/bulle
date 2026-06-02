@@ -14,7 +14,7 @@ import (
 const preparedPolicyRunnerCommand = "__run-prepared-policy"
 
 func isPreparedPolicyRunner(args []string) bool {
-	return len(args) > 1 && args[1] == preparedPolicyRunnerCommand
+	return len(args) == 4 && args[1] == preparedPolicyRunnerCommand && args[2] == "--policy-fd"
 }
 
 func runPreparedPolicy(args []string, stderr io.Writer) int {
