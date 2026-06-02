@@ -2,12 +2,17 @@ package app
 
 import (
 	"bytes"
+	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"syscall"
 	"testing"
 
 	"github.com/vincentarelbundock/bulle/internal/elfdeps"
+	"github.com/vincentarelbundock/bulle/internal/policy"
 )
 
 func TestRunReturnsUsageErrorWhenCommandMissing(t *testing.T) {
@@ -53,6 +58,56 @@ func TestRunPreparedPolicyRejectsInvalidFD(t *testing.T) {
 	if !bytes.Contains(stderr.Bytes(), []byte(`invalid policy fd "not-a-number"`)) {
 		t.Fatalf("stderr = %s", stderr.String())
 	}
+}
+
+func TestRunPreparedPolicyClosesFDBeforeBackend(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	fd := writePreparedPolicy(t, policy.Policy{Backend: policy.BackendName("test")})
+
+	called := false
+	oldRunPreparedPolicyBackend := runPreparedPolicyBackend
+	runPreparedPolicyBackend = func(policy.Policy, io.Writer) int {
+		called = true
+		dup, err := syscall.Dup(fd)
+		if err != syscall.EBADF {
+			if err == nil {
+				_ = syscall.Close(dup)
+			}
+			t.Fatalf("policy fd is still open when backend starts; err = %v", err)
+		}
+		return ExitOK
+	}
+	defer func() {
+		runPreparedPolicyBackend = oldRunPreparedPolicyBackend
+	}()
+
+	code := Run([]string{"bulle", "__run-prepared-policy", "--policy-fd", strconv.Itoa(fd)}, &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitOK, stderr.String())
+	}
+	if !called {
+		t.Fatal("backend was not called")
+	}
+}
+
+func writePreparedPolicy(t *testing.T, p policy.Policy) int {
+	t.Helper()
+
+	data, err := json.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "prepared-policy.json")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fd, err := syscall.Open(path, syscall.O_RDONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fd
 }
 
 func TestRunDefaultsWorkspacePathToCurrentDirectory(t *testing.T) {

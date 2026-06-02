@@ -35,7 +35,7 @@ var Version = "dev"
 
 func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if isPreparedPolicyRunner(args) {
-		return runPreparedPolicy(args, stdout, stderr)
+		return runPreparedPolicy(args, stderr)
 	}
 
 	opts, err := cli.Parse(args)

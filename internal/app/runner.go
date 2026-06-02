@@ -17,7 +17,7 @@ func isPreparedPolicyRunner(args []string) bool {
 	return len(args) > 1 && args[1] == preparedPolicyRunnerCommand
 }
 
-func runPreparedPolicy(args []string, _ io.Writer, stderr io.Writer) int {
+func runPreparedPolicy(args []string, stderr io.Writer) int {
 	if len(args) != 4 || args[2] != "--policy-fd" {
 		fmt.Fprintln(stderr, "usage: bulle __run-prepared-policy --policy-fd FD")
 		return ExitSandboxSetup
@@ -32,17 +32,21 @@ func runPreparedPolicy(args []string, _ io.Writer, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "invalid policy fd %q\n", args[3])
 		return ExitSandboxSetup
 	}
-	defer file.Close()
 
 	var p policy.Policy
 	if err := json.NewDecoder(file).Decode(&p); err != nil {
+		_ = file.Close()
 		fmt.Fprintf(stderr, "decode prepared policy: %v\n", err)
+		return ExitSandboxSetup
+	}
+	if err := file.Close(); err != nil {
+		fmt.Fprintf(stderr, "close prepared policy fd: %v\n", err)
 		return ExitSandboxSetup
 	}
 	return runPreparedPolicyBackend(p, stderr)
 }
 
-func runPreparedPolicyBackend(p policy.Policy, stderr io.Writer) int {
+var runPreparedPolicyBackend = func(p policy.Policy, stderr io.Writer) int {
 	backend, err := backends.ForName(p.Backend)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
