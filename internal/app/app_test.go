@@ -508,6 +508,36 @@ func TestRunPolicyJSONPrintsResolvedPolicy(t *testing.T) {
 	}
 }
 
+func TestRunPolicyJSONIncludesTimeoutWhenConfigured(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	tmp := t.TempDir()
+
+	code := Run([]string{"bulle", "--timeout", "30s", "--profile", "tool", tmp, "--policy=json", "--", "echo", "hi"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte(`"timeout":"30s"`)) {
+		t.Fatalf("stdout missing timeout: %s", stdout.String())
+	}
+}
+
+func TestRunPolicyJSONOmitsTimeoutWhenUnset(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	tmp := t.TempDir()
+
+	code := Run([]string{"bulle", "--profile", "tool", tmp, "--policy=json", "--", "echo", "hi"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
+	}
+	if bytes.Contains(stdout.Bytes(), []byte(`"timeout"`)) {
+		t.Fatalf("stdout unexpectedly contains timeout: %s", stdout.String())
+	}
+}
+
 func TestRunPolicyPrintsHumanReadableSummaryByDefault(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

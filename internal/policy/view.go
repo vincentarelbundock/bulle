@@ -7,6 +7,10 @@ func NewView(p Policy) View {
 	if network == "" {
 		network = NetworkFull
 	}
+	timeout := ""
+	if p.Timeout > 0 {
+		timeout = p.Timeout.String()
+	}
 	envKeys := make([]string, 0, len(p.Env))
 	for key := range p.Env {
 		envKeys = append(envKeys, key)
@@ -16,6 +20,7 @@ func NewView(p Policy) View {
 		Backend:       p.Backend,
 		ProjectPath:   p.ProjectPath,
 		Command:       append([]string{}, p.Command...),
+		Timeout:       timeout,
 		ReadOnly:      append([]string{}, p.ReadOnly...),
 		ReadOnlyExec:  append([]string{}, p.ReadOnlyExec...),
 		ReadWrite:     append([]string{}, p.ReadWrite...),

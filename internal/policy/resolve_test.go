@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/vincentarelbundock/bulle/internal/cli"
 	"github.com/vincentarelbundock/bulle/internal/config"
@@ -178,6 +179,24 @@ func TestResolveAlwaysUsesRuntimeBackend(t *testing.T) {
 	}
 	if got.Backend != RuntimeDefaultBackend() {
 		t.Fatalf("Backend = %q, want %q", got.Backend, RuntimeDefaultBackend())
+	}
+}
+
+func TestResolveCarriesTimeoutFromOptions(t *testing.T) {
+	project := t.TempDir()
+	cfg := config.Config{Profiles: map[string]config.Profile{"default": {}}}
+	got, err := Resolve(Inputs{
+		Options:   cli.Options{ProjectPath: project, Timeout: 45 * time.Second},
+		Global:    cfg,
+		ParentEnv: map[string]string{},
+		Home:      t.TempDir(),
+		Tmp:       t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if got.Timeout != 45*time.Second {
+		t.Fatalf("Timeout = %v, want 45s", got.Timeout)
 	}
 }
 

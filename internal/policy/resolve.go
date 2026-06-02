@@ -40,6 +40,7 @@ func Resolve(in Inputs) (Policy, error) {
 	p.Backend = backend
 	p.ProjectPath = in.Options.ProjectPath
 	p.Command = in.Options.Command
+	p.Timeout = in.Options.Timeout
 	p.AddExec = addExec
 	p.AddLibs = addLibs
 	p.MachLookup = append(p.MachLookup, platformDefaults.MachLookup...)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vincentarelbundock/bulle/internal/cli"
 	"github.com/vincentarelbundock/bulle/internal/policy"
@@ -95,6 +96,21 @@ func TestWriteProfilePermissionSummaryQuotesAmbiguousCommandArgs(t *testing.T) {
 
 	got := stderr.String()
 	assertContains(t, got, `  command: cmd "two words" "quote\"arg" "semi;colon"`+"\n")
+}
+
+func TestWriteProfilePermissionSummaryIncludesTimeoutWhenSet(t *testing.T) {
+	var stderr bytes.Buffer
+	p := policy.Policy{
+		Backend:     policy.BackendLinuxLandlock,
+		ProjectPath: "/tmp/project",
+		Command:     []string{"sleep", "60"},
+		Env:         map[string]string{},
+		Timeout:     30 * time.Second,
+	}
+
+	writeProfilePermissionSummary("agent", p, &stderr)
+
+	assertContains(t, stderr.String(), "  timeout: 30s\n")
 }
 
 func TestWriteProfilePermissionSummaryCompactsFilesystemPaths(t *testing.T) {

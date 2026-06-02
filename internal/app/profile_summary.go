@@ -29,6 +29,9 @@ func writeProfilePermissionSummary(profileName string, p policy.Policy, w io.Wri
 	writePermissionGroup(w, "rwx", view.ReadWriteExec, paths)
 	fmt.Fprintf(w, "  environment: %s\n", formatInlineList(view.EnvKeys))
 	fmt.Fprintf(w, "  network: %s\n", formatNetwork(view.Network))
+	if view.Timeout != "" {
+		fmt.Fprintf(w, "  timeout: %s\n", view.Timeout)
+	}
 	fmt.Fprintf(w, "  add_exec: %s\n", formatEnabled(view.AddExec))
 	fmt.Fprintf(w, "  add_libs: %s\n", formatEnabled(view.AddLibs))
 	fmt.Fprintf(w, "  mach_lookup: %s\n", formatInlineList(view.MachLookup))

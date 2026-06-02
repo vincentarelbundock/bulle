@@ -1,5 +1,7 @@
 package policy
 
+import "time"
+
 type BackendName string
 type NetworkMode string
 
@@ -14,6 +16,7 @@ const (
 type Policy struct {
 	ProjectPath string
 	Command     []string
+	Timeout     time.Duration
 
 	ReadOnly      []string
 	ReadOnlyExec  []string
@@ -34,6 +37,7 @@ type View struct {
 	Backend       BackendName `json:"backend"`
 	ProjectPath   string      `json:"workspace_path"`
 	Command       []string    `json:"command"`
+	Timeout       string      `json:"timeout,omitempty"`
 	ReadOnly      []string    `json:"ro"`
 	ReadOnlyExec  []string    `json:"rox"`
 	ReadWrite     []string    `json:"rw"`
