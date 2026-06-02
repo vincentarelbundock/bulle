@@ -16,7 +16,7 @@ import (
 
 func TestRunReturnsNilForSuccessfulRunner(t *testing.T) {
 	script := helperScript(t, "exit 0\n")
-	err := Run(policy.Policy{}, Options{Executable: script, Timeout: time.Second, GracePeriod: 10 * time.Millisecond})
+	err := Run(policy.Policy{}, Options{Executable: script, Timeout: 5 * time.Second, GracePeriod: 10 * time.Millisecond})
 	if err != nil {
 		t.Fatalf("Run returned error: %v", err)
 	}
@@ -24,7 +24,7 @@ func TestRunReturnsNilForSuccessfulRunner(t *testing.T) {
 
 func TestRunReturnsExitErrorForFailedRunner(t *testing.T) {
 	script := helperScript(t, "exit 7\n")
-	err := Run(policy.Policy{}, Options{Executable: script, Timeout: time.Second, GracePeriod: 10 * time.Millisecond})
+	err := Run(policy.Policy{}, Options{Executable: script, Timeout: 5 * time.Second, GracePeriod: 10 * time.Millisecond})
 	var exitErr *ExitError
 	if !errors.As(err, &exitErr) {
 		t.Fatalf("Run error = %T %[1]v, want ExitError", err)
@@ -79,6 +79,91 @@ func TestRunKillsProcessGroupOnTimeout(t *testing.T) {
 	time.Sleep(1200 * time.Millisecond)
 	if _, err := os.Stat(marker); !os.IsNotExist(err) {
 		t.Fatalf("background child survived timeout; marker stat err = %v", err)
+	}
+}
+
+func TestRunKillsProcessGroupAfterRunnerExitsOnTimeout(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "survived")
+	script := helperScript(t,
+		"(trap '' TERM; sleep 1; printf survived > "+shellQuote(marker)+") &\n"+
+			"trap 'exit 0' TERM\n"+
+			"wait\n",
+	)
+
+	err := Run(policy.Policy{}, Options{Executable: script, Timeout: 50 * time.Millisecond, GracePeriod: 10 * time.Millisecond})
+	var timeoutErr *TimeoutError
+	if !errors.As(err, &timeoutErr) {
+		t.Fatalf("Run error = %T %[1]v, want TimeoutError", err)
+	}
+
+	time.Sleep(1200 * time.Millisecond)
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("SIGTERM-ignoring child survived timeout; marker stat err = %v", err)
+	}
+}
+
+func TestTimeoutIncludesTerminalRestoreError(t *testing.T) {
+	restoreErr := errors.New("restore failed")
+	err := finishWithRestore(&TimeoutError{Duration: 50 * time.Millisecond}, &foregroundTerminal{
+		fd:   9,
+		pgid: 42,
+		restoreFunc: func() error {
+			return restoreErr
+		},
+	})
+
+	var timeoutErr *TimeoutError
+	if !errors.As(err, &timeoutErr) {
+		t.Fatalf("error = %T %[1]v, want TimeoutError", err)
+	}
+	if !errors.Is(err, restoreErr) {
+		t.Fatalf("error = %v, want joined restore error %v", err, restoreErr)
+	}
+}
+
+func TestSignalForwarderQueuesSignalsBeforeTargetIsSet(t *testing.T) {
+	kills := make(chan syscall.Signal, 1)
+	forwarder := newSignalForwarder(func(pgid int, sig syscall.Signal) error {
+		if pgid != 123 {
+			t.Fatalf("forwarded pgid = %d, want 123", pgid)
+		}
+		kills <- sig
+		return nil
+	})
+	defer forwarder.stop()
+
+	forwarder.forward(syscall.SIGTERM)
+	select {
+	case sig := <-kills:
+		t.Fatalf("forwarded signal before target was set: %v", sig)
+	default:
+	}
+
+	forwarder.setTarget(123)
+	select {
+	case sig := <-kills:
+		if sig != syscall.SIGTERM {
+			t.Fatalf("forwarded signal = %v, want SIGTERM", sig)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("queued signal was not forwarded after target was set")
+	}
+}
+
+func TestTimeoutPrefersCompletedWaitWhenProcessGroupIsGone(t *testing.T) {
+	waitDone := make(chan error, 1)
+	waitDone <- nil
+	err := handleTimeout(waitDone, nil, nil, timeoutContext{
+		duration: 50 * time.Millisecond,
+		grace:    10 * time.Millisecond,
+		pgid:     123,
+		kill: func(pgid int, sig syscall.Signal) error {
+			return syscall.ESRCH
+		},
+	})
+	if err != nil {
+		t.Fatalf("handleTimeout returned %v, want nil", err)
 	}
 }
 

@@ -98,6 +98,9 @@ func Run(p policy.Policy, opts Options) error {
 	defer read.Close()
 	defer write.Close()
 
+	forwarder := startSignalForwarder()
+	defer forwarder.stop()
+
 	cmd := exec.Command(executable, "__run-prepared-policy", "--policy-fd", "3")
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout
@@ -122,8 +125,7 @@ func Run(p policy.Policy, opts Options) error {
 	read.Close()
 
 	pgid := cmd.Process.Pid
-	forwarder := forwardSignals(pgid)
-	defer forwarder.stop()
+	forwarder.setTarget(pgid)
 
 	waitDone := make(chan error, 1)
 	go func() {
@@ -177,28 +179,59 @@ func Run(p policy.Policy, opts Options) error {
 				return finishWithRestore(err, term)
 			}
 		case <-timer.C:
-			_ = killProcessGroup(pgid, syscall.SIGTERM)
-			graceTimer := time.NewTimer(grace)
-			var waitErr error
-			select {
-			case waitErr = <-waitDone:
-				waitDone = nil
-			case <-graceTimer.C:
-				_ = killProcessGroup(pgid, syscall.SIGKILL)
-				waitErr = <-waitDone
-				waitDone = nil
-			}
-			graceTimer.Stop()
-			_ = waitErr
 			_ = closeWrite()
-			if writeDone != nil {
-				<-writeDone
-			}
-			if term != nil {
-				_ = term.restore()
-			}
-			return &TimeoutError{Duration: opts.Timeout}
+			return handleTimeout(waitDone, writeDone, term, timeoutContext{
+				duration: opts.Timeout,
+				grace:    grace,
+				pgid:     pgid,
+				kill:     killProcessGroup,
+			})
 		}
+	}
+}
+
+type timeoutContext struct {
+	duration time.Duration
+	grace    time.Duration
+	pgid     int
+	kill     func(int, syscall.Signal) error
+}
+
+func handleTimeout(waitDone <-chan error, writeDone <-chan error, term *foregroundTerminal, ctx timeoutContext) error {
+	select {
+	case waitErr := <-waitDone:
+		drainWrite(writeDone)
+		return finishWait(waitErr, term, 0)
+	default:
+	}
+
+	termErr := ctx.kill(ctx.pgid, syscall.SIGTERM)
+	if errors.Is(termErr, syscall.ESRCH) {
+		waitErr := <-waitDone
+		drainWrite(writeDone)
+		return finishWait(waitErr, term, 0)
+	}
+
+	graceTimer := time.NewTimer(ctx.grace)
+	defer graceTimer.Stop()
+	waitReaped := false
+	select {
+	case <-waitDone:
+		waitReaped = true
+	case <-graceTimer.C:
+	}
+
+	_ = ctx.kill(ctx.pgid, syscall.SIGKILL)
+	if !waitReaped {
+		<-waitDone
+	}
+	drainWrite(writeDone)
+	return finishWithRestore(&TimeoutError{Duration: ctx.duration}, term)
+}
+
+func drainWrite(writeDone <-chan error) {
+	if writeDone != nil {
+		<-writeDone
 	}
 }
 
@@ -245,30 +278,31 @@ func killProcessGroup(pgid int, sig syscall.Signal) error {
 	if pgid <= 0 {
 		return nil
 	}
-	err := syscall.Kill(-pgid, sig)
-	if err == syscall.ESRCH {
-		return nil
-	}
-	return err
+	return syscall.Kill(-pgid, sig)
 }
 
 type signalForwarder struct {
-	signals chan os.Signal
-	done    chan struct{}
-	last    atomic.Int64
+	signals  chan os.Signal
+	done     chan struct{}
+	stopOnce sync.Once
+	mu       sync.Mutex
+	target   int
+	pending  []syscall.Signal
+	kill     func(int, syscall.Signal) error
+	last     atomic.Int64
 }
 
-func forwardSignals(pgid int) *signalForwarder {
+func startSignalForwarder() *signalForwarder {
+	forwarder := newSignalForwarder(killProcessGroup)
 	signals := make(chan os.Signal, 4)
 	supervisorSignalNotifier.Notify(signals, os.Interrupt, syscall.SIGQUIT, syscall.SIGTERM)
-	forwarder := &signalForwarder{signals: signals, done: make(chan struct{})}
+	forwarder.signals = signals
 	go func() {
 		for {
 			select {
 			case sig := <-signals:
 				if s, ok := sig.(syscall.Signal); ok {
-					forwarder.last.Store(int64(s))
-					_ = killProcessGroup(pgid, s)
+					forwarder.forward(s)
 				}
 			case <-forwarder.done:
 				return
@@ -278,9 +312,44 @@ func forwardSignals(pgid int) *signalForwarder {
 	return forwarder
 }
 
+func newSignalForwarder(kill func(int, syscall.Signal) error) *signalForwarder {
+	return &signalForwarder{done: make(chan struct{}), kill: kill}
+}
+
 func (f *signalForwarder) stop() {
-	supervisorSignalNotifier.Stop(f.signals)
-	close(f.done)
+	f.stopOnce.Do(func() {
+		if f.signals != nil {
+			supervisorSignalNotifier.Stop(f.signals)
+		}
+		close(f.done)
+	})
+}
+
+func (f *signalForwarder) setTarget(pgid int) {
+	f.mu.Lock()
+	f.target = pgid
+	pending := append([]syscall.Signal(nil), f.pending...)
+	f.pending = nil
+	f.mu.Unlock()
+
+	for _, sig := range pending {
+		f.forward(sig)
+	}
+}
+
+func (f *signalForwarder) forward(sig syscall.Signal) {
+	f.last.Store(int64(sig))
+
+	f.mu.Lock()
+	pgid := f.target
+	if pgid == 0 {
+		f.pending = append(f.pending, sig)
+		f.mu.Unlock()
+		return
+	}
+	f.mu.Unlock()
+
+	_ = f.kill(pgid, sig)
 }
 
 func (f *signalForwarder) forwardedSignal() syscall.Signal {
@@ -288,9 +357,10 @@ func (f *signalForwarder) forwardedSignal() syscall.Signal {
 }
 
 type foregroundTerminal struct {
-	fd   int
-	pgid int
-	done bool
+	fd          int
+	pgid        int
+	done        bool
+	restoreFunc func() error
 }
 
 func prepareForegroundTerminal(file *os.File) (*foregroundTerminal, error) {
@@ -311,6 +381,13 @@ func prepareForegroundTerminal(file *os.File) (*foregroundTerminal, error) {
 func (t *foregroundTerminal) restore() error {
 	if t == nil || t.done {
 		return nil
+	}
+	if t.restoreFunc != nil {
+		err := t.restoreFunc()
+		if err == nil {
+			t.done = true
+		}
+		return err
 	}
 	err := withSIGTTOUBlocked(func() error {
 		return ioctlSetForegroundProcessGroup(t.fd, t.pgid)
