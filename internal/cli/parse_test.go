@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vincentarelbundock/bulle/internal/config"
 )
@@ -120,6 +121,49 @@ func TestParseInstallProfilesFlag(t *testing.T) {
 	}
 }
 
+func TestParseTimeoutFlag(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want time.Duration
+	}{
+		{name: "space separated seconds", args: []string{"bulle", "--timeout", "30s", "--", "echo"}, want: 30 * time.Second},
+		{name: "equals combined duration", args: []string{"bulle", "--timeout=1h30m", "--", "echo"}, want: 90 * time.Minute},
+		{name: "omitted timeout", args: []string{"bulle", "--", "echo"}, want: 0},
+		{name: "plain zero disables", args: []string{"bulle", "--timeout", "0", "--", "echo"}, want: 0},
+		{name: "zero with unit disables", args: []string{"bulle", "--timeout", "0s", "--", "echo"}, want: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts, err := Parse(tt.args)
+			if err != nil {
+				t.Fatalf("Parse returned error: %v", err)
+			}
+			if opts.Timeout != tt.want {
+				t.Fatalf("Timeout = %v, want %v", opts.Timeout, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseTimeoutRejectsInvalidValues(t *testing.T) {
+	tests := []string{"30", "-1s", "ten seconds"}
+	for _, value := range tests {
+		t.Run(value, func(t *testing.T) {
+			_, err := Parse([]string{"bulle", "--timeout", value, "--", "echo"})
+			if err == nil {
+				t.Fatal("Parse returned nil error, want timeout validation error")
+			}
+			if !strings.Contains(err.Error(), `invalid --timeout value "`+value+`"`) {
+				t.Fatalf("Parse error = %q, want invalid timeout value", err.Error())
+			}
+			if !strings.Contains(err.Error(), "30s") || !strings.Contains(err.Error(), "1h30m") {
+				t.Fatalf("Parse error = %q, want Go duration examples", err.Error())
+			}
+		})
+	}
+}
+
 func TestParseNoWorkspaceFlag(t *testing.T) {
 	opts, err := Parse([]string{"bulle", "--no-workspace", "--", "codex"})
 	if err != nil {
@@ -213,6 +257,15 @@ func TestUsageShowsProfileShortFlag(t *testing.T) {
 	}
 	if !strings.Contains(Usage(), "--install-profiles SOURCE") {
 		t.Fatalf("Usage() does not show --install-profiles:\n%s", Usage())
+	}
+	if !strings.Contains(Usage(), "--timeout DURATION") {
+		t.Fatalf("Usage() does not show --timeout:\n%s", Usage())
+	}
+	if !strings.Contains(Usage(), "Go duration") {
+		t.Fatalf("Usage() does not explain Go duration syntax:\n%s", Usage())
+	}
+	if !strings.Contains(Usage(), "exit 124") {
+		t.Fatalf("Usage() does not document timeout exit code:\n%s", Usage())
 	}
 	for _, example := range []string{
 		"bulle --install-profiles agent.toml",

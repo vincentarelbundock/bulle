@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/alecthomas/kong"
 )
@@ -14,6 +15,7 @@ func Parse(args []string) (Options, error) {
 		return opts, fmt.Errorf("missing argv")
 	}
 	cliArgs, command := splitCommand(args[1:])
+	cliArgs = normalizeTimeoutValue(cliArgs)
 	var policyFormat string
 	var err error
 	cliArgs, policyFormat, err = normalizePolicyFormat(cliArgs)
@@ -38,6 +40,11 @@ func Parse(args []string) (Options, error) {
 		return opts, err
 	}
 	opts.Flags = parsed.Flags
+	timeout, err := parseTimeout(parsed.Timeout)
+	if err != nil {
+		return opts, err
+	}
+	opts.Timeout = timeout
 	opts.PolicyFormat = policyFormat
 	if opts.Policy && opts.PolicyFormat == "" {
 		opts.PolicyFormat = "summary"
@@ -71,11 +78,12 @@ type Flags struct {
 	Help    bool `name:"help" short:"h" help:"Show this help and exit."`
 	Version bool `name:"version" short:"V" help:"Show version information and exit."`
 
-	AddExec      bool `name:"add-exec" help:"Add the resolved command executable to the sandbox."`
-	AddLibs      bool `name:"add-libs" help:"Add runtime library access for executables."`
-	NoWorkspace  bool `name:"no-workspace" help:"Do not automatically grant the workspace read-write access."`
-	ListProfiles bool `name:"list-profiles" help:"List available profiles and exit."`
-	Policy       bool `name:"policy" help:"Print the resolved policy and exit."`
+	AddExec      bool   `name:"add-exec" help:"Add the resolved command executable to the sandbox."`
+	AddLibs      bool   `name:"add-libs" help:"Add runtime library access for executables."`
+	NoWorkspace  bool   `name:"no-workspace" help:"Do not automatically grant the workspace read-write access."`
+	ListProfiles bool   `name:"list-profiles" help:"List available profiles and exit."`
+	Timeout      string `name:"timeout" placeholder:"DURATION" help:"Kill the sandboxed command if it runs longer than DURATION, using Go duration syntax such as 30s, 2m, or 1h30m; 0 disables."`
+	Policy       bool   `name:"policy" help:"Print the resolved policy and exit."`
 }
 
 func normalizePolicyFormat(args []string) ([]string, string, error) {
@@ -99,6 +107,19 @@ func normalizePolicyFormat(args []string) ([]string, string, error) {
 	return out, format, nil
 }
 
+func normalizeTimeoutValue(args []string) []string {
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--timeout" && i+1 < len(args) && strings.HasPrefix(args[i+1], "-") && args[i+1] != "--" {
+			out = append(out, "--timeout="+args[i+1])
+			i++
+			continue
+		}
+		out = append(out, args[i])
+	}
+	return out
+}
+
 func parseKong(grammar any, args []string) error {
 	parser, err := kong.New(
 		grammar,
@@ -115,6 +136,17 @@ func parseKong(grammar any, args []string) error {
 		return fmt.Errorf("%s (run 'bulle --help')", err)
 	}
 	return nil
+}
+
+func parseTimeout(value string) (time.Duration, error) {
+	if value == "" || value == "0" {
+		return 0, nil
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil || duration < 0 {
+		return 0, fmt.Errorf("invalid --timeout value %q; use a Go duration such as 30s, 2m, or 1h30m", value)
+	}
+	return duration, nil
 }
 
 func splitCommand(args []string) ([]string, []string) {
