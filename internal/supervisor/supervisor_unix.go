@@ -29,12 +29,7 @@ var ioctlSetForegroundProcessGroup = func(fd int, pgid int) error {
 	return unix.IoctlSetPointerInt(fd, unix.TIOCSPGRP, pgid)
 }
 
-var withSIGTTOUBlocked = func(fn func() error) error {
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGTTOU)
-	defer signal.Stop(signals)
-	return fn()
-}
+var withSIGTTOUBlocked = blockSIGTTOU
 
 type signalNotifier interface {
 	Notify(chan<- os.Signal, ...os.Signal)
@@ -114,8 +109,6 @@ func Run(p policy.Policy, opts Options) error {
 		return err
 	}
 	if term != nil {
-		cmd.SysProcAttr.Foreground = true
-		cmd.SysProcAttr.Ctty = int(stdin.Fd())
 		defer term.restore()
 	}
 
@@ -125,6 +118,14 @@ func Run(p policy.Policy, opts Options) error {
 	read.Close()
 
 	pgid := cmd.Process.Pid
+	if term != nil {
+		if err := term.setForeground(pgid); err != nil {
+			_ = killProcessGroup(pgid, syscall.SIGKILL)
+			_ = write.Close()
+			_ = cmd.Wait()
+			return finishWithRestore(err, term)
+		}
+	}
 	forwarder.setTarget(pgid)
 
 	waitDone := make(chan error, 1)
@@ -389,12 +390,19 @@ func (t *foregroundTerminal) restore() error {
 		}
 		return err
 	}
-	err := withSIGTTOUBlocked(func() error {
-		return ioctlSetForegroundProcessGroup(t.fd, t.pgid)
-	})
+	err := t.setForeground(t.pgid)
 	if err != nil {
 		return err
 	}
 	t.done = true
 	return nil
+}
+
+func (t *foregroundTerminal) setForeground(pgid int) error {
+	if t == nil {
+		return nil
+	}
+	return withSIGTTOUBlocked(func() error {
+		return ioctlSetForegroundProcessGroup(t.fd, pgid)
+	})
 }
