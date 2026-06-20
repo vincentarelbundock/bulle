@@ -2,6 +2,7 @@
 rox = [
   "/bin",
   "/usr/bin",
+  "/sbin",
   "/usr/local/bin",
   "~/.local/bin",
   "~/.bin",
@@ -36,6 +37,7 @@ rox = [
 rox = [
   "/bin",
   "/usr/bin",
+  "/sbin",
   "/usr/local/bin",
   "~/.local/bin",
   "~/.bin",
