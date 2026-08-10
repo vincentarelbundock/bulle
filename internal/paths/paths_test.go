@@ -88,6 +88,34 @@ func TestResolvePreservesUserSymlinkAlias(t *testing.T) {
 	}
 }
 
+func TestResolveRejectsSymlinkToFilesystemRoot(t *testing.T) {
+	tmp := t.TempDir()
+	alias := filepath.Join(tmp, "escape")
+	if err := os.Symlink("/", alias); err != nil {
+		t.Fatal(err)
+	}
+	_, err := ResolveList([]Input{{Path: alias, Source: SourceUser}}, Vars{})
+	if err == nil {
+		t.Fatalf("ResolveList succeeded, want refusal for symlink to filesystem root")
+	}
+}
+
+func TestResolveRejectsSymlinkToHomeDirectory(t *testing.T) {
+	tmp := t.TempDir()
+	home := filepath.Join(tmp, "home")
+	if err := os.Mkdir(home, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(tmp, "escape")
+	if err := os.Symlink(home, alias); err != nil {
+		t.Fatal(err)
+	}
+	_, err := ResolveList([]Input{{Path: alias, Source: SourceUser}}, Vars{"HOME": home})
+	if err == nil {
+		t.Fatalf("ResolveList succeeded, want refusal for symlink to home directory")
+	}
+}
+
 func TestResolveRejectsUnknownEnvironmentVariables(t *testing.T) {
 	tmp := t.TempDir()
 	secret := filepath.Join(tmp, "secret")

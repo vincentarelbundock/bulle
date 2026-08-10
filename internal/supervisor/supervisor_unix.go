@@ -224,9 +224,18 @@ func handleTimeout(waitDone <-chan error, writeDone <-chan error, term *foregrou
 	case <-graceTimer.C:
 	}
 
-	_ = ctx.kill(ctx.pgid, syscall.SIGKILL)
 	if !waitReaped {
+		_ = ctx.kill(ctx.pgid, syscall.SIGKILL)
 		<-waitDone
+	} else {
+		// The leader has already been reaped. If the group still has members
+		// (surviving background children), signal 0 succeeds and it is safe to
+		// SIGKILL them. If it is empty, signal 0 returns ESRCH; we must not
+		// SIGKILL, because a reaped PGID can be recycled by the kernel and
+		// reassigned to an unrelated process group owned by the same user.
+		if ctx.kill(ctx.pgid, syscall.Signal(0)) == nil {
+			_ = ctx.kill(ctx.pgid, syscall.SIGKILL)
+		}
 	}
 	drainWrite(writeDone)
 	return finishWithRestore(&TimeoutError{Duration: ctx.duration}, term)

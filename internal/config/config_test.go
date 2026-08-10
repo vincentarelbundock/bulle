@@ -192,6 +192,22 @@ func TestEffectiveProfileMergesCommaSeparatedProfilesSequentially(t *testing.T) 
 	}
 }
 
+func TestEffectiveProfileTopLevelDoesNotOverrideSelectedProfileDeny(t *testing.T) {
+	cfg := Config{
+		Settings: Settings{Allow: []string{"network"}},
+		Profiles: map[string]Profile{
+			"locked": {Settings: Settings{Deny: []string{"network"}}},
+		},
+	}
+	profile, _, _, err := EffectiveProfile(cfg, "locked")
+	if err != nil {
+		t.Fatalf("EffectiveProfile returned error: %v", err)
+	}
+	if contains(profile.Allow, "network") || !contains(profile.Deny, "network") {
+		t.Fatalf("capabilities = allow %#v deny %#v, want selected profile deny to win over top-level allow", profile.Allow, profile.Deny)
+	}
+}
+
 func TestEffectiveProfileRejectsEmptyCommaProfile(t *testing.T) {
 	_, _, _, err := EffectiveProfile(Config{Profiles: map[string]Profile{"default": {}}}, "tool,,offline")
 	if err == nil || !strings.Contains(err.Error(), "empty profile") {

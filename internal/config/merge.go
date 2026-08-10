@@ -310,7 +310,11 @@ func EffectiveProfile(global Config, explicitProfile string) (Profile, string, C
 	}
 	topLevel := cfg.TopLevelProfile()
 	topLevel.DefaultApp = ""
-	profile = MergeProfiles(profile, topLevel)
+	// Top-level settings act as global defaults (the parent); an explicitly
+	// selected profile is merged as the child so it wins. Otherwise a top-level
+	// convenience grant (e.g. allow = ["network"]) would silently override the
+	// restrictions of a deliberately chosen locked-down profile.
+	profile = MergeProfiles(topLevel, profile)
 	if profile.DefaultApp == "" {
 		profile.DefaultApp = cfg.DefaultApp
 	}

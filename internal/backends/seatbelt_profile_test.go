@@ -40,6 +40,24 @@ func TestSeatbeltProfileMapsReadWriteAndExec(t *testing.T) {
 	}
 }
 
+func TestSeatbeltProfileScopesProcessExecToExecRoots(t *testing.T) {
+	execDir := t.TempDir()
+	sbpl := BuildSeatbeltProfile(policy.Policy{ReadOnlyExec: []string{execDir}})
+	if strings.Contains(sbpl, "(allow process-exec*)\n") {
+		t.Fatalf("profile grants unconditional process-exec*:\n%s", sbpl)
+	}
+	if !strings.Contains(sbpl, `(allow process-exec*`) || !strings.Contains(sbpl, `(subpath "`+execDir+`")`) {
+		t.Fatalf("profile should scope process-exec* to exec roots:\n%s", sbpl)
+	}
+}
+
+func TestSeatbeltProfileDeniesProcessExecWithoutExecRoots(t *testing.T) {
+	sbpl := BuildSeatbeltProfile(policy.Policy{ReadOnly: []string{"/usr/share"}})
+	if strings.Contains(sbpl, "process-exec") {
+		t.Fatalf("profile should not grant process-exec when no exec roots are configured:\n%s", sbpl)
+	}
+}
+
 func TestSeatbeltProfileOmitsNetworkWhenDenied(t *testing.T) {
 	sbpl := BuildSeatbeltProfile(policy.Policy{Network: policy.NetworkNone})
 	if strings.Contains(sbpl, "(allow network*)") {

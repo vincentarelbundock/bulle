@@ -10,12 +10,17 @@ func BuildSeatbeltProfile(p policy.Policy) string {
 	var b strings.Builder
 	b.WriteString("(version 1)\n\n")
 	b.WriteString("(deny default)\n\n")
-	b.WriteString("(allow process-exec*)\n")
 	b.WriteString("(allow process-fork)\n")
 	b.WriteString("(allow sysctl-read)\n")
 	readPaths := appendPaths(p.ReadOnly, p.ReadOnlyExec)
 	readWritePaths := appendPaths(p.ReadWrite, p.ReadWriteExec)
 	execPaths := appendPaths(p.ReadOnlyExec, p.ReadWriteExec)
+	// Scope process-exec to the executable roots the policy actually granted,
+	// rather than allowing exec of any binary on the system. This keeps exec
+	// consistent with the file-map-executable grants below and prevents a
+	// confined process from launching arbitrary system binaries as a springboard
+	// out of the sandbox.
+	writeSeatbeltPathRules(&b, "process-exec*", execPaths, false)
 	rootAncestors, nonRootAncestors := splitRoot(ancestorDirs(appendPaths(readPaths, readWritePaths)))
 	writeLiteralRule(&b, "file-read-data file-read-metadata", rootAncestors)
 	metadataOnlyPaths := append([]string{}, nonRootAncestors...)

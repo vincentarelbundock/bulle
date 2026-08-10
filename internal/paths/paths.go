@@ -81,9 +81,31 @@ func resolve(raw string, vars Vars) ([]string, bool, error) {
 		real = filepath.Clean(evaluated)
 	}
 	if real != alias {
+		// A configured path is a symlink (or has a symlinked component). We grant
+		// the resolved target as well as the alias, which means an attacker who
+		// can write inside a granted directory could, between runs, repoint a
+		// grant at a sensitive location and have it granted on the next run.
+		// Refuse the catastrophic cases outright: a target that resolves to the
+		// filesystem root or the home directory would hand over far more than any
+		// legitimate grant intends.
+		if err := refuseSensitiveSymlinkTarget(alias, real, vars); err != nil {
+			return nil, false, err
+		}
 		return []string{alias, real}, true, nil
 	}
 	return []string{real}, true, nil
+}
+
+func refuseSensitiveSymlinkTarget(alias, real string, vars Vars) error {
+	if real == string(filepath.Separator) {
+		return fmt.Errorf("configured path %q resolves through a symlink to the filesystem root %q; refusing to grant", alias, real)
+	}
+	if home, ok := vars["HOME"]; ok && home != "" {
+		if real == filepath.Clean(home) {
+			return fmt.Errorf("configured path %q resolves through a symlink to the home directory %q; refusing to grant", alias, real)
+		}
+	}
+	return nil
 }
 
 func expand(raw string, vars Vars) (string, error) {
