@@ -481,6 +481,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#capability-micro-profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Capability micro-profiles
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#install_1" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -515,6 +526,39 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ephemeral-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Ephemeral State
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rerunning-with-added-grants" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Rerunning With Added Grants
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration Defaults
+      </span>
+    </span>
+  </a>
   
 </li>
       
@@ -701,11 +745,23 @@ the default profile cannot; pass --profile to choose explicitly
 <p class="admonition-title">Note</p>
 <p>Grant the narrowest paths that are practical. Use <code>--rw</code> or <code>--rwx</code> only for paths outside the workspace that the command should be allowed to modify.</p>
 </div>
+<p>The <code>--</code> separator may be omitted when the reading is unambiguous. The first positional argument that is an existing directory reads as the workspace; the first positional that is not an existing directory starts the command, and <code>bulle</code> announces the split on stderr:</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>~/repos/project<span class="w"> </span>git<span class="w"> </span>status
+<span class="c1"># bulle: treating &quot;git&quot; as the start of the command; use -- to separate the command explicitly</span>
+</code></pre></div>
+<p>Ambiguity resolves toward the workspace reading, so <code>--</code> remains the explicit way to force a directory name to be treated as a command.</p>
 <h2 id="environment">Environment<a class="headerlink" href="#environment" title="Permanent link">&para;</a></h2>
 <p>Environment variables are also explicit. By default, <code>bulle</code> does not pass your shell environment into the sandbox. Use <code>--env NAME</code> to pass a variable from the parent environment, or <code>--env NAME=VALUE</code> to define one on the fly:</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--rox<span class="w"> </span>/usr/bin<span class="w"> </span>--env<span class="w"> </span><span class="nv">HELLO</span><span class="o">=</span>WORLD<span class="w"> </span>--<span class="w"> </span>printenv<span class="w"> </span>HELLO
 </code></pre></div>
 <p>This is important for secrets. A command cannot read <code>OPENAI_API_KEY</code>, <code>GITHUB_TOKEN</code>, or similar variables unless you explicitly pass them.</p>
+<p>Three conveniences cover common cases:</p>
+<ul>
+<li><strong>Name globs.</strong> <code>--env 'GIT_*'</code> passes every parent variable whose name matches the glob. Quote the pattern so your shell does not expand it. Globs also work in profile <code>env</code> lists.</li>
+<li><strong>Dotenv files.</strong> <code>--env-file PATH</code> loads <code>NAME=VALUE</code> entries from a dotenv-style file: blank lines and <code>#</code> comments are ignored, an optional <code>export</code> prefix is stripped, and matching single or double quotes around values are removed.</li>
+<li><strong>Everything except.</strong> <code>--env-all-except SECRET_KEY,GITHUB_TOKEN</code> passes the whole parent environment minus the named variables, for throwaway commands that want your shell environment without specific secrets.</li>
+</ul>
+<p>When sources conflict, the most explicit wins: profile entries, then <code>--env-all-except</code>, then <code>--env-file</code>, then <code>--env</code>.</p>
 <p>The summary and JSON views list environment variables by name only; neither view prints their values.</p>
 <h2 id="profiles">Profiles<a class="headerlink" href="#profiles" title="Permanent link">&para;</a></h2>
 <p>A profile is a named bundle of path, environment, network, and platform grants. It saves you from spelling out the same permissions every time you run a tool.</p>
@@ -757,16 +813,27 @@ ping: cannot resolve google.com: Unknown host
 claude
 codex
 default
+git
+go
 keychain
 macos-certs
 macos-dns
 network
+node
 offline
 opencode
 pi
+rust
 tool
 </code></pre></div>
 <p>Built-in helper profiles such as <code>default</code>, <code>network</code>, <code>offline</code>, <code>macos-dns</code>, <code>macos-certs</code>, and <code>keychain</code> are ordinary profiles that can be inherited directly or selected explicitly when you pass a command.</p>
+<h3 id="capability-micro-profiles">Capability micro-profiles<a class="headerlink" href="#capability-micro-profiles" title="Permanent link">&para;</a></h3>
+<p>The built-in <code>git</code>, <code>node</code>, <code>rust</code>, and <code>go</code> profiles are small capability bundles: each answers one tool's location questions (binary, configuration, caches) once, portably, using <code>which:</code> resolvers, platform variables, and optional/create markers. They are meant to be assembled through <code>inherits</code> rather than restating tool layouts in every agent profile:</p>
+<div class="language-toml highlight"><pre><span></span><code><span class="n">title</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;My agent&quot;</span>
+<span class="n">inherits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;tool&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;git&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;node&quot;</span><span class="p">]</span>
+<span class="n">default_app</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;my-agent&quot;</span>
+</code></pre></div>
+<p>They can also be combined on the command line: <code>bulle --profile tool,git,rust -- cargo build</code>.</p>
 <h3 id="install_1">Install<a class="headerlink" href="#install_1" title="Permanent link">&para;</a></h3>
 <p>Install or override profiles with <code>--install-profiles SOURCE</code>. The source can be one <code>.toml</code> file, a directory containing <code>.toml</code> files, a local git repository, or a GitHub source such as <code>github:vincentarelbundock/bulle/custom_profiles</code>.</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--install-profiles<span class="w"> </span>agent.toml
@@ -861,6 +928,29 @@ bulle<span class="w"> </span>--install-profiles<span class="w"> </span>github:vi
 <span class="n">PROJECTS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;/mnt/work/repos&quot;</span>
 </code></pre></div>
 <p>Profiles then reference <code>$PROJECTS</code>, and <code>${NAME:-fallback}</code> supplies a default when a variable is unset. A small allowlist of well-known tool environment variables (<code>CARGO_HOME</code>, <code>GOPATH</code>, <code>NVM_DIR</code>, <code>PYENV_ROOT</code>, and similar) may also be referenced; their values come from the parent environment and are treated as untrusted — values that are not absolute paths, or that resolve to <code>/</code> or the home directory, are ignored so a hostile environment cannot widen a grant. Custom variable names are uppercase, and reserved names (<code>HOME</code>, <code>WORKSPACE</code>, <code>TMP</code>, <code>CONFIG</code>, <code>DATA</code>, <code>CACHE</code>, <code>STATE</code>, <code>XDG_*</code>, ...) cannot be redefined.</p>
+<h2 id="ephemeral-state">Ephemeral State<a class="headerlink" href="#ephemeral-state" title="Permanent link">&para;</a></h2>
+<p><code>--ephemeral-home</code> runs the command with a freshly created temporary <code>HOME</code> directory instead of your real one. Path grants that reference <code>$HOME</code> resolve into it, <code>+</code> create markers materialize the tool's state directories inside it, and the <code>HOME</code> environment variable (when a profile passes it) points at it. The directory is announced on stderr when created and removed when the command exits:</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>claude<span class="w"> </span>--ephemeral-home
+<span class="c1"># bulle: ephemeral home /tmp/bulle-1000/home-1234 (removed at exit)</span>
+</code></pre></div>
+<p>This is useful for trying an agent without touching its real login, configuration, or cache state, or for guaranteeing that a run leaves nothing behind. Cleanup is unconditional: anything the tool wrote under the ephemeral home is deleted at exit.</p>
+<h2 id="rerunning-with-added-grants">Rerunning With Added Grants<a class="headerlink" href="#rerunning-with-added-grants" title="Permanent link">&para;</a></h2>
+<p>A sandboxed run often fails because one grant is missing. The kernel-level <a href="denial-diagnostics">denial diagnostics</a> already print the missing grants after a failed run; <code>bulle</code> now also prints a copy-pasteable retry line:</p>
+<div class="language-text highlight"><pre><span></span><code>bulle: the sandbox denied the following accesses during this run:
+  denied: read /home/user/.gitconfig — add --ro ~/.gitconfig
+bulle: retry with these grants: bulle --last --ro ~/.gitconfig
+</code></pre></div>
+<p><code>bulle --last</code> repeats the previous invocation — from any shell, restoring the original working directory — and inserts any extra flags before the command, so the retry line works as-is. Each run overwrites the recorded invocation, and repeated <code>--last</code> runs accumulate their added grants. The sandbox is restarted rather than widened: Landlock cannot extend a live sandbox, and agents resume from their own session state.</p>
+<p>The invocation is recorded in <code>$XDG_STATE_HOME/bulle/last-run.json</code> (usually <code>~/.local/state/bulle/</code>) on Linux and <code>~/Library/Application Support/bulle/</code> on macOS.</p>
+<h2 id="configuration-defaults">Configuration Defaults<a class="headerlink" href="#configuration-defaults" title="Permanent link">&para;</a></h2>
+<p>A <code>[defaults]</code> block in <code>&lt;config&gt;/config.toml</code> (usually <code>~/.config/bulle/config.toml</code>) supplies values used when the corresponding flag is absent, so bare <code>bulle</code> does the usual thing in a repository:</p>
+<div class="language-toml highlight"><pre><span></span><code><span class="k">[defaults]</span>
+<span class="n">profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;claude&quot;</span>
+<span class="n">timeout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;2h&quot;</span>
+<span class="n">env</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;GITHUB_TOKEN&quot;</span><span class="p">]</span>
+<span class="n">ro</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;?~/.gitconfig&quot;</span><span class="p">]</span>
+</code></pre></div>
+<p>Explicit flags always win: <code>--profile codex</code> overrides the default profile, <code>--timeout</code> the default timeout, and list-valued defaults (<code>env</code>, <code>ro</code>, <code>rox</code>, <code>rw</code>, <code>rwx</code>) are merged with command-line entries taking precedence. Pass <code>--no-defaults</code> to ignore the block entirely.</p>
 <h2 id="network">Network<a class="headerlink" href="#network" title="Permanent link">&para;</a></h2>
 <p>Network access is controlled by profiles. The built-in <code>network</code> profile allows it, and the built-in <code>offline</code> profile denies it. On macOS, the <code>network</code> profile also inherits DNS and certificate service bundles that network clients normally need. Built-in agent profiles inherit network access for compatibility with package managers and remote services.</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>offline<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--<span class="w"> </span>/bin/ls

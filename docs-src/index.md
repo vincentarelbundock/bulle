@@ -120,6 +120,15 @@ Additional filesystem access is explicit. Use these flags to add paths to the ac
 
     Grant the narrowest paths that are practical. Use `--rw` or `--rwx` only for paths outside the workspace that the command should be allowed to modify.
 
+The `--` separator may be omitted when the reading is unambiguous. The first positional argument that is an existing directory reads as the workspace; the first positional that is not an existing directory starts the command, and `bulle` announces the split on stderr:
+
+```bash
+bulle ~/repos/project git status
+# bulle: treating "git" as the start of the command; use -- to separate the command explicitly
+```
+
+Ambiguity resolves toward the workspace reading, so `--` remains the explicit way to force a directory name to be treated as a command.
+
 ## Environment
 
 Environment variables are also explicit. By default, `bulle` does not pass your shell environment into the sandbox. Use `--env NAME` to pass a variable from the parent environment, or `--env NAME=VALUE` to define one on the fly:
@@ -129,6 +138,14 @@ bulle --rox /usr/bin --env HELLO=WORLD -- printenv HELLO
 ```
 
 This is important for secrets. A command cannot read `OPENAI_API_KEY`, `GITHUB_TOKEN`, or similar variables unless you explicitly pass them.
+
+Three conveniences cover common cases:
+
+- **Name globs.** `--env 'GIT_*'` passes every parent variable whose name matches the glob. Quote the pattern so your shell does not expand it. Globs also work in profile `env` lists.
+- **Dotenv files.** `--env-file PATH` loads `NAME=VALUE` entries from a dotenv-style file: blank lines and `#` comments are ignored, an optional `export ` prefix is stripped, and matching single or double quotes around values are removed.
+- **Everything except.** `--env-all-except SECRET_KEY,GITHUB_TOKEN` passes the whole parent environment minus the named variables, for throwaway commands that want your shell environment without specific secrets.
+
+When sources conflict, the most explicit wins: profile entries, then `--env-all-except`, then `--env-file`, then `--env`.
 
 The summary and JSON views list environment variables by name only; neither view prints their values.
 
@@ -209,17 +226,33 @@ bulle --list-profiles
 claude
 codex
 default
+git
+go
 keychain
 macos-certs
 macos-dns
 network
+node
 offline
 opencode
 pi
+rust
 tool
 ```
 
 Built-in helper profiles such as `default`, `network`, `offline`, `macos-dns`, `macos-certs`, and `keychain` are ordinary profiles that can be inherited directly or selected explicitly when you pass a command.
+
+### Capability micro-profiles
+
+The built-in `git`, `node`, `rust`, and `go` profiles are small capability bundles: each answers one tool's location questions (binary, configuration, caches) once, portably, using `which:` resolvers, platform variables, and optional/create markers. They are meant to be assembled through `inherits` rather than restating tool layouts in every agent profile:
+
+```toml
+title = "My agent"
+inherits = ["tool", "git", "node"]
+default_app = "my-agent"
+```
+
+They can also be combined on the command line: `bulle --profile tool,git,rust -- cargo build`.
 
 ### Install
 
@@ -324,6 +357,45 @@ PROJECTS = "/mnt/work/repos"
 ```
 
 Profiles then reference `$PROJECTS`, and `${NAME:-fallback}` supplies a default when a variable is unset. A small allowlist of well-known tool environment variables (`CARGO_HOME`, `GOPATH`, `NVM_DIR`, `PYENV_ROOT`, and similar) may also be referenced; their values come from the parent environment and are treated as untrusted — values that are not absolute paths, or that resolve to `/` or the home directory, are ignored so a hostile environment cannot widen a grant. Custom variable names are uppercase, and reserved names (`HOME`, `WORKSPACE`, `TMP`, `CONFIG`, `DATA`, `CACHE`, `STATE`, `XDG_*`, ...) cannot be redefined.
+
+## Ephemeral State
+
+`--ephemeral-home` runs the command with a freshly created temporary `HOME` directory instead of your real one. Path grants that reference `$HOME` resolve into it, `+` create markers materialize the tool's state directories inside it, and the `HOME` environment variable (when a profile passes it) points at it. The directory is announced on stderr when created and removed when the command exits:
+
+```bash
+bulle --profile claude --ephemeral-home
+# bulle: ephemeral home /tmp/bulle-1000/home-1234 (removed at exit)
+```
+
+This is useful for trying an agent without touching its real login, configuration, or cache state, or for guaranteeing that a run leaves nothing behind. Cleanup is unconditional: anything the tool wrote under the ephemeral home is deleted at exit.
+
+## Rerunning With Added Grants
+
+A sandboxed run often fails because one grant is missing. The kernel-level [denial diagnostics](denial-diagnostics) already print the missing grants after a failed run; `bulle` now also prints a copy-pasteable retry line:
+
+```text
+bulle: the sandbox denied the following accesses during this run:
+  denied: read /home/user/.gitconfig — add --ro ~/.gitconfig
+bulle: retry with these grants: bulle --last --ro ~/.gitconfig
+```
+
+`bulle --last` repeats the previous invocation — from any shell, restoring the original working directory — and inserts any extra flags before the command, so the retry line works as-is. Each run overwrites the recorded invocation, and repeated `--last` runs accumulate their added grants. The sandbox is restarted rather than widened: Landlock cannot extend a live sandbox, and agents resume from their own session state.
+
+The invocation is recorded in `$XDG_STATE_HOME/bulle/last-run.json` (usually `~/.local/state/bulle/`) on Linux and `~/Library/Application Support/bulle/` on macOS.
+
+## Configuration Defaults
+
+A `[defaults]` block in `<config>/config.toml` (usually `~/.config/bulle/config.toml`) supplies values used when the corresponding flag is absent, so bare `bulle` does the usual thing in a repository:
+
+```toml
+[defaults]
+profile = "claude"
+timeout = "2h"
+env = ["GITHUB_TOKEN"]
+ro = ["?~/.gitconfig"]
+```
+
+Explicit flags always win: `--profile codex` overrides the default profile, `--timeout` the default timeout, and list-valued defaults (`env`, `ro`, `rox`, `rw`, `rwx`) are merged with command-line entries taking precedence. Pass `--no-defaults` to ignore the block entirely.
 
 ## Network
 

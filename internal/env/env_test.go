@@ -52,3 +52,29 @@ func TestResolveRejectsInvalidNames(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveGlobEntries(t *testing.T) {
+	parent := map[string]string{
+		"GIT_AUTHOR":    "a",
+		"GIT_EDITOR":    "e",
+		"HOME":          "/home/x",
+		"BASH_FUNC_f%%": "() { :; }",
+	}
+	out, err := Resolve(parent, []string{"GIT_*"})
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if out["GIT_AUTHOR"] != "a" || out["GIT_EDITOR"] != "e" {
+		t.Fatalf("out = %#v", out)
+	}
+	if _, ok := out["HOME"]; ok {
+		t.Fatalf("HOME leaked: %#v", out)
+	}
+	out, err = Resolve(parent, []string{"BASH_*"})
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if len(out) != 0 {
+		t.Fatalf("invalid names should be skipped: %#v", out)
+	}
+}

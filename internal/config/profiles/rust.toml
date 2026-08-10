@@ -1,0 +1,12 @@
+title = "Rust"
+description = "cargo, rustup toolchains, and the registry cache"
+rox = [
+  "${CARGO_HOME:-~/.cargo}/bin",
+  "?${RUSTUP_HOME:-~/.rustup}",
+]
+ro = ["?${CARGO_HOME:-~/.cargo}/config.toml"]
+rw = [
+  "+${CARGO_HOME:-~/.cargo}/registry/",
+  "+${CARGO_HOME:-~/.cargo}/git/",
+]
+env = ["CARGO_HOME", "RUSTUP_HOME", "RUSTFLAGS"]

@@ -22,6 +22,9 @@ The workspace is the command's working directory and writable area. If omitted,
 it defaults to the current directory. Use --no-workspace to run without the
 automatic read-write workspace grant.
 If no command is given after --, the configured default_app is used.
+The -- separator may be omitted when unambiguous: the first positional that is
+an existing directory reads as the workspace, and the first positional that is
+not starts the command (announced on stderr).
 
 Filesystem flags (repeatable, comma-separated; executables must be allowed
 explicitly with --rox or --rwx):
@@ -46,10 +49,20 @@ Path entries (flags and profiles):
 Environment flags (no variables are passed unless requested):
   --env NAME        pass NAME from the current environment, if it is set
   --env NAME=VALUE  set NAME to VALUE inside the sandbox
+  --env 'GLOB'      pass every parent variable matching a name glob (GIT_*)
+  --env-file PATH   load NAME=VALUE entries from a dotenv-style file
+  --env-all-except NAME,...
+                    pass the whole parent environment except the named variables
+
+State and reruns:
+  --ephemeral-home  run with a temporary HOME directory, removed at exit
+  --last            repeat the previous invocation, with extra flags inserted
+                    before the command (e.g. bulle --last --ro ~/.gitconfig)
 
 Configuration:
   --config PATH     path to a configuration directory
   --var NAME=VALUE  define a custom path variable usable in grants as $NAME
+  --no-defaults     ignore the [defaults] block of the user configuration
 
 Profiles:
   -p, --profile NAME

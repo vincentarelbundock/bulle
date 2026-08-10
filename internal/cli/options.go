@@ -9,4 +9,9 @@ type Options struct {
 	Command      []string
 	PolicyFormat string
 	Timeout      time.Duration
+
+	// Notes are informational messages produced during parsing (for example
+	// when the command separator -- was inferred) for the app to print on
+	// stderr.
+	Notes []string
 }

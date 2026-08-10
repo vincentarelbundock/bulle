@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -14,19 +15,10 @@ func Parse(args []string) (Options, error) {
 	if len(args) == 0 {
 		return opts, fmt.Errorf("missing argv")
 	}
-	cliArgs, command := splitCommand(args[1:])
-	cliArgs = normalizeTimeoutValue(cliArgs)
-	var policyFormat string
-	var err error
-	cliArgs, policyFormat, err = normalizePolicyFormat(cliArgs)
-	if err != nil {
-		return opts, err
-	}
-	// Top-level aliases are handled before Kong because the main invocation has
-	// no explicit subcommand; adding Kong commands would make help/version
-	// ambiguous with the optional workspace argument.
-	if len(cliArgs) > 0 {
-		switch cliArgs[0] {
+	// help/version aliases are checked before separator inference so that
+	// "bulle help" is never mistaken for a sandboxed command named help.
+	if len(args) > 1 {
+		switch args[1] {
 		case "help":
 			opts.Help = true
 			return opts, nil
@@ -34,6 +26,17 @@ func Parse(args []string) (Options, error) {
 			opts.Version = true
 			return opts, nil
 		}
+	}
+	cliArgs, command, note := splitCommand(args[1:])
+	if note != "" {
+		opts.Notes = append(opts.Notes, note)
+	}
+	cliArgs = normalizeTimeoutValue(cliArgs)
+	var policyFormat string
+	var err error
+	cliArgs, policyFormat, err = normalizePolicyFormat(cliArgs)
+	if err != nil {
+		return opts, err
 	}
 	var parsed runCLI
 	if err := parseKong(&parsed, cliArgs); err != nil {
@@ -73,11 +76,17 @@ type Flags struct {
 	ReadWrite     []string `name:"rw" placeholder:"PATH" help:"Grant read-write access."`
 	ReadWriteExec []string `name:"rwx" placeholder:"PATH" help:"Grant read-write access plus execute."`
 
-	Env []string `name:"env" sep:"none" placeholder:"NAME[=VALUE]" help:"Pass NAME from the current environment, or set NAME=VALUE."`
-	Var []string `name:"var" sep:"none" placeholder:"NAME=VALUE" help:"Define a custom path variable usable in path grants as $NAME."`
+	Env          []string `name:"env" sep:"none" placeholder:"NAME[=VALUE]" help:"Pass NAME (or a NAME glob such as 'GIT_*') from the current environment, or set NAME=VALUE."`
+	EnvFile      []string `name:"env-file" sep:"none" placeholder:"PATH" help:"Load NAME=VALUE environment entries from a dotenv-style file."`
+	EnvAllExcept []string `name:"env-all-except" placeholder:"NAME,..." help:"Pass the whole parent environment except the named variables."`
+	Var          []string `name:"var" sep:"none" placeholder:"NAME=VALUE" help:"Define a custom path variable usable in path grants as $NAME."`
 
 	Help    bool `name:"help" short:"h" help:"Show this help and exit."`
 	Version bool `name:"version" short:"V" help:"Show version information and exit."`
+
+	EphemeralHome bool `name:"ephemeral-home" help:"Run with a temporary HOME directory, removed when the command exits."`
+	Last          bool `name:"last" help:"Repeat the previous bulle invocation, with any extra flags appended."`
+	NoDefaults    bool `name:"no-defaults" help:"Ignore the [defaults] block of the user configuration."`
 
 	AddExec      bool   `name:"add-exec" help:"Add the resolved command executable to the sandbox."`
 	AddLibs      bool   `name:"add-libs" help:"Add runtime library access for executables."`
@@ -150,11 +159,58 @@ func parseTimeout(value string) (time.Duration, error) {
 	return duration, nil
 }
 
-func splitCommand(args []string) ([]string, []string) {
+// NormalizeSeparator returns the argument list (without the program name)
+// with an explicit "--" before the command, applying the same split used by
+// Parse. Recording invocations in this form lets later flags be inserted
+// before the command unambiguously.
+func NormalizeSeparator(args []string) []string {
+	cliArgs, command, _ := splitCommand(args)
+	if len(command) == 0 {
+		return cliArgs
+	}
+	return append(append(cliArgs, "--"), command...)
+}
+
+// valueFlags are flags that consume the following argument when not written
+// in --flag=value form, so the separator inference below does not mistake
+// their values for positionals.
+var valueFlags = map[string]bool{
+	"--profile": true, "-p": true,
+	"--config": true, "--install-profiles": true,
+	"--ro": true, "--rox": true, "--rw": true, "--rwx": true,
+	"--env": true, "--env-file": true, "--env-all-except": true,
+	"--var": true, "--timeout": true,
+}
+
+// splitCommand separates bulle's own arguments from the sandboxed command.
+// An explicit "--" always wins. Without one, the first positional that is an
+// existing directory reads as the workspace (ambiguity resolves toward the
+// workspace), and the first positional after that — or a first positional
+// that is not an existing directory — starts the command. The returned note
+// announces an inferred command split.
+func splitCommand(args []string) ([]string, []string, string) {
 	for i, arg := range args {
 		if arg == "--" {
-			return append([]string{}, args[:i]...), append([]string{}, args[i+1:]...)
+			return append([]string{}, args[:i]...), append([]string{}, args[i+1:]...), ""
 		}
 	}
-	return append([]string{}, args...), nil
+	sawWorkspace := false
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if strings.HasPrefix(arg, "-") {
+			if valueFlags[arg] && i+1 < len(args) {
+				i++
+			}
+			continue
+		}
+		if !sawWorkspace {
+			if info, err := os.Stat(arg); err == nil && info.IsDir() {
+				sawWorkspace = true
+				continue
+			}
+		}
+		note := fmt.Sprintf("bulle: treating %q as the start of the command; use -- to separate the command explicitly", arg)
+		return append([]string{}, args[:i]...), append([]string{}, args[i:]...), note
+	}
+	return append([]string{}, args...), nil, ""
 }

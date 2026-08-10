@@ -22,6 +22,18 @@ type Config struct {
 	ProfileMetadata map[string]ProfileMetadata `toml:"-"`
 	Platform        PlatformSettings           `toml:"platform"`
 	Vars            map[string]string          `toml:"vars"`
+	Defaults        DefaultsSettings           `toml:"defaults"`
+}
+
+// DefaultsSettings is the [defaults] block of the user configuration: values
+// applied when the corresponding flag is absent, so bare `bulle` does the
+// usual thing. Explicit flags always win, and --no-defaults ignores the block.
+type DefaultsSettings struct {
+	Profile string   `toml:"profile"`
+	Timeout string   `toml:"timeout"`
+	Env     []string `toml:"env"`
+
+	PathSettings `toml:",inline"`
 }
 
 type ProfileMetadata struct {

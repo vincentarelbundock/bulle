@@ -1,0 +1,16 @@
+title = "Git"
+description = "git binary, user configuration, and global ignores"
+rox = ["?which:git"]
+ro = [
+  "?$HOME/.gitconfig",
+  "?$CONFIG/git",
+  "?$HOME/.gitignore",
+  "?$HOME/.gitignore_global",
+]
+env = [
+  "GIT_AUTHOR_NAME",
+  "GIT_AUTHOR_EMAIL",
+  "GIT_COMMITTER_NAME",
+  "GIT_COMMITTER_EMAIL",
+  "GIT_SSH_COMMAND",
+]

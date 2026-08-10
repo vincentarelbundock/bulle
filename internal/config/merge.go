@@ -13,6 +13,7 @@ func MergeConfigs(parent Config, child Config) Config {
 	out.Platform = MergePlatformSettings(parent.Platform, child.Platform)
 	out.ProfileMetadata = mergeProfileMetadata(parent.ProfileMetadata, child.ProfileMetadata)
 	out.Vars = mergeVars(parent.Vars, child.Vars)
+	out.Defaults = mergeDefaults(parent.Defaults, child.Defaults)
 	if out.Profiles == nil {
 		out.Profiles = map[string]Profile{}
 	}
@@ -198,6 +199,15 @@ func MergePathSettings(parent PathSettings, child PathSettings) PathSettings {
 
 func pathKey(path string) string {
 	return paths.CanonicalEntryKey(path)
+}
+
+func mergeDefaults(parent, child DefaultsSettings) DefaultsSettings {
+	return DefaultsSettings{
+		Profile:      choose(child.Profile, parent.Profile),
+		Timeout:      choose(child.Timeout, parent.Timeout),
+		Env:          mergeEnv(parent.Env, child.Env),
+		PathSettings: MergePathSettings(parent.PathSettings, child.PathSettings),
+	}
 }
 
 func mergeVars(parent, child map[string]string) map[string]string {
@@ -391,6 +401,7 @@ func cloneConfig(c Config) Config {
 		ProfileMetadata: cloneProfileMetadata(c.ProfileMetadata),
 		Platform:        clonePlatformSettings(c.Platform),
 		Vars:            mergeVars(c.Vars, nil),
+		Defaults:        mergeDefaults(DefaultsSettings{}, c.Defaults),
 	}
 }
 

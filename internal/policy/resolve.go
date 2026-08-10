@@ -131,7 +131,11 @@ func Resolve(in Inputs) (Policy, error) {
 		return Policy{}, err
 	}
 	p.Trace = dropDerivedTraces(p.Trace, derived)
-	p.Env, err = benv.Resolve(in.ParentEnv, append(profile.Env, in.Options.Env...))
+	envEntries, err := composeEnvEntries(profile.Env, in.ParentEnv, in.Options.EnvAllExcept, in.Options.EnvFile, in.Options.Env)
+	if err != nil {
+		return Policy{}, err
+	}
+	p.Env, err = benv.Resolve(in.ParentEnv, envEntries)
 	if err != nil {
 		return Policy{}, err
 	}

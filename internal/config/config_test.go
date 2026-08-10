@@ -790,3 +790,32 @@ func contains(xs []string, want string) bool {
 	}
 	return false
 }
+
+func TestLoadDefaultsBlock(t *testing.T) {
+	data := []byte(`
+[defaults]
+profile = "claude"
+timeout = "30m"
+env = ["GITHUB_TOKEN"]
+ro = ["?~/.gitconfig"]
+`)
+	cfg, err := LoadBytes(data)
+	if err != nil {
+		t.Fatalf("LoadBytes: %v", err)
+	}
+	if cfg.Defaults.Profile != "claude" || cfg.Defaults.Timeout != "30m" {
+		t.Fatalf("Defaults = %+v", cfg.Defaults)
+	}
+	if !contains(cfg.Defaults.Env, "GITHUB_TOKEN") || !contains(cfg.Defaults.ReadOnly, "?~/.gitconfig") {
+		t.Fatalf("Defaults lists = %+v", cfg.Defaults)
+	}
+}
+
+func TestDefaultConfigIncludesMicroProfiles(t *testing.T) {
+	cfg := DefaultConfig()
+	for _, name := range []string{"git", "node", "rust", "go"} {
+		if _, err := cfg.ResolveProfile(name); err != nil {
+			t.Errorf("ResolveProfile(%q): %v", name, err)
+		}
+	}
+}

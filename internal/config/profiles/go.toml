@@ -1,0 +1,9 @@
+title = "Go"
+description = "Go toolchain, module cache, and build cache"
+rox = [
+  "?pkg:go",
+  "${GOPATH:-~/go}/bin",
+]
+rwx = ["+${GOPATH:-~/go}/"]
+rw = ["+$CACHE/go-build/"]
+env = ["GOPATH", "GOBIN", "GOFLAGS", "GOCACHE", "GOMODCACHE", "GOPROXY"]

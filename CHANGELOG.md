@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Ephemeral state: `--ephemeral-home`.** Runs the command with a freshly
+  created temporary `HOME`: `$HOME` grants resolve into it, `+` markers
+  create the tool's state directories inside it, and it is announced on
+  stderr and removed unconditionally when the command exits.
+- **Rerun with an added grant: `--last`.** Every real run records its
+  invocation (arguments and working directory) under the user state
+  directory. `bulle --last` repeats it from any shell, inserting extra flags
+  before the command, and denial diagnostics now end with a copy-pasteable
+  `bulle: retry with these grants: bulle --last --ro ...` line. The sandbox
+  restarts rather than widens.
+- **Configuration defaults: `[defaults]` block.** `config.toml` can supply
+  `profile`, `timeout`, `env`, and path grants used when the corresponding
+  flag is absent, so bare `bulle` does the usual thing in a repository.
+  Explicit flags win; `--no-defaults` ignores the block.
+- **The `--` separator may be omitted when unambiguous.** The first
+  positional that is an existing directory reads as the workspace; the first
+  positional that is not starts the command, announced on stderr. Ambiguity
+  resolves toward the workspace, and `--` remains the explicit override.
+- **Capability micro-profiles: `git`, `node`, `rust`, `go`.** Small built-in
+  profiles that answer one tool's location questions portably (binaries via
+  `which:`/`pkg:`, configuration, caches), meant to be assembled through
+  `inherits` or combined with `--profile tool,git,rust`.
+- **Environment conveniences.** `--env 'GIT_*'` name globs against the
+  parent environment (also in profile `env` lists), `--env-file PATH` for
+  dotenv-style files, and `--env-all-except NAME,...` for the whole parent
+  environment minus named secrets.
+
 - **Portable profiles: path entries now adapt to the machine.** A profile
   written on one machine works on another:
     - `?path` marks a writable entry optional (skip when missing); `+path/`

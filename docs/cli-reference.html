@@ -423,6 +423,9 @@ The workspace is the command&#39;s working directory and writable area. If omitt
 it defaults to the current directory. Use --no-workspace to run without the
 automatic read-write workspace grant.
 If no command is given after --, the configured default_app is used.
+The -- separator may be omitted when unambiguous: the first positional that is
+an existing directory reads as the workspace, and the first positional that is
+not starts the command (announced on stderr).
 
 Filesystem flags (repeatable, comma-separated; executables must be allowed
 explicitly with --rox or --rwx):
@@ -447,10 +450,20 @@ Path entries (flags and profiles):
 Environment flags (no variables are passed unless requested):
   --env NAME        pass NAME from the current environment, if it is set
   --env NAME=VALUE  set NAME to VALUE inside the sandbox
+  --env &#39;GLOB&#39;      pass every parent variable matching a name glob (GIT_*)
+  --env-file PATH   load NAME=VALUE entries from a dotenv-style file
+  --env-all-except NAME,...
+                    pass the whole parent environment except the named variables
+
+State and reruns:
+  --ephemeral-home  run with a temporary HOME directory, removed at exit
+  --last            repeat the previous invocation, with extra flags inserted
+                    before the command (e.g. bulle --last --ro ~/.gitconfig)
 
 Configuration:
   --config PATH     path to a configuration directory
   --var NAME=VALUE  define a custom path variable usable in grants as $NAME
+  --no-defaults     ignore the [defaults] block of the user configuration
 
 Profiles:
   -p, --profile NAME
@@ -461,13 +474,17 @@ Profiles:
   claude            Claude Code app state, config, and login support
   codex             Codex app state, config, network, MCP, and login support
   default           default sandbox profile
+  git               git binary, user configuration, and global ignores
+  go                Go toolchain, module cache, and build cache
   keychain          macOS Keychain file and service access
   macos-certs       macOS certificate trust service lookup
   macos-dns         macOS DNS and directory service lookups
   network           network socket access capability
+  node              Node.js runtime, npm, and package caches
   offline           deny network socket access
   opencode          OpenCode app state and config support
   pi                Pi app state and config support
+  rust              cargo, rustup toolchains, and the registry cache
   tool              general local command support (PATH, executables, libs)
 
 Executable discovery:

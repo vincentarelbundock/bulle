@@ -39,6 +39,13 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if isPreparedPolicyRunner(args) {
 		return runPreparedPolicy(args, stderr)
 	}
+	// An incomplete internal-runner invocation must not fall through to the
+	// public CLI, where command inference would try to execute the reserved
+	// name as a sandboxed command.
+	if len(args) > 1 && args[1] == preparedPolicyRunnerCommand {
+		fmt.Fprintf(stderr, "bulle: %s is an internal invocation and cannot be used directly\n", preparedPolicyRunnerCommand)
+		return ExitConfigError
+	}
 
 	opts, err := cli.Parse(args)
 	if err != nil {
@@ -52,6 +59,33 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if opts.Version {
 		fmt.Fprintf(stdout, "bulle %s\n", Version)
 		return ExitOK
+	}
+	if opts.Last {
+		stored, err := loadLastRun()
+		if err != nil {
+			fmt.Fprintln(stderr, "bulle: --last: no previous invocation recorded")
+			return ExitConfigError
+		}
+		merged := mergeLastRunArgs(stored.Args, args[1:])
+		if stored.Dir != "" {
+			if cwd, err := os.Getwd(); err == nil && cwd != stored.Dir {
+				if err := os.Chdir(stored.Dir); err != nil {
+					fmt.Fprintf(stderr, "bulle: --last: cannot return to %s: %v\n", stored.Dir, err)
+					return ExitConfigError
+				}
+				fmt.Fprintf(stderr, "bulle: --last: running from %s\n", stored.Dir)
+			}
+		}
+		fmt.Fprintf(stderr, "bulle: repeating: bulle %s\n", strings.Join(merged, " "))
+		args = append([]string{args[0]}, merged...)
+		opts, err = cli.Parse(args)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitConfigError
+		}
+	}
+	for _, note := range opts.Notes {
+		fmt.Fprintln(stderr, note)
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -82,6 +116,12 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return ExitConfigError
+	}
+	if !opts.NoDefaults {
+		if err := applyConfigDefaults(&opts, global.Defaults); err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitConfigError
+		}
 	}
 	if opts.ListProfiles {
 		for _, name := range cli.ProfileNames(global) {
@@ -119,7 +159,19 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 			os.RemoveAll(dir)
 		}
 	}()
-	p, err := policy.Resolve(policy.Inputs{Options: opts, Global: global, ParentEnv: parentEnv(), Home: home, Tmp: tmp})
+	env := parentEnv()
+	if opts.EphemeralHome {
+		dir, err := os.MkdirTemp(tmp, "home-")
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitConfigError
+		}
+		defer os.RemoveAll(dir)
+		home = dir
+		env["HOME"] = dir
+		fmt.Fprintf(stderr, "bulle: ephemeral home %s (removed at exit)\n", dir)
+	}
+	p, err := policy.Resolve(policy.Inputs{Options: opts, Global: global, ParentEnv: env, Home: home, Tmp: tmp})
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return ExitPolicyValidation
@@ -143,7 +195,7 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		if len(matches) == 1 {
 			retry := opts
 			retry.Profile = matches[0]
-			if rescued, rerr := resolveAndPrepare(retry, global, home, tmp); rerr == nil {
+			if rescued, rerr := resolveAndPrepare(retry, global, env, home, tmp); rerr == nil {
 				if rescued.ShimDir != "" {
 					shimDirs = append(shimDirs, rescued.ShimDir)
 				}
@@ -182,6 +234,7 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 		return ExitOK
 	}
+	saveLastRun(cli.NormalizeSeparator(args[1:]))
 	p.Command = commandWithSessionPermissions(opts.Profile, p.Command, preRunSessionPaste(opts, p))
 	// All runs go through the supervisor (even without a timeout) so a parent
 	// process survives the sandboxed command and can report on its failure.
@@ -216,10 +269,13 @@ func printDenialHints(probe denialProbe, stderr io.Writer) {
 		}
 		fmt.Fprintf(stderr, "  %s\n", hint)
 	}
+	if retry := retryHintLine(hints); retry != "" {
+		fmt.Fprintln(stderr, retry)
+	}
 }
 
-func resolveAndPrepare(opts cli.Options, global config.Config, home string, tmp string) (policy.Policy, error) {
-	p, err := policy.Resolve(policy.Inputs{Options: opts, Global: global, ParentEnv: parentEnv(), Home: home, Tmp: tmp})
+func resolveAndPrepare(opts cli.Options, global config.Config, env map[string]string, home string, tmp string) (policy.Policy, error) {
+	p, err := policy.Resolve(policy.Inputs{Options: opts, Global: global, ParentEnv: env, Home: home, Tmp: tmp})
 	if err != nil {
 		return policy.Policy{}, err
 	}

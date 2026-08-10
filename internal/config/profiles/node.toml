@@ -1,0 +1,12 @@
+title = "Node"
+description = "Node.js runtime, npm, and package caches"
+rox = [
+  "?pkg:node",
+  "?which:npm",
+  "?which:npx",
+  "?which:corepack",
+  "$HOME/.nvm/versions/node/*/bin",
+]
+ro = ["?$HOME/.npmrc"]
+rw = ["+$HOME/.npm/"]
+env = ["NODE_ENV", "NODE_OPTIONS", "NVM_DIR", "npm_config_cache"]
