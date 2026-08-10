@@ -160,17 +160,6 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 	}()
 	env := parentEnv()
-	if opts.EphemeralHome {
-		dir, err := os.MkdirTemp(tmp, "home-")
-		if err != nil {
-			fmt.Fprintln(stderr, err)
-			return ExitConfigError
-		}
-		defer os.RemoveAll(dir)
-		home = dir
-		env["HOME"] = dir
-		fmt.Fprintf(stderr, "bulle: ephemeral home %s (removed at exit)\n", dir)
-	}
 	p, err := policy.Resolve(policy.Inputs{Options: opts, Global: global, ParentEnv: env, Home: home, Tmp: tmp})
 	if err != nil {
 		fmt.Fprintln(stderr, err)

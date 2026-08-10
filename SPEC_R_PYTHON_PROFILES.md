@@ -95,6 +95,11 @@ This directly conflicts with R, which does use `~/Library` on macOS. No single
 platform-neutral directory variable is correct for both; each profile must
 encode its own tool's convention, or ask the tool.
 
+`uv run --offline` succeeds against an existing virtual environment (verified:
+`uv init` followed by `uv run --offline python -c ...` with network denied at
+the uv level). An offline-by-default `uv` profile is therefore workable, though
+the first `uv init`/`uv sync` in a project needs `uv-install`.
+
 Python packaging is easier than R here: compiled wheels generally vendor their
 shared objects inside the wheel (and `auditwheel`/`delocate` rewrite them to
 load from within the package), so the §3 `dlopen` problem is much smaller for
@@ -272,5 +277,3 @@ surface them in `--list-profiles --long`.
    `python3` exists on this machine and layouts vary widely?
 4. Should `-install` variants be separate profiles or a shared `--writable-libs`
    flag applying to any interpreter profile?
-5. Does `uv run` require network even with a warm cache and a lockfile? If so,
-   `uv` cannot be offline by default and §5 needs revising.

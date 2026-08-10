@@ -9,10 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Ephemeral state: `--ephemeral-home`.** Runs the command with a freshly
-  created temporary `HOME`: `$HOME` grants resolve into it, `+` markers
-  create the tool's state directories inside it, and it is announced on
-  stderr and removed unconditionally when the command exits.
 - **Rerun with an added grant: `--last`.** Every real run records its
   invocation (arguments and working directory) under the user state
   directory. `bulle --last` repeats it from any shell, inserting extra flags

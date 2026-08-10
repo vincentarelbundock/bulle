@@ -84,9 +84,8 @@ type Flags struct {
 	Help    bool `name:"help" short:"h" help:"Show this help and exit."`
 	Version bool `name:"version" short:"V" help:"Show version information and exit."`
 
-	EphemeralHome bool `name:"ephemeral-home" help:"Run with a temporary HOME directory, removed when the command exits."`
-	Last          bool `name:"last" help:"Repeat the previous bulle invocation, with any extra flags appended."`
-	NoDefaults    bool `name:"no-defaults" help:"Ignore the [defaults] block of the user configuration."`
+	Last       bool `name:"last" help:"Repeat the previous bulle invocation, with any extra flags appended."`
+	NoDefaults bool `name:"no-defaults" help:"Ignore the [defaults] block of the user configuration."`
 
 	AddExec      bool   `name:"add-exec" help:"Add the resolved command executable to the sandbox."`
 	AddLibs      bool   `name:"add-libs" help:"Add runtime library access for executables."`

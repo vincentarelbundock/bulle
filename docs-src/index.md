@@ -358,17 +358,6 @@ PROJECTS = "/mnt/work/repos"
 
 Profiles then reference `$PROJECTS`, and `${NAME:-fallback}` supplies a default when a variable is unset. A small allowlist of well-known tool environment variables (`CARGO_HOME`, `GOPATH`, `NVM_DIR`, `PYENV_ROOT`, and similar) may also be referenced; their values come from the parent environment and are treated as untrusted — values that are not absolute paths, or that resolve to `/` or the home directory, are ignored so a hostile environment cannot widen a grant. Custom variable names are uppercase, and reserved names (`HOME`, `WORKSPACE`, `TMP`, `CONFIG`, `DATA`, `CACHE`, `STATE`, `XDG_*`, ...) cannot be redefined.
 
-## Ephemeral State
-
-`--ephemeral-home` runs the command with a freshly created temporary `HOME` directory instead of your real one. Path grants that reference `$HOME` resolve into it, `+` create markers materialize the tool's state directories inside it, and the `HOME` environment variable (when a profile passes it) points at it. The directory is announced on stderr when created and removed when the command exits:
-
-```bash
-bulle --profile claude --ephemeral-home
-# bulle: ephemeral home /tmp/bulle-1000/home-1234 (removed at exit)
-```
-
-This is useful for trying an agent without touching its real login, configuration, or cache state, or for guaranteeing that a run leaves nothing behind. Cleanup is unconditional: anything the tool wrote under the ephemeral home is deleted at exit.
-
 ## Rerunning With Added Grants
 
 A sandboxed run often fails because one grant is missing. The kernel-level [denial diagnostics](denial-diagnostics) already print the missing grants after a failed run; `bulle` now also prints a copy-pasteable retry line:

@@ -530,17 +530,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#ephemeral-state" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Ephemeral State
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#rerunning-with-added-grants" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -928,12 +917,6 @@ bulle<span class="w"> </span>--install-profiles<span class="w"> </span>github:vi
 <span class="n">PROJECTS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;/mnt/work/repos&quot;</span>
 </code></pre></div>
 <p>Profiles then reference <code>$PROJECTS</code>, and <code>${NAME:-fallback}</code> supplies a default when a variable is unset. A small allowlist of well-known tool environment variables (<code>CARGO_HOME</code>, <code>GOPATH</code>, <code>NVM_DIR</code>, <code>PYENV_ROOT</code>, and similar) may also be referenced; their values come from the parent environment and are treated as untrusted — values that are not absolute paths, or that resolve to <code>/</code> or the home directory, are ignored so a hostile environment cannot widen a grant. Custom variable names are uppercase, and reserved names (<code>HOME</code>, <code>WORKSPACE</code>, <code>TMP</code>, <code>CONFIG</code>, <code>DATA</code>, <code>CACHE</code>, <code>STATE</code>, <code>XDG_*</code>, ...) cannot be redefined.</p>
-<h2 id="ephemeral-state">Ephemeral State<a class="headerlink" href="#ephemeral-state" title="Permanent link">&para;</a></h2>
-<p><code>--ephemeral-home</code> runs the command with a freshly created temporary <code>HOME</code> directory instead of your real one. Path grants that reference <code>$HOME</code> resolve into it, <code>+</code> create markers materialize the tool's state directories inside it, and the <code>HOME</code> environment variable (when a profile passes it) points at it. The directory is announced on stderr when created and removed when the command exits:</p>
-<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>claude<span class="w"> </span>--ephemeral-home
-<span class="c1"># bulle: ephemeral home /tmp/bulle-1000/home-1234 (removed at exit)</span>
-</code></pre></div>
-<p>This is useful for trying an agent without touching its real login, configuration, or cache state, or for guaranteeing that a run leaves nothing behind. Cleanup is unconditional: anything the tool wrote under the ephemeral home is deleted at exit.</p>
 <h2 id="rerunning-with-added-grants">Rerunning With Added Grants<a class="headerlink" href="#rerunning-with-added-grants" title="Permanent link">&para;</a></h2>
 <p>A sandboxed run often fails because one grant is missing. The kernel-level <a href="denial-diagnostics">denial diagnostics</a> already print the missing grants after a failed run; <code>bulle</code> now also prints a copy-pasteable retry line:</p>
 <div class="language-text highlight"><pre><span></span><code>bulle: the sandbox denied the following accesses during this run:

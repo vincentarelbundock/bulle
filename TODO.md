@@ -2,7 +2,7 @@
 
 ## Near-term features
 
-- [x] Add ephemeral state support.
+- [ ] Add ephemeral state support.
   - Provide a mode such as `--ephemeral-home` or `--scratch-profile-state`.
   - Run agents with temporary writable state instead of real app config/cache directories.
   - Make the cleanup behavior explicit and predictable.
