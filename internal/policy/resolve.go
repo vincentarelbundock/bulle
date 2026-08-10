@@ -60,7 +60,49 @@ func Resolve(in Inputs) (Policy, error) {
 	p.ReadWriteExec = append(p.ReadWriteExec, profile.ReadWriteExec...)
 	p.ReadWriteExec = append(p.ReadWriteExec, in.Options.ReadWriteExec...)
 
-	vars := pathVars(p.ProjectPath, in.Home, in.Tmp)
+	if err := rejectResolverEntries(p.ReadOnly, "ro"); err != nil {
+		return Policy{}, err
+	}
+	if err := rejectResolverEntries(p.ReadWrite, "rw"); err != nil {
+		return Policy{}, err
+	}
+	// which:/pkg: entries only appear after the built-in defaults prefix
+	// (built-ins are literal paths passed through one-to-one), so the
+	// builtinCount boundaries used below stay valid after expansion.
+	parentPATH := in.ParentEnv["PATH"]
+	shims := []shimEntry{}
+	// Entries produced by which:/pkg: expansion carry their own trace line
+	// (the resolver spelling); suppress the per-path duplicates below.
+	derived := map[string]bool{}
+	for _, exec := range []struct {
+		list  *[]string
+		label string
+	}{
+		{&p.ReadOnlyExec, "rox"},
+		{&p.ReadWriteExec, "rwx"},
+	} {
+		expanded, found, traces, err := expandExecResolvers(*exec.list, exec.label, parentPATH, in.Home)
+		if err != nil {
+			return Policy{}, err
+		}
+		*exec.list = expanded
+		shims = append(shims, found...)
+		p.Trace = append(p.Trace, traces...)
+		for _, trace := range traces {
+			for _, path := range trace.Paths {
+				derived[path] = true
+			}
+		}
+	}
+
+	userVars, err := collectUserVars(cfg.Vars, in.Options.Var)
+	if err != nil {
+		return Policy{}, err
+	}
+	vars, err := buildVars(p.ProjectPath, in.Home, in.Tmp, in.ParentEnv, userVars)
+	if err != nil {
+		return Policy{}, err
+	}
 	p.ProjectPath, err = resolveProjectPath(p.ProjectPath, vars)
 	if err != nil {
 		return Policy{}, err
@@ -69,28 +111,42 @@ func Resolve(in Inputs) (Policy, error) {
 	if err := validateProjectPath(p.ProjectPath, in.Home); err != nil {
 		return Policy{}, err
 	}
-	p.ReadOnly, err = resolvePathList(p.ReadOnly, len(defaults.ReadOnly), vars, true)
+	p.ReadOnly, err = resolvePathList(&p, "ro", p.ReadOnly, len(defaults.ReadOnly), vars, true)
 	if err != nil {
 		return Policy{}, err
 	}
-	p.ReadOnlyExec, err = resolvePathList(p.ReadOnlyExec, len(defaults.ReadOnlyExec), vars, true)
+	p.ReadOnlyExec, err = resolvePathList(&p, "rox", p.ReadOnlyExec, len(defaults.ReadOnlyExec), vars, true)
 	if err != nil {
 		return Policy{}, err
 	}
 	if !in.Options.NoWorkspace {
 		p.ReadWrite = append(p.ReadWrite, "$WORKSPACE")
 	}
-	p.ReadWrite, err = resolvePathList(p.ReadWrite, len(defaults.ReadWrite), vars, false)
+	p.ReadWrite, err = resolvePathList(&p, "rw", p.ReadWrite, len(defaults.ReadWrite), vars, false)
 	if err != nil {
 		return Policy{}, err
 	}
-	p.ReadWriteExec, err = resolvePathList(p.ReadWriteExec, len(defaults.ReadWriteExec), vars, false)
+	p.ReadWriteExec, err = resolvePathList(&p, "rwx", p.ReadWriteExec, len(defaults.ReadWriteExec), vars, false)
 	if err != nil {
 		return Policy{}, err
 	}
+	p.Trace = dropDerivedTraces(p.Trace, derived)
 	p.Env, err = benv.Resolve(in.ParentEnv, append(profile.Env, in.Options.Env...))
 	if err != nil {
 		return Policy{}, err
+	}
+	if len(shims) > 0 {
+		shimDir, err := createShimDir(in.Tmp, shims)
+		if err != nil {
+			return Policy{}, err
+		}
+		p.ShimDir = shimDir
+		p.ReadOnlyExec = append(p.ReadOnlyExec, shimDir)
+		if path := p.Env["PATH"]; path != "" {
+			p.Env["PATH"] = shimDir + string(os.PathListSeparator) + path
+		} else {
+			p.Env["PATH"] = shimDir
+		}
 	}
 	execRoots := append(append([]string{}, p.ReadOnlyExec...), p.ReadWriteExec...)
 	if usesToolDefaults {
@@ -138,8 +194,33 @@ func sandboxTmpDir(tmp string) string {
 	return filepath.Clean(path)
 }
 
-func pathVars(workspace, home, tmp string) bpaths.Vars {
-	return bpaths.Vars{"WORKSPACE": workspace, "HOME": home, "TMPDIR": tmp, "TMP": tmp}
+func dropDerivedTraces(traces []bpaths.Trace, derived map[string]bool) []bpaths.Trace {
+	if len(derived) == 0 {
+		return traces
+	}
+	out := traces[:0]
+	for _, trace := range traces {
+		if derived[trace.Raw] {
+			continue
+		}
+		out = append(out, trace)
+	}
+	return out
+}
+
+func collectUserVars(configVars map[string]string, flagVars []string) (map[string]string, error) {
+	out := map[string]string{}
+	for name, value := range configVars {
+		out[name] = value
+	}
+	for _, item := range flagVars {
+		name, value, ok := strings.Cut(item, "=")
+		if !ok || name == "" {
+			return nil, fmt.Errorf("invalid --var value %q; use NAME=VALUE", item)
+		}
+		out[name] = value
+	}
+	return out, nil
 }
 
 func boolValue(value *bool) bool {
@@ -254,8 +335,16 @@ func sameExistingPath(a, b string) bool {
 	return os.SameFile(ainfo, binfo)
 }
 
-func resolvePathList(paths []string, builtinCount int, vars bpaths.Vars, optionalMissing bool) ([]string, error) {
-	return bpaths.ResolveList(toInputs(paths, builtinCount, optionalMissing), vars)
+func resolvePathList(p *Policy, label string, paths []string, builtinCount int, vars bpaths.Vars, optionalMissing bool) ([]string, error) {
+	out, traces, err := bpaths.ResolveListTrace(toInputs(paths, builtinCount, optionalMissing), vars)
+	if err != nil {
+		return nil, err
+	}
+	for i := range traces {
+		traces[i].List = label
+	}
+	p.Trace = append(p.Trace, traces...)
+	return out, nil
 }
 
 func toInputs(xs []string, builtinCount int, optionalMissing bool) []bpaths.Input {

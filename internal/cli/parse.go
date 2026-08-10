@@ -74,6 +74,7 @@ type Flags struct {
 	ReadWriteExec []string `name:"rwx" placeholder:"PATH" help:"Grant read-write access plus execute."`
 
 	Env []string `name:"env" sep:"none" placeholder:"NAME[=VALUE]" help:"Pass NAME from the current environment, or set NAME=VALUE."`
+	Var []string `name:"var" sep:"none" placeholder:"NAME=VALUE" help:"Define a custom path variable usable in path grants as $NAME."`
 
 	Help    bool `name:"help" short:"h" help:"Show this help and exit."`
 	Version bool `name:"version" short:"V" help:"Show version information and exit."`

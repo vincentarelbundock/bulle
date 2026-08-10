@@ -4,11 +4,11 @@ inherits = "tool"
 default_app = "claude"
 env = ["HOME", "USER", "TERM", "LANG", "SHELL"]
 rw = [
-  "$HOME/.claude.json",
+  "+$HOME/.claude.json",
 ]
 rwx = [
-  "$HOME/.claude",
-  "$HOME/.local/share/claude",
+  "+$HOME/.claude/",
+  "+$HOME/.local/share/claude/",
 ]
 
 [macos]

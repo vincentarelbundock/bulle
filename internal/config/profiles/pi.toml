@@ -3,4 +3,4 @@ description = "Pi app state and config support"
 inherits = "tool"
 default_app = "pi"
 env = ["HOME", "USER", "TERM", "LANG", "SHELL"]
-rwx = ["$HOME/.pi"]
+rwx = ["+$HOME/.pi/"]

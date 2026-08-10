@@ -269,13 +269,61 @@ rox = ["/usr/bin"]
 
 Available top-level options are `title`, `description`, `inherits`, `default_app`, path grants (`ro`, `rox`, `rw`, `rwx`), `env`, network settings (`allow`, `deny`), macOS Mach services (`mach_lookup`, `deny_mach_lookup`), executable discovery defaults (`add_exec`, `add_libs`), and platform tables (`[macos]`, `[linux]`). Only `title` and `description` are metadata fields.
 
-Path grants can use placeholders. `$WORKSPACE` refers to the workspace path. Fixed placeholders are `$HOME`, `$WORKSPACE`, `$TMP`, and `$TMPDIR`; custom path variables are not part of the config model.
+Path grants can use variables and entry markers; see [Portable profiles](#portable-profiles) below.
 
 `inherits` can be one profile name or an array of profile names. Parents are merged left to right and the child is applied last. Path grants merge by path and promote permissions, so `rox` plus `rw` for the same path becomes `rwx`. Environment entries merge by variable name with later values winning. Network and Mach allow/deny entries supersede by name.
 
 `env` entries can be variable names copied from the parent environment or explicit `KEY=value` assignments. The only current network capability name is `network`, so `allow = ["network"]` enables network access and `deny = ["network"]` disables it.
 
 The `[macos]` and `[linux]` tables are applied only on that platform. They accept `default_app`, path grants, `env`, `allow`, `deny`, `mach_lookup`, `deny_mach_lookup`, `add_exec`, and `add_libs`. They do not accept profile metadata or `inherits`.
+
+### Portable profiles
+
+A profile written on one machine should work on another, even when tools are installed in different places. Several features make path entries portable.
+
+**Path variables.** `$WORKSPACE` is the workspace path; `$HOME`, `$TMP`, and `$TMPDIR` are fixed. Four variables resolve per platform, so one entry covers both operating systems:
+
+| Variable  | Linux                               | macOS                           |
+|-----------|-------------------------------------|---------------------------------|
+| `$CONFIG` | `$XDG_CONFIG_HOME` or `~/.config`   | `~/Library/Application Support` |
+| `$DATA`   | `$XDG_DATA_HOME` or `~/.local/share`| `~/Library/Application Support` |
+| `$CACHE`  | `$XDG_CACHE_HOME` or `~/.cache`     | `~/Library/Caches`              |
+| `$STATE`  | `$XDG_STATE_HOME` or `~/.local/state`| `~/Library/Application Support` |
+
+On Linux, the raw `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_CACHE_HOME`, and `XDG_STATE_HOME` names are also available and honor the parent environment when set. On macOS, several of these collapse to the same directory; the `--policy` resolution table flags entries whose grants merge because of that.
+
+**Optional and created entries.** Read-only entries (`ro`, `rox`) are always skipped silently when the path does not exist. Writable entries (`rw`, `rwx`) fail hard on a missing path unless marked:
+
+```toml
+rw  = ["?$HOME/.netrc"]        # ? optional: skip when missing
+rwx = ["+$HOME/.codex/"]       # + trailing slash: create the directory when missing
+rw  = ["+$HOME/.claude.json"]  # + no slash: create an empty file when missing
+```
+
+Creation is the right default for a tool's own state: silently skipping a missing writable grant would produce a mysterious permission error later, and the built-in agent profiles use `+` for their state directories so they work on a fresh machine.
+
+**Executable resolvers.** `which:NAME` looks up `NAME` on the parent `PATH` at policy-build time and grants exactly that binary (and its symlink chain) — never its containing directory, so `which:codex` does not hand over everything else in the same `bin`. `pkg:NAME` additionally grants the tool's package tree (two levels above the real binary), which Node- and Python-based tools need for their libraries; it refuses to expand when that tree would be a system directory such as `/usr`. Both are valid only in `rox` and `rwx`:
+
+```toml
+rox = ["which:git", "which:rg", "pkg:codex"]
+```
+
+Name lookup inside the sandbox works through a per-run shim directory of symlinks that `bulle` creates outside the sandbox's writable area, grants read+execute, prepends to `PATH`, and removes after the run. A `which:`-based profile must name every binary the tool shells out to; missing ones surface through denial diagnostics. The broad-grant `tool` profile remains the escape hatch.
+
+**Globs.** A `*` matches within one path segment (no `**`). No matches means the entry is skipped, so version-stamped directories stop breaking on upgrade:
+
+```toml
+rox = ["$HOME/.nvm/versions/node/*/bin"]
+```
+
+**Custom variables.** Machine-specific layouts live in a `[vars]` table in `<config>/config.toml` (usually `~/.config/bulle/config.toml`), or one-off with `--var NAME=VALUE`:
+
+```toml
+[vars]
+PROJECTS = "/mnt/work/repos"
+```
+
+Profiles then reference `$PROJECTS`, and `${NAME:-fallback}` supplies a default when a variable is unset. A small allowlist of well-known tool environment variables (`CARGO_HOME`, `GOPATH`, `NVM_DIR`, `PYENV_ROOT`, and similar) may also be referenced; their values come from the parent environment and are treated as untrusted — values that are not absolute paths, or that resolve to `/` or the home directory, are ignored so a hostile environment cannot widen a grant. Custom variable names are uppercase, and reserved names (`HOME`, `WORKSPACE`, `TMP`, `CONFIG`, `DATA`, `CACHE`, `STATE`, `XDG_*`, ...) cannot be redefined.
 
 ## Network
 
@@ -292,6 +340,15 @@ Use `--policy` to inspect the resolved sandbox policy without running the comman
 
 ```bash
 bulle --profile codex --policy
+```
+
+The summary ends with a **resolution table**: one line per configured entry showing what it resolved to — granted, skipped, created, or expanded from a `which:`/`pkg:` resolver or glob — so "why can't the agent see X" is answerable from one command. Entries whose resolved path is also granted through another list (for example when `$CONFIG` and `$DATA` collapse to the same directory on macOS) are flagged with their effective permission.
+
+```text
+  resolution:
+    rox  which:codex        → /home/user/.local/share/mise/installs/node/22/bin/codex (+1 more)
+    rwx  +$HOME/.codex/     → created (dir) /home/user/.codex
+    rw   ?$HOME/.netrc      → skipped (does not exist)
 ```
 
 Stable machine-readable output is available with `--policy=json`:

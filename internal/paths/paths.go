@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -14,28 +15,98 @@ const (
 	SourceUser    Source = "user"
 )
 
+const (
+	CreateNone = ""
+	CreateDir  = "dir"
+	CreateFile = "file"
+)
+
 type Input struct {
 	Path     string
 	Source   Source
 	Optional bool
+	Create   string
 }
 
 type Vars map[string]string
 
+// Trace records the outcome of resolving one configured entry, for the
+// resolution table shown by --policy.
+type Trace struct {
+	Raw     string
+	List    string
+	Source  Source
+	Outcome string
+	Paths   []string
+}
+
+// ParseMarkers strips the optional (?) and create (+) markers from a raw
+// configured entry. A + entry with a trailing slash creates a directory when
+// missing; without one it creates an empty file.
+func ParseMarkers(raw string) (path string, optional bool, create string) {
+	path = raw
+	for {
+		if rest, ok := strings.CutPrefix(path, "?"); ok {
+			optional = true
+			path = rest
+			continue
+		}
+		if rest, ok := strings.CutPrefix(path, "+"); ok {
+			create = CreateFile
+			path = rest
+			continue
+		}
+		break
+	}
+	if create != CreateNone && strings.HasSuffix(path, "/") {
+		create = CreateDir
+	}
+	return path, optional, create
+}
+
+// CanonicalEntryKey returns the key under which two spellings of the same
+// configured entry should merge: markers are stripped and literal paths are
+// cleaned, so "?~/.x", "+~/.x/", and "~/.x" all merge to one grant.
+func CanonicalEntryKey(raw string) string {
+	path, _, _ := ParseMarkers(strings.TrimSpace(raw))
+	if path == "" {
+		return ""
+	}
+	if IsResolverEntry(path) {
+		return path
+	}
+	return filepath.Clean(path)
+}
+
+// IsResolverEntry reports whether a configured entry is a which:/pkg:
+// executable resolver rather than a literal path.
+func IsResolverEntry(path string) bool {
+	return strings.HasPrefix(path, "which:") || strings.HasPrefix(path, "pkg:")
+}
+
 func ResolveList(inputs []Input, vars Vars) ([]string, error) {
+	out, _, err := ResolveListTrace(inputs, vars)
+	return out, err
+}
+
+func ResolveListTrace(inputs []Input, vars Vars) ([]string, []Trace, error) {
 	out := []string{}
+	traces := []Trace{}
 	seen := map[string]bool{}
 	for _, input := range inputs {
-		resolved, exists, err := resolve(input.Path, vars)
+		path, optional, create := ParseMarkers(input.Path)
+		optional = optional || input.Optional
+		if create == CreateNone {
+			create = input.Create
+		}
+		trace := Trace{Raw: input.Path, Source: input.Source}
+		resolved, outcome, err := resolveEntry(path, vars, optional, create, input.Source)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		if !exists {
-			if input.Optional || input.Source == SourceBuiltIn {
-				continue
-			}
-			return nil, fmt.Errorf("configured path does not exist: %s", input.Path)
-		}
+		trace.Outcome = outcome
+		trace.Paths = resolved
+		traces = append(traces, trace)
 		for _, path := range resolved {
 			if !seen[path] {
 				seen[path] = true
@@ -43,7 +114,96 @@ func ResolveList(inputs []Input, vars Vars) ([]string, error) {
 			}
 		}
 	}
-	return out, nil
+	return out, traces, nil
+}
+
+// resolveEntry resolves one marker-stripped entry, applying glob expansion,
+// optional skipping, and creation of missing paths. It returns the granted
+// paths and a human-readable outcome for the resolution table.
+func resolveEntry(path string, vars Vars, optional bool, create string, source Source) ([]string, string, error) {
+	if strings.TrimSpace(path) == "" {
+		return nil, "", fmt.Errorf("configured path is empty")
+	}
+	expanded, err := expand(path, vars)
+	if err != nil {
+		return nil, "", err
+	}
+	if strings.Contains(expanded, "*") {
+		return resolveGlob(expanded, vars)
+	}
+	resolved, exists, err := resolve(expanded, vars)
+	if err != nil {
+		return nil, "", err
+	}
+	if !exists {
+		if create != CreateNone {
+			kind, err := createMissing(resolved[len(resolved)-1], create)
+			if err != nil {
+				return nil, "", err
+			}
+			resolved, _, err = resolve(expanded, vars)
+			if err != nil {
+				return nil, "", err
+			}
+			return resolved, "created (" + kind + ")", nil
+		}
+		if optional || source == SourceBuiltIn {
+			return nil, "skipped (does not exist)", nil
+		}
+		return nil, "", fmt.Errorf("configured path does not exist: %s (mark it optional with a ? prefix or create it with a + prefix)", path)
+	}
+	return resolved, "granted", nil
+}
+
+func resolveGlob(pattern string, vars Vars) ([]string, string, error) {
+	if strings.Contains(pattern, "**") {
+		return nil, "", fmt.Errorf("configured path %q uses **; only single * wildcards are supported", pattern)
+	}
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, "", fmt.Errorf("configured path %q is not a valid glob: %w", pattern, err)
+	}
+	if len(matches) == 0 {
+		return nil, "skipped (no matches)", nil
+	}
+	sort.Strings(matches)
+	out := []string{}
+	for _, match := range matches {
+		resolved, exists, err := resolve(match, vars)
+		if err != nil {
+			return nil, "", err
+		}
+		if !exists {
+			continue
+		}
+		out = append(out, resolved...)
+	}
+	if len(out) == 0 {
+		return nil, "skipped (no matches)", nil
+	}
+	return out, fmt.Sprintf("granted (%d matches)", len(matches)), nil
+}
+
+func createMissing(path string, create string) (string, error) {
+	switch create {
+	case CreateDir:
+		if err := os.MkdirAll(path, 0o700); err != nil {
+			return "", fmt.Errorf("creating configured directory %s: %w", path, err)
+		}
+		return "dir", nil
+	case CreateFile:
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			return "", fmt.Errorf("creating parent directory for configured file %s: %w", path, err)
+		}
+		file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o600)
+		if err != nil {
+			return "", fmt.Errorf("creating configured file %s: %w", path, err)
+		}
+		file.Close()
+		return "file", nil
+	default:
+		return "", fmt.Errorf("unknown create mode %q", create)
+	}
 }
 
 func ResolveOne(raw string, vars Vars) (string, bool, error) {
@@ -140,12 +300,18 @@ func expand(raw string, vars Vars) (string, error) {
 	}
 	unknown := map[string]bool{}
 	expanded := os.Expand(raw, func(key string) string {
-		value, ok := vars[key]
-		if !ok {
-			unknown[key] = true
-			return ""
+		name, fallback, hasFallback := strings.Cut(key, ":-")
+		if value, ok := vars[name]; ok && value != "" {
+			return value
 		}
-		return value
+		if hasFallback {
+			if home, ok := vars["HOME"]; ok && strings.HasPrefix(fallback, "~/") {
+				return filepath.Join(home, strings.TrimPrefix(fallback, "~/"))
+			}
+			return fallback
+		}
+		unknown[name] = true
+		return ""
 	})
 	if len(unknown) > 0 {
 		for key := range unknown {

@@ -2,8 +2,9 @@ package config
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
+
+	"github.com/vincentarelbundock/bulle/internal/paths"
 )
 
 func MergeConfigs(parent Config, child Config) Config {
@@ -11,6 +12,7 @@ func MergeConfigs(parent Config, child Config) Config {
 	out.Settings = MergeSettings(parent.Settings, child.Settings)
 	out.Platform = MergePlatformSettings(parent.Platform, child.Platform)
 	out.ProfileMetadata = mergeProfileMetadata(parent.ProfileMetadata, child.ProfileMetadata)
+	out.Vars = mergeVars(parent.Vars, child.Vars)
 	if out.Profiles == nil {
 		out.Profiles = map[string]Profile{}
 	}
@@ -195,11 +197,21 @@ func MergePathSettings(parent PathSettings, child PathSettings) PathSettings {
 }
 
 func pathKey(path string) string {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return ""
+	return paths.CanonicalEntryKey(path)
+}
+
+func mergeVars(parent, child map[string]string) map[string]string {
+	if parent == nil && child == nil {
+		return nil
 	}
-	return filepath.Clean(path)
+	out := map[string]string{}
+	for name, value := range parent {
+		out[name] = value
+	}
+	for name, value := range child {
+		out[name] = value
+	}
+	return out
 }
 
 func mergeEnv(parent []string, child []string) []string {
@@ -378,6 +390,7 @@ func cloneConfig(c Config) Config {
 		Profiles:        cloneProfiles(c.Profiles),
 		ProfileMetadata: cloneProfileMetadata(c.ProfileMetadata),
 		Platform:        clonePlatformSettings(c.Platform),
+		Vars:            mergeVars(c.Vars, nil),
 	}
 }
 

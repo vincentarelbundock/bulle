@@ -502,6 +502,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#portable-profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Portable profiles
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -793,10 +804,63 @@ bulle<span class="w"> </span>--install-profiles<span class="w"> </span>github:vi
 <span class="n">rox</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;/usr/bin&quot;</span><span class="p">]</span>
 </code></pre></div>
 <p>Available top-level options are <code>title</code>, <code>description</code>, <code>inherits</code>, <code>default_app</code>, path grants (<code>ro</code>, <code>rox</code>, <code>rw</code>, <code>rwx</code>), <code>env</code>, network settings (<code>allow</code>, <code>deny</code>), macOS Mach services (<code>mach_lookup</code>, <code>deny_mach_lookup</code>), executable discovery defaults (<code>add_exec</code>, <code>add_libs</code>), and platform tables (<code>[macos]</code>, <code>[linux]</code>). Only <code>title</code> and <code>description</code> are metadata fields.</p>
-<p>Path grants can use placeholders. <code>$WORKSPACE</code> refers to the workspace path. Fixed placeholders are <code>$HOME</code>, <code>$WORKSPACE</code>, <code>$TMP</code>, and <code>$TMPDIR</code>; custom path variables are not part of the config model.</p>
+<p>Path grants can use variables and entry markers; see <a href="#portable-profiles">Portable profiles</a> below.</p>
 <p><code>inherits</code> can be one profile name or an array of profile names. Parents are merged left to right and the child is applied last. Path grants merge by path and promote permissions, so <code>rox</code> plus <code>rw</code> for the same path becomes <code>rwx</code>. Environment entries merge by variable name with later values winning. Network and Mach allow/deny entries supersede by name.</p>
 <p><code>env</code> entries can be variable names copied from the parent environment or explicit <code>KEY=value</code> assignments. The only current network capability name is <code>network</code>, so <code>allow = ["network"]</code> enables network access and <code>deny = ["network"]</code> disables it.</p>
 <p>The <code>[macos]</code> and <code>[linux]</code> tables are applied only on that platform. They accept <code>default_app</code>, path grants, <code>env</code>, <code>allow</code>, <code>deny</code>, <code>mach_lookup</code>, <code>deny_mach_lookup</code>, <code>add_exec</code>, and <code>add_libs</code>. They do not accept profile metadata or <code>inherits</code>.</p>
+<h3 id="portable-profiles">Portable profiles<a class="headerlink" href="#portable-profiles" title="Permanent link">&para;</a></h3>
+<p>A profile written on one machine should work on another, even when tools are installed in different places. Several features make path entries portable.</p>
+<p><strong>Path variables.</strong> <code>$WORKSPACE</code> is the workspace path; <code>$HOME</code>, <code>$TMP</code>, and <code>$TMPDIR</code> are fixed. Four variables resolve per platform, so one entry covers both operating systems:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Linux</th>
+<th>macOS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>$CONFIG</code></td>
+<td><code>$XDG_CONFIG_HOME</code> or <code>~/.config</code></td>
+<td><code>~/Library/Application Support</code></td>
+</tr>
+<tr>
+<td><code>$DATA</code></td>
+<td><code>$XDG_DATA_HOME</code> or <code>~/.local/share</code></td>
+<td><code>~/Library/Application Support</code></td>
+</tr>
+<tr>
+<td><code>$CACHE</code></td>
+<td><code>$XDG_CACHE_HOME</code> or <code>~/.cache</code></td>
+<td><code>~/Library/Caches</code></td>
+</tr>
+<tr>
+<td><code>$STATE</code></td>
+<td><code>$XDG_STATE_HOME</code> or <code>~/.local/state</code></td>
+<td><code>~/Library/Application Support</code></td>
+</tr>
+</tbody>
+</table>
+<p>On Linux, the raw <code>XDG_CONFIG_HOME</code>, <code>XDG_DATA_HOME</code>, <code>XDG_CACHE_HOME</code>, and <code>XDG_STATE_HOME</code> names are also available and honor the parent environment when set. On macOS, several of these collapse to the same directory; the <code>--policy</code> resolution table flags entries whose grants merge because of that.</p>
+<p><strong>Optional and created entries.</strong> Read-only entries (<code>ro</code>, <code>rox</code>) are always skipped silently when the path does not exist. Writable entries (<code>rw</code>, <code>rwx</code>) fail hard on a missing path unless marked:</p>
+<div class="language-toml highlight"><pre><span></span><code><span class="n">rw</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;?$HOME/.netrc&quot;</span><span class="p">]</span><span class="w">        </span><span class="c1"># ? optional: skip when missing</span>
+<span class="n">rwx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;+$HOME/.codex/&quot;</span><span class="p">]</span><span class="w">       </span><span class="c1"># + trailing slash: create the directory when missing</span>
+<span class="n">rw</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;+$HOME/.claude.json&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># + no slash: create an empty file when missing</span>
+</code></pre></div>
+<p>Creation is the right default for a tool's own state: silently skipping a missing writable grant would produce a mysterious permission error later, and the built-in agent profiles use <code>+</code> for their state directories so they work on a fresh machine.</p>
+<p><strong>Executable resolvers.</strong> <code>which:NAME</code> looks up <code>NAME</code> on the parent <code>PATH</code> at policy-build time and grants exactly that binary (and its symlink chain) — never its containing directory, so <code>which:codex</code> does not hand over everything else in the same <code>bin</code>. <code>pkg:NAME</code> additionally grants the tool's package tree (two levels above the real binary), which Node- and Python-based tools need for their libraries; it refuses to expand when that tree would be a system directory such as <code>/usr</code>. Both are valid only in <code>rox</code> and <code>rwx</code>:</p>
+<div class="language-toml highlight"><pre><span></span><code><span class="n">rox</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;which:git&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;which:rg&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;pkg:codex&quot;</span><span class="p">]</span>
+</code></pre></div>
+<p>Name lookup inside the sandbox works through a per-run shim directory of symlinks that <code>bulle</code> creates outside the sandbox's writable area, grants read+execute, prepends to <code>PATH</code>, and removes after the run. A <code>which:</code>-based profile must name every binary the tool shells out to; missing ones surface through denial diagnostics. The broad-grant <code>tool</code> profile remains the escape hatch.</p>
+<p><strong>Globs.</strong> A <code>*</code> matches within one path segment (no <code>**</code>). No matches means the entry is skipped, so version-stamped directories stop breaking on upgrade:</p>
+<div class="language-toml highlight"><pre><span></span><code><span class="n">rox</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;$HOME/.nvm/versions/node/*/bin&quot;</span><span class="p">]</span>
+</code></pre></div>
+<p><strong>Custom variables.</strong> Machine-specific layouts live in a <code>[vars]</code> table in <code>&lt;config&gt;/config.toml</code> (usually <code>~/.config/bulle/config.toml</code>), or one-off with <code>--var NAME=VALUE</code>:</p>
+<div class="language-toml highlight"><pre><span></span><code><span class="k">[vars]</span>
+<span class="n">PROJECTS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;/mnt/work/repos&quot;</span>
+</code></pre></div>
+<p>Profiles then reference <code>$PROJECTS</code>, and <code>${NAME:-fallback}</code> supplies a default when a variable is unset. A small allowlist of well-known tool environment variables (<code>CARGO_HOME</code>, <code>GOPATH</code>, <code>NVM_DIR</code>, <code>PYENV_ROOT</code>, and similar) may also be referenced; their values come from the parent environment and are treated as untrusted — values that are not absolute paths, or that resolve to <code>/</code> or the home directory, are ignored so a hostile environment cannot widen a grant. Custom variable names are uppercase, and reserved names (<code>HOME</code>, <code>WORKSPACE</code>, <code>TMP</code>, <code>CONFIG</code>, <code>DATA</code>, <code>CACHE</code>, <code>STATE</code>, <code>XDG_*</code>, ...) cannot be redefined.</p>
 <h2 id="network">Network<a class="headerlink" href="#network" title="Permanent link">&para;</a></h2>
 <p>Network access is controlled by profiles. The built-in <code>network</code> profile allows it, and the built-in <code>offline</code> profile denies it. On macOS, the <code>network</code> profile also inherits DNS and certificate service bundles that network clients normally need. Built-in agent profiles inherit network access for compatibility with package managers and remote services.</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>offline<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--<span class="w"> </span>/bin/ls
@@ -805,6 +869,12 @@ bulle<span class="w"> </span>--profile<span class="w"> </span>codex,offline
 <h2 id="policy">Policy<a class="headerlink" href="#policy" title="Permanent link">&para;</a></h2>
 <p>Use <code>--policy</code> to inspect the resolved sandbox policy without running the command. By default, it prints the same human-readable permissions summary that <code>bulle</code> sends to supported LLM agent profiles at startup. This is a useful safety check before launching an agent or script, especially when combining profiles with extra filesystem or environment grants.</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>codex<span class="w"> </span>--policy
+</code></pre></div>
+<p>The summary ends with a <strong>resolution table</strong>: one line per configured entry showing what it resolved to — granted, skipped, created, or expanded from a <code>which:</code>/<code>pkg:</code> resolver or glob — so "why can't the agent see X" is answerable from one command. Entries whose resolved path is also granted through another list (for example when <code>$CONFIG</code> and <code>$DATA</code> collapse to the same directory on macOS) are flagged with their effective permission.</p>
+<div class="language-text highlight"><pre><span></span><code>  resolution:
+    rox  which:codex        → /home/user/.local/share/mise/installs/node/22/bin/codex (+1 more)
+    rwx  +$HOME/.codex/     → created (dir) /home/user/.codex
+    rw   ?$HOME/.netrc      → skipped (does not exist)
 </code></pre></div>
 <p>Stable machine-readable output is available with <code>--policy=json</code>:</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--policy<span class="o">=</span>json<span class="w"> </span>~/Desktop<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--<span class="w"> </span>/bin/ls

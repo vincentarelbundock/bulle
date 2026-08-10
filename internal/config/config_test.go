@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/vincentarelbundock/bulle/internal/paths"
 )
 
 func TestLoadTOMLProfileInheritanceEnvAndMachLookup(t *testing.T) {
@@ -51,19 +53,29 @@ mach_lookup = ["com.example.agent"]
 	}
 }
 
-func TestLoadRejectsDefaultProfileAndVars(t *testing.T) {
-	for name, data := range map[string]string{
-		"default_profile": `default_profile = "tool"`,
-		"vars": `[vars]
-CACHE = "$HOME/.cache"
-`,
-	} {
-		t.Run(name, func(t *testing.T) {
-			_, err := LoadBytes([]byte(data))
-			if err == nil {
-				t.Fatalf("LoadBytes succeeded, want %s rejected", name)
-			}
-		})
+func TestLoadRejectsDefaultProfile(t *testing.T) {
+	_, err := LoadBytes([]byte(`default_profile = "tool"`))
+	if err == nil {
+		t.Fatalf("LoadBytes succeeded, want default_profile rejected")
+	}
+}
+
+func TestLoadAcceptsVarsTable(t *testing.T) {
+	cfg, err := LoadBytes([]byte("[vars]\nPROJECTS = \"/mnt/work/repos\"\n"))
+	if err != nil {
+		t.Fatalf("LoadBytes: %v", err)
+	}
+	if cfg.Vars["PROJECTS"] != "/mnt/work/repos" {
+		t.Fatalf("Vars = %#v", cfg.Vars)
+	}
+}
+
+func TestMergeConfigsChildVarsWin(t *testing.T) {
+	parent := Config{Vars: map[string]string{"A": "/one", "B": "/two"}}
+	child := Config{Vars: map[string]string{"B": "/three"}}
+	merged := MergeConfigs(parent, child)
+	if merged.Vars["A"] != "/one" || merged.Vars["B"] != "/three" {
+		t.Fatalf("Vars = %#v", merged.Vars)
 	}
 }
 
@@ -603,7 +615,7 @@ func TestDefaultConfigIncludesAgentProfiles(t *testing.T) {
 		if name == "codex" && (!contains(profile.Env, "HTTPS_PROXY") || !contains(profile.Env, "NO_PROXY") || !contains(profile.Env, "SSL_CERT_FILE") || !contains(profile.Env, "CODEX_CONNECTORS_TOKEN") || !contains(profile.Env, "CODEX_CA_CERTIFICATE")) {
 			t.Fatalf("codex Env missing network/MCP support variables: %#v", profile.Env)
 		}
-		if !contains(profile.ReadWriteExec, tt.statePath) {
+		if !containsGrant(profile.ReadWriteExec, tt.statePath) {
 			t.Fatalf("profile %q ReadWriteExec = %#v, want %q", name, profile.ReadWriteExec, tt.statePath)
 		}
 	}
@@ -653,7 +665,7 @@ func TestClaudeProfileAllowsTopLevelClaudeState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveProfile returned error: %v", err)
 	}
-	if !contains(profile.ReadWrite, "$HOME/.claude.json") {
+	if !containsGrant(profile.ReadWrite, "$HOME/.claude.json") {
 		t.Fatalf("ReadWrite = %#v", profile.ReadWrite)
 	}
 	if contains(profile.ReadWrite, "$HOME/.claude/settings.json") {
@@ -663,7 +675,7 @@ func TestClaudeProfileAllowsTopLevelClaudeState(t *testing.T) {
 		"$HOME/.claude",
 		"$HOME/.local/share/claude",
 	} {
-		if !contains(profile.ReadWriteExec, want) {
+		if !containsGrant(profile.ReadWriteExec, want) {
 			t.Fatalf("ReadWriteExec = %#v, want %q", profile.ReadWriteExec, want)
 		}
 	}
@@ -681,7 +693,7 @@ func TestOpenCodeProfileAllowsXDGState(t *testing.T) {
 		"$HOME/.local/state/opencode",
 		"$HOME/.cache/opencode",
 	} {
-		if !contains(profile.ReadWriteExec, want) {
+		if !containsGrant(profile.ReadWriteExec, want) {
 			t.Fatalf("ReadWriteExec = %#v, want %q", profile.ReadWriteExec, want)
 		}
 	}
@@ -693,7 +705,7 @@ func TestPiProfileAllowsExecutableAgentState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveProfile returned error: %v", err)
 	}
-	if !contains(profile.ReadWriteExec, "$HOME/.pi") {
+	if !containsGrant(profile.ReadWriteExec, "$HOME/.pi") {
 		t.Fatalf("ReadWriteExec = %#v", profile.ReadWriteExec)
 	}
 }
@@ -756,6 +768,18 @@ func assertMacOSPreferencesDefault(t *testing.T, name string, profile Profile) {
 	if runtime.GOOS != "darwin" && hasPreferences {
 		t.Fatalf("profile %q ReadOnly = %#v, did not want macOS preferences on %s", name, profile.ReadOnly, runtime.GOOS)
 	}
+}
+
+// containsGrant compares path entries by their canonical grant key, ignoring
+// optional/create markers and trailing slashes.
+func containsGrant(xs []string, want string) bool {
+	key := paths.CanonicalEntryKey(want)
+	for _, x := range xs {
+		if paths.CanonicalEntryKey(x) == key {
+			return true
+		}
+	}
+	return false
 }
 
 func contains(xs []string, want string) bool {

@@ -21,6 +21,7 @@ type Config struct {
 	Profiles        map[string]Profile         `toml:"profiles"`
 	ProfileMetadata map[string]ProfileMetadata `toml:"-"`
 	Platform        PlatformSettings           `toml:"platform"`
+	Vars            map[string]string          `toml:"vars"`
 }
 
 type ProfileMetadata struct {

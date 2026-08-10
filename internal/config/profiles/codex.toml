@@ -34,7 +34,7 @@ env = [
   "YARN_HTTP_PROXY",
   "YARN_NO_PROXY",
 ]
-rwx = ["$HOME/.codex"]
+rwx = ["+$HOME/.codex/"]
 
 [macos]
 ro = ["$HOME/Library/Preferences"]

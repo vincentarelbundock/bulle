@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/vincentarelbundock/bulle/internal/cli"
+	bpaths "github.com/vincentarelbundock/bulle/internal/paths"
 	"github.com/vincentarelbundock/bulle/internal/policy"
 )
 
@@ -35,6 +36,66 @@ func writeProfilePermissionSummary(profileName string, p policy.Policy, w io.Wri
 	fmt.Fprintf(w, "  add_exec: %s\n", formatEnabled(view.AddExec))
 	fmt.Fprintf(w, "  add_libs: %s\n", formatEnabled(view.AddLibs))
 	fmt.Fprintf(w, "  mach_lookup: %s\n", formatInlineList(view.MachLookup))
+}
+
+// writeResolutionTable prints one line per configured entry with its
+// resolution outcome. Shown only for --policy: the session paste stays
+// compact, but "why can't the agent see X" is answerable from one command.
+func writeResolutionTable(p policy.Policy, w io.Writer) {
+	if len(p.Trace) == 0 {
+		return
+	}
+	rights := resolvedRights(p)
+	fmt.Fprintln(w, "  resolution:")
+	for _, trace := range p.Trace {
+		line := fmt.Sprintf("    %-4s %-40s → %s", trace.List, trace.Raw, formatTraceOutcome(trace))
+		if note := unionNote(trace, rights); note != "" {
+			line += " " + note
+		}
+		fmt.Fprintln(w, line)
+	}
+}
+
+func formatTraceOutcome(trace bpaths.Trace) string {
+	if len(trace.Paths) == 0 {
+		return trace.Outcome
+	}
+	out := trace.Paths[0]
+	if trace.Outcome != "granted" {
+		out = trace.Outcome + " " + out
+	}
+	if extra := len(trace.Paths) - 1; extra > 0 {
+		out += fmt.Sprintf(" (+%d more)", extra)
+	}
+	return out
+}
+
+// unionNote flags entries whose resolved path also appears in a stronger
+// list: two portable entries can collapse to one path on a given platform
+// (e.g. $CONFIG and $DATA on macOS), silently widening the weaker grant.
+func unionNote(trace bpaths.Trace, rights map[string]string) string {
+	for _, path := range trace.Paths {
+		if effective, ok := rights[path]; ok && effective != trace.List {
+			return fmt.Sprintf("(effective %s: also granted via another list)", effective)
+		}
+	}
+	return ""
+}
+
+func resolvedRights(p policy.Policy) map[string]string {
+	out := map[string]string{}
+	// Strongest last so overlapping paths report their widest grant.
+	for _, group := range []struct {
+		label string
+		paths []string
+	}{
+		{"ro", p.ReadOnly}, {"rox", p.ReadOnlyExec}, {"rw", p.ReadWrite}, {"rwx", p.ReadWriteExec},
+	} {
+		for _, path := range group.paths {
+			out[path] = group.label
+		}
+	}
+	return out
 }
 
 func preRunSessionPaste(opts cli.Options, p policy.Policy) string {

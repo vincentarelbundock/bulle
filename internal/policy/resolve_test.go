@@ -32,7 +32,7 @@ func TestResolveRejectsUnknownPathVariable(t *testing.T) {
 	if err := os.Mkdir(project, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cfg := config.Config{Profiles: map[string]config.Profile{"default": {Settings: config.Settings{PathSettings: config.PathSettings{ReadWrite: []string{"$CACHE"}}}}}}
+	cfg := config.Config{Profiles: map[string]config.Profile{"default": {Settings: config.Settings{PathSettings: config.PathSettings{ReadWrite: []string{"$NO_SUCH_VARIABLE"}}}}}}
 
 	_, err := Resolve(Inputs{Options: cli.Options{ProjectPath: project}, Global: cfg, ParentEnv: map[string]string{}, Home: root, Tmp: t.TempDir()})
 	if err == nil {

@@ -110,10 +110,22 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "pass a command after -- (e.g. bulle . -- claude) or set default_app in your config")
 		return ExitConfigError
 	}
+	// Shim directories created for which:/pkg: entries are per-run; remove
+	// them on the way out (normal exit, command failure, and timeout all
+	// return through here).
+	shimDirs := []string{}
+	defer func() {
+		for _, dir := range shimDirs {
+			os.RemoveAll(dir)
+		}
+	}()
 	p, err := policy.Resolve(policy.Inputs{Options: opts, Global: global, ParentEnv: parentEnv(), Home: home, Tmp: tmp})
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return ExitPolicyValidation
+	}
+	if p.ShimDir != "" {
+		shimDirs = append(shimDirs, p.ShimDir)
 	}
 	if _, err := backends.ForName(p.Backend); err != nil {
 		fmt.Fprintln(stderr, err)
@@ -132,6 +144,9 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 			retry := opts
 			retry.Profile = matches[0]
 			if rescued, rerr := resolveAndPrepare(retry, global, home, tmp); rerr == nil {
+				if rescued.ShimDir != "" {
+					shimDirs = append(shimDirs, rescued.ShimDir)
+				}
 				fmt.Fprintf(stderr, "bulle: selected profile %q because its default_app runs %q and the default profile cannot; pass --profile to choose explicitly\n", matches[0], opts.Command[0])
 				opts.Profile = matches[0]
 				prepared, err = rescued, nil
@@ -155,6 +170,7 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		switch opts.PolicyFormat {
 		case "", "summary":
 			writeProfilePermissionSummary(policySummaryProfileName(opts), p, stdout)
+			writeResolutionTable(p, stdout)
 		case "json":
 			if err := json.NewEncoder(stdout).Encode(policy.NewView(p)); err != nil {
 				fmt.Fprintln(stderr, err)
@@ -208,9 +224,20 @@ func resolveAndPrepare(opts cli.Options, global config.Config, home string, tmp 
 		return policy.Policy{}, err
 	}
 	if _, err := backends.ForName(p.Backend); err != nil {
+		removeShimDir(p)
 		return policy.Policy{}, err
 	}
-	return backends.PreparePolicy(p)
+	prepared, err := backends.PreparePolicy(p)
+	if err != nil {
+		removeShimDir(p)
+	}
+	return prepared, err
+}
+
+func removeShimDir(p policy.Policy) {
+	if p.ShimDir != "" {
+		os.RemoveAll(p.ShimDir)
+	}
 }
 
 func loadConfig(opts cli.Options) (config.Config, error) {
@@ -218,18 +245,26 @@ func loadConfig(opts cli.Options) (config.Config, error) {
 	if err != nil {
 		return config.Config{}, err
 	}
-	if opts.Config != "" {
-		loaded, err := config.LoadProfileDirectory(filepath.Join(opts.Config, "profiles"))
-		if err != nil {
-			return config.Config{}, err
-		}
+	root := opts.Config
+	explicit := root != ""
+	if root == "" {
+		root = defaultConfigRoot()
+	}
+	if root == "" {
+		return global, nil
+	}
+	// Machine-local settings (notably [vars]) live in <root>/config.toml so a
+	// portable profile can reference layouts this machine declares.
+	if loaded, err := config.LoadFile(filepath.Join(root, "config.toml")); err == nil {
 		global = config.MergeConfigs(global, loaded)
-	} else if root := defaultConfigRoot(); root != "" {
-		if loaded, err := config.LoadProfileDirectory(filepath.Join(root, "profiles")); err == nil {
-			global = config.MergeConfigs(global, loaded)
-		} else if !os.IsNotExist(err) {
-			return config.Config{}, err
-		}
+	} else if !os.IsNotExist(err) {
+		return config.Config{}, err
+	}
+	loaded, err := config.LoadProfileDirectory(filepath.Join(root, "profiles"))
+	if err == nil {
+		global = config.MergeConfigs(global, loaded)
+	} else if explicit || !os.IsNotExist(err) {
+		return config.Config{}, err
 	}
 	return global, nil
 }

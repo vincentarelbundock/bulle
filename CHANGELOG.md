@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Portable profiles: path entries now adapt to the machine.** A profile
+  written on one machine works on another:
+    - `?path` marks a writable entry optional (skip when missing); `+path/`
+      creates a missing directory and `+path` a missing file. Read-only
+      entries keep their existing skip-if-missing behavior. The built-in
+      `claude`, `codex`, `opencode`, and `pi` profiles now create their state
+      directories on first run instead of failing on a fresh machine.
+    - `which:NAME` resolves a command on the parent `PATH` and grants exactly
+      that binary (plus its symlink chain) — never its containing directory.
+      Name lookup inside the sandbox goes through a per-run, read-only shim
+      directory that `bulle` creates and removes automatically. `pkg:NAME`
+      additionally grants the tool's package tree, refusing system
+      directories such as `/usr`.
+    - Platform-neutral variables `$CONFIG`, `$DATA`, `$CACHE`, and `$STATE`
+      resolve to XDG directories on Linux (honoring `XDG_*` overrides) and
+      `~/Library` equivalents on macOS.
+    - Single-star globs (`~/.nvm/versions/node/*/bin`); no matches means the
+      entry is skipped.
+    - Custom variables from a `[vars]` table in `<config>/config.toml` or
+      `--var NAME=VALUE`, with `${NAME:-fallback}` defaults. A small
+      allowlist of well-known tool environment variables (`CARGO_HOME`,
+      `GOPATH`, `NVM_DIR`, ...) may be referenced; untrusted values that are
+      relative or resolve to `/` or the home directory are ignored.
+- **Resolution table in `--policy`.** The policy summary now ends with one
+  line per configured entry showing its outcome (granted, skipped, created,
+  resolver expansion), and flags entries whose grants collapse into a
+  stronger permission on the current platform.
+
 - **Denial diagnostics: failed runs explain what the sandbox blocked.** After a
   sandboxed command fails, `bulle` reads the operating system's own record of
   sandbox denials and prints copy-pasteable fixes, e.g.

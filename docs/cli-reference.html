@@ -432,12 +432,25 @@ explicitly with --rox or --rwx):
   --rwx path       grant read-write access plus execute
   --no-workspace   do not automatically grant the workspace read-write access
 
+Path entries (flags and profiles):
+  ?path            optional: skip silently when the path does not exist
+  +path            create an empty file when missing (rw/rwx entries)
+  +path/           create a directory when missing (rw/rwx entries)
+  which:NAME       resolve NAME on the parent PATH and grant that binary only,
+                   findable by name inside the sandbox (rox/rwx entries)
+  pkg:NAME         like which:, plus the tool&#39;s package tree (rox/rwx entries)
+  dir/*/bin        single-star glob; no matches means the entry is skipped
+  Variables: $WORKSPACE, $HOME, $TMP, $TMPDIR, and the per-platform
+  $CONFIG, $DATA, $CACHE, $STATE (XDG dirs on Linux, ~/Library on macOS).
+  ${NAME:-fallback} falls back when NAME is unset.
+
 Environment flags (no variables are passed unless requested):
   --env NAME        pass NAME from the current environment, if it is set
   --env NAME=VALUE  set NAME to VALUE inside the sandbox
 
 Configuration:
   --config PATH     path to a configuration directory
+  --var NAME=VALUE  define a custom path variable usable in grants as $NAME
 
 Profiles:
   -p, --profile NAME

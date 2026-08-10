@@ -1,6 +1,10 @@
 package policy
 
-import "time"
+import (
+	"time"
+
+	bpaths "github.com/vincentarelbundock/bulle/internal/paths"
+)
 
 type BackendName string
 type NetworkMode string
@@ -31,6 +35,12 @@ type Policy struct {
 
 	MachLookup []string
 	Network    NetworkMode
+
+	// ShimDir is the per-run directory of symlinks created for which:/pkg:
+	// entries, or empty. The caller removes it after the run.
+	ShimDir string
+	// Trace records the per-entry resolution outcomes for --policy output.
+	Trace []bpaths.Trace
 }
 
 type View struct {
