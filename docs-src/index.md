@@ -15,8 +15,10 @@ hide:
 You can spin up an agent with restricted permissions using this simple command:
 
 ```bash
-bulle /path/to/project --profile claude
+bulle /path/to/project -- claude
 ```
+
+`bulle` notices that the built-in `claude` profile is designed to run this command, announces the profile it selected, and applies its permissions automatically. The same works for `codex`, `opencode`, and `pi`.
 
 Sandboxes are not limited to agents. You can use `bulle` to run any command with custom permissions. See the [Quick start](#quick-start) section and the [CLI reference](cli-reference) for details.
 
@@ -81,15 +83,24 @@ That error is intentional: even finding and executing `ls` requires permission. 
 bulle --rox /bin -- ls
 ```
 
-Instead of specifying the path of every command manually, we can load [profiles](#profiles): named bundles of permissions for common tools. `bulle` ships with built-in profiles for several coding agents. For example, the first command below gives read-write access to the current directory, and launches Claude Code with minimal permissions:
+Instead of specifying the path of every command manually, we can use [profiles](#profiles): named bundles of permissions for common tools. `bulle` ships with built-in profiles for several coding agents, and when your command matches the tool a profile was made for, `bulle` selects that profile for you. The commands below each give read-write access to a workspace and launch an agent with minimal permissions:
 
 ```sh
-bulle --profile claude
-# bulle /path/to/project --profile claude
-# bulle --profile codex
-# bulle --profile pi
-# bulle --profile opencode
+bulle -- claude
+# bulle /path/to/project -- claude
+# bulle -- codex
+# bulle -- pi
+# bulle -- opencode
 ```
+
+`bulle` announces the choice on startup, for example:
+
+```text
+bulle: selected profile "claude" because its default_app runs "claude" and
+the default profile cannot; pass --profile to choose explicitly
+```
+
+You can always pick a profile explicitly instead — `bulle --profile claude`, which also launches the app for you — or combine profiles and one-off grants; see [Profiles](#profiles) for the distinction between selecting profiles and letting `bulle` infer one.
 
 ## Filesystem
 
@@ -129,13 +140,33 @@ A profile is a named bundle of path, environment, network, and platform grants. 
 
     Profiles can grant broad filesystem, environment, network, and platform access. Use `--policy` to inspect the resolved permissions before running an unfamiliar profile or combining profiles.
 
-### Use
+### Selection and inference
 
-The simplest way to use `bulle` is to select a built-in agent profile. This will launch the Claude Code app with appropriate permissions and constraints:
+There are two ways a profile gets applied to a run.
+
+**Explicit selection** with `--profile` names the profile directly. When the profile declares a `default_app`, you do not even need to pass a command — this launches Claude Code with appropriate permissions and constraints:
 
 ```bash
 bulle --profile claude
 ```
+
+**Inference** goes the other way: you pass the command, and `bulle` finds the profile made for it. When no `--profile` is given and the command cannot run under the default profile, `bulle` checks whether exactly one installed profile declares that command as its `default_app`. If so, it selects that profile, announces the choice, and continues:
+
+```bash
+bulle -- claude
+```
+
+```text
+bulle: selected profile "claude" because its default_app runs "claude" and
+the default profile cannot; pass --profile to choose explicitly
+```
+
+Inference is deliberately conservative, because applying a profile changes what the sandbox grants:
+
+- It only ever rescues a run that would otherwise fail command discovery. A command that already works under the default profile is never re-profiled.
+- It never fires when you pass `--profile` — an explicit selection always wins.
+- If several profiles declare the same command, `bulle` refuses to guess, lists the candidates, and asks you to choose with `--profile`.
+- The selection is always announced on stderr, and `--policy` shows the resulting permissions (`bulle --policy -- claude`).
 
 Without a profile or an explicit grant, `bulle` cannot find or execute anything, so command discovery fails before the sandbox starts:
 

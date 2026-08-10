@@ -138,6 +138,10 @@
           CLI Reference
         </a>
       
+        <a href="./denial-diagnostics.html" style="color: inherit; opacity: 0.9; text-decoration: none; white-space: nowrap;">
+          Denial Diagnostics
+        </a>
+      
     </div>
     
       
@@ -323,6 +327,32 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./denial-diagnostics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Denial Diagnostics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -429,10 +459,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#use" class="md-nav__link">
+  <a href="#selection-and-inference" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Use
+        Selection and inference
       </span>
     </span>
   </a>
@@ -586,8 +616,9 @@
 
 <p><code>bulle</code> is an easy-to-use sandbox for running local commands while exposing only the essential parts of your machine. It allows you to run tools you don't fully trust, without handing over all your files or secrets, and with an option to deny network access. <code>bulle</code> sandboxes are especially helpful when running LLM coding agents or untrusted scripts.</p>
 <p>You can spin up an agent with restricted permissions using this simple command:</p>
-<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>/path/to/project<span class="w"> </span>--profile<span class="w"> </span>claude
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>/path/to/project<span class="w"> </span>--<span class="w"> </span>claude
 </code></pre></div>
+<p><code>bulle</code> notices that the built-in <code>claude</code> profile is designed to run this command, announces the profile it selected, and applies its permissions automatically. The same works for <code>codex</code>, <code>opencode</code>, and <code>pi</code>.</p>
 <p>Sandboxes are not limited to agents. You can use <code>bulle</code> to run any command with custom permissions. See the <a href="#quick-start">Quick start</a> section and the <a href="cli-reference">CLI reference</a> for details.</p>
 <div class="admonition warning">
 <p class="admonition-title"><code>bulle</code> is still experimental. Please report bugs, comments, and feature requests <a href="https://github.com/vincentarelbundock/bulle">on GitHub</a>.</p>
@@ -634,13 +665,18 @@ or pass an explicit executable path after --
 <p>That error is intentional: even finding and executing <code>ls</code> requires permission. Grant read-and-execute access to a directory with <code>--rox</code>, and <code>bulle</code> can find commands in it:</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--<span class="w"> </span>ls
 </code></pre></div>
-<p>Instead of specifying the path of every command manually, we can load <a href="#profiles">profiles</a>: named bundles of permissions for common tools. <code>bulle</code> ships with built-in profiles for several coding agents. For example, the first command below gives read-write access to the current directory, and launches Claude Code with minimal permissions:</p>
-<div class="language-sh highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>claude
-<span class="c1"># bulle /path/to/project --profile claude</span>
-<span class="c1"># bulle --profile codex</span>
-<span class="c1"># bulle --profile pi</span>
-<span class="c1"># bulle --profile opencode</span>
+<p>Instead of specifying the path of every command manually, we can use <a href="#profiles">profiles</a>: named bundles of permissions for common tools. <code>bulle</code> ships with built-in profiles for several coding agents, and when your command matches the tool a profile was made for, <code>bulle</code> selects that profile for you. The commands below each give read-write access to a workspace and launch an agent with minimal permissions:</p>
+<div class="language-sh highlight"><pre><span></span><code>bulle<span class="w"> </span>--<span class="w"> </span>claude
+<span class="c1"># bulle /path/to/project -- claude</span>
+<span class="c1"># bulle -- codex</span>
+<span class="c1"># bulle -- pi</span>
+<span class="c1"># bulle -- opencode</span>
 </code></pre></div>
+<p><code>bulle</code> announces the choice on startup, for example:</p>
+<div class="language-text highlight"><pre><span></span><code>bulle: selected profile &quot;claude&quot; because its default_app runs &quot;claude&quot; and
+the default profile cannot; pass --profile to choose explicitly
+</code></pre></div>
+<p>You can always pick a profile explicitly instead — <code>bulle --profile claude</code>, which also launches the app for you — or combine profiles and one-off grants; see <a href="#profiles">Profiles</a> for the distinction between selecting profiles and letting <code>bulle</code> infer one.</p>
 <h2 id="filesystem">Filesystem<a class="headerlink" href="#filesystem" title="Permanent link">&para;</a></h2>
 <p>The workspace is the command's working directory and writable area. If omitted, it defaults to the current directory. Use <code>--no-workspace</code> when you do not want this automatic read-write grant.</p>
 <p>Additional filesystem access is explicit. Use these flags to add paths to the active policy:</p>
@@ -666,10 +702,24 @@ or pass an explicit executable path after --
 <p class="admonition-title">Warning</p>
 <p>Profiles can grant broad filesystem, environment, network, and platform access. Use <code>--policy</code> to inspect the resolved permissions before running an unfamiliar profile or combining profiles.</p>
 </div>
-<h3 id="use">Use<a class="headerlink" href="#use" title="Permanent link">&para;</a></h3>
-<p>The simplest way to use <code>bulle</code> is to select a built-in agent profile. This will launch the Claude Code app with appropriate permissions and constraints:</p>
+<h3 id="selection-and-inference">Selection and inference<a class="headerlink" href="#selection-and-inference" title="Permanent link">&para;</a></h3>
+<p>There are two ways a profile gets applied to a run.</p>
+<p><strong>Explicit selection</strong> with <code>--profile</code> names the profile directly. When the profile declares a <code>default_app</code>, you do not even need to pass a command — this launches Claude Code with appropriate permissions and constraints:</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>claude
 </code></pre></div>
+<p><strong>Inference</strong> goes the other way: you pass the command, and <code>bulle</code> finds the profile made for it. When no <code>--profile</code> is given and the command cannot run under the default profile, <code>bulle</code> checks whether exactly one installed profile declares that command as its <code>default_app</code>. If so, it selects that profile, announces the choice, and continues:</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--<span class="w"> </span>claude
+</code></pre></div>
+<div class="language-text highlight"><pre><span></span><code>bulle: selected profile &quot;claude&quot; because its default_app runs &quot;claude&quot; and
+the default profile cannot; pass --profile to choose explicitly
+</code></pre></div>
+<p>Inference is deliberately conservative, because applying a profile changes what the sandbox grants:</p>
+<ul>
+<li>It only ever rescues a run that would otherwise fail command discovery. A command that already works under the default profile is never re-profiled.</li>
+<li>It never fires when you pass <code>--profile</code> — an explicit selection always wins.</li>
+<li>If several profiles declare the same command, <code>bulle</code> refuses to guess, lists the candidates, and asks you to choose with <code>--profile</code>.</li>
+<li>The selection is always announced on stderr, and <code>--policy</code> shows the resulting permissions (<code>bulle --policy -- claude</code>).</li>
+</ul>
 <p>Without a profile or an explicit grant, <code>bulle</code> cannot find or execute anything, so command discovery fails before the sandbox starts:</p>
 <div class="language-text highlight"><pre><span></span><code>bulle -- ping google.com
 

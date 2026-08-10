@@ -5,7 +5,6 @@ package supervisor
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -59,9 +58,6 @@ type Options struct {
 }
 
 func Run(p policy.Policy, opts Options) error {
-	if opts.Timeout <= 0 {
-		return fmt.Errorf("supervisor requires a positive timeout")
-	}
 	executable := opts.Executable
 	if executable == "" {
 		var err error
@@ -154,8 +150,12 @@ func Run(p policy.Policy, opts Options) error {
 		writeDone <- err
 	}()
 
-	timer := time.NewTimer(opts.Timeout)
-	defer timer.Stop()
+	var timeoutC <-chan time.Time
+	if opts.Timeout > 0 {
+		timer := time.NewTimer(opts.Timeout)
+		defer timer.Stop()
+		timeoutC = timer.C
+	}
 
 	for {
 		select {
@@ -181,7 +181,7 @@ func Run(p policy.Policy, opts Options) error {
 				waitErr := <-waitDone
 				return finishWriteError(err, waitErr, term, forwarder.forwardedSignal())
 			}
-		case <-timer.C:
+		case <-timeoutC:
 			_ = closeWrite()
 			return handleTimeout(waitDone, writeDone, term, timeoutContext{
 				duration: opts.Timeout,

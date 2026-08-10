@@ -89,6 +89,7 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 		return ExitOK
 	}
+	explicitCommand := len(opts.Command) > 0
 	if len(opts.Command) == 0 {
 		defaultApp, err := defaultAppForRun(opts, global)
 		if err != nil {
@@ -114,14 +115,36 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return ExitPolicyValidation
 	}
-	backend, err := backends.ForName(p.Backend)
-	if err != nil {
+	if _, err := backends.ForName(p.Backend); err != nil {
 		fmt.Fprintln(stderr, err)
 		return ExitBackendMissing
 	}
 	prepared, err := backends.PreparePolicy(p)
+	// Rescue-only profile inference: when the user gave a command but no
+	// profile and discovery fails under the default profile, a profile whose
+	// default_app runs that same command is almost certainly what they meant.
+	// Runs that would succeed are never affected, and ambiguity refuses to
+	// guess because selecting a profile changes what the sandbox grants.
+	var ambiguousProfiles []string
+	if err != nil && opts.Profile == "" && explicitCommand {
+		matches := profilesMatchingCommand(global, opts.Command[0])
+		if len(matches) == 1 {
+			retry := opts
+			retry.Profile = matches[0]
+			if rescued, rerr := resolveAndPrepare(retry, global, home, tmp); rerr == nil {
+				fmt.Fprintf(stderr, "bulle: selected profile %q because its default_app runs %q and the default profile cannot; pass --profile to choose explicitly\n", matches[0], opts.Command[0])
+				opts.Profile = matches[0]
+				prepared, err = rescued, nil
+			}
+		} else if len(matches) > 1 {
+			ambiguousProfiles = matches
+		}
+	}
 	if err != nil {
 		fmt.Fprintln(stderr, err)
+		if len(ambiguousProfiles) > 0 {
+			fmt.Fprintf(stderr, "profiles %s all declare a default_app running %q; choose one with --profile\n", strings.Join(ambiguousProfiles, ", "), opts.Command[0])
+		}
 		if errors.Is(err, policy.ErrCommandNotFound) {
 			return ExitNotFound
 		}
@@ -144,25 +167,50 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return ExitOK
 	}
 	p.Command = commandWithSessionPermissions(opts.Profile, p.Command, preRunSessionPaste(opts, p))
-	if p.Timeout > 0 {
-		if err := supervisor.Run(p, supervisor.Options{
-			Timeout: p.Timeout,
-			Stdin:   os.Stdin,
-			Stdout:  os.Stdout,
-			Stderr:  os.Stderr,
-		}); err != nil {
-			return exitCodeForSupervisorError(err, stderr)
-		}
-		return ExitOK
-	}
-	if err := backend.Run(p); err != nil {
-		fmt.Fprintln(stderr, err)
-		if isCommandExitError(err) {
-			return ExitCommandFailed
-		}
-		return ExitSandboxSetup
+	// All runs go through the supervisor (even without a timeout) so a parent
+	// process survives the sandboxed command and can report on its failure.
+	probe := startDenialProbe(p)
+	if err := supervisor.Run(p, supervisor.Options{
+		Timeout: p.Timeout,
+		Stdin:   os.Stdin,
+		Stdout:  os.Stdout,
+		Stderr:  os.Stderr,
+	}); err != nil {
+		code := exitCodeForSupervisorError(err, stderr)
+		printDenialHints(probe, stderr)
+		return code
 	}
 	return ExitOK
+}
+
+// printDenialHints reports sandbox denials logged by the kernel during a
+// failed run, with copy-pasteable policy fixes. Best-effort: it prints
+// nothing when denial logging is unsupported or kernel logs are unreadable.
+func printDenialHints(probe denialProbe, stderr io.Writer) {
+	hints := probe.hints()
+	if len(hints) == 0 {
+		return
+	}
+	const maxHints = 10
+	fmt.Fprintln(stderr, "bulle: the sandbox denied the following accesses during this run:")
+	for i, hint := range hints {
+		if i == maxHints {
+			fmt.Fprintf(stderr, "  ... and %d more (see journalctl --kernel)\n", len(hints)-maxHints)
+			break
+		}
+		fmt.Fprintf(stderr, "  %s\n", hint)
+	}
+}
+
+func resolveAndPrepare(opts cli.Options, global config.Config, home string, tmp string) (policy.Policy, error) {
+	p, err := policy.Resolve(policy.Inputs{Options: opts, Global: global, ParentEnv: parentEnv(), Home: home, Tmp: tmp})
+	if err != nil {
+		return policy.Policy{}, err
+	}
+	if _, err := backends.ForName(p.Backend); err != nil {
+		return policy.Policy{}, err
+	}
+	return backends.PreparePolicy(p)
 }
 
 func loadConfig(opts cli.Options) (config.Config, error) {

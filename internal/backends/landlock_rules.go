@@ -12,6 +12,13 @@ import (
 
 func applyLandlockFilesystem(p policy.Policy) error {
 	llCfg := landlock.V3
+	// On kernels with Landlock audit support (ABI v7, Linux 6.15+), ask the
+	// kernel to log denials hit by the sandboxed command after execve. The
+	// supervisor reads these back on failure to suggest policy fixes; they are
+	// also visible via journalctl/dmesg. Enforcement stays strict V3 either way.
+	if abi, err := llsyscall.LandlockGetABIVersion(); err == nil && abi >= 7 {
+		llCfg = llCfg.EnableLoggingForSubprocesses()
+	}
 	rules := []landlock.Rule{}
 	for _, path := range p.ReadOnlyExec {
 		rules = append(rules, landlock.PathAccess(fsRights(path, true, false), path))
