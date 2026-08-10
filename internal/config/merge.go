@@ -294,6 +294,36 @@ func choose(child string, parent string) string {
 	return parent
 }
 
+// applyGuardrailDenies enforces a set of denied names on top of a merged
+// allow/deny pair: each guardrail name is removed from allow (if present) and
+// added to deny (if not already there). Order within each list is preserved.
+func applyGuardrailDenies(allow, deny, guardrails []string) ([]string, []string) {
+	if len(guardrails) == 0 {
+		return allow, deny
+	}
+	denied := map[string]bool{}
+	for _, name := range deny {
+		denied[strings.TrimSpace(name)] = true
+	}
+	for _, name := range guardrails {
+		key := strings.TrimSpace(name)
+		if key == "" {
+			continue
+		}
+		if !denied[key] {
+			denied[key] = true
+			deny = append(deny, key)
+		}
+	}
+	filtered := allow[:0:0]
+	for _, name := range allow {
+		if !denied[strings.TrimSpace(name)] {
+			filtered = append(filtered, name)
+		}
+	}
+	return filtered, deny
+}
+
 func EffectiveProfile(global Config, explicitProfile string) (Profile, string, Config, error) {
 	cfg := cloneConfig(global)
 	names, err := profileNamesFromSpec(explicitProfile)
@@ -315,6 +345,11 @@ func EffectiveProfile(global Config, explicitProfile string) (Profile, string, C
 	// convenience grant (e.g. allow = ["network"]) would silently override the
 	// restrictions of a deliberately chosen locked-down profile.
 	profile = MergeProfiles(topLevel, profile)
+	// A top-level deny is a security guardrail, not a default: reapply it after
+	// the merge so a selected profile cannot silently re-grant what the global
+	// config forbids. Deny beats allow in both directions.
+	profile.Allow, profile.Deny = applyGuardrailDenies(profile.Allow, profile.Deny, topLevel.Deny)
+	profile.MachLookup, profile.DenyMachLookup = applyGuardrailDenies(profile.MachLookup, profile.DenyMachLookup, topLevel.DenyMachLookup)
 	if profile.DefaultApp == "" {
 		profile.DefaultApp = cfg.DefaultApp
 	}

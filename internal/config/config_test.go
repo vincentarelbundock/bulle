@@ -208,6 +208,34 @@ func TestEffectiveProfileTopLevelDoesNotOverrideSelectedProfileDeny(t *testing.T
 	}
 }
 
+func TestEffectiveProfileTopLevelDenyIsGuardrailOverProfileAllow(t *testing.T) {
+	cfg := Config{
+		Settings: Settings{
+			Deny:           []string{"network"},
+			DenyMachLookup: []string{"com.example.dns"},
+		},
+		Profiles: map[string]Profile{
+			"open": {Settings: Settings{
+				Allow:      []string{"network"},
+				MachLookup: []string{"com.example.dns", "com.example.keychain"},
+			}},
+		},
+	}
+	profile, _, _, err := EffectiveProfile(cfg, "open")
+	if err != nil {
+		t.Fatalf("EffectiveProfile returned error: %v", err)
+	}
+	if contains(profile.Allow, "network") || !contains(profile.Deny, "network") {
+		t.Fatalf("capabilities = allow %#v deny %#v, want top-level deny to override profile allow", profile.Allow, profile.Deny)
+	}
+	if contains(profile.MachLookup, "com.example.dns") || !contains(profile.DenyMachLookup, "com.example.dns") {
+		t.Fatalf("mach lookup = allow %#v deny %#v, want top-level deny_mach_lookup guardrail", profile.MachLookup, profile.DenyMachLookup)
+	}
+	if !contains(profile.MachLookup, "com.example.keychain") {
+		t.Fatalf("mach lookup = %#v, want unrelated allow retained", profile.MachLookup)
+	}
+}
+
 func TestEffectiveProfileRejectsEmptyCommaProfile(t *testing.T) {
 	_, _, _, err := EffectiveProfile(Config{Profiles: map[string]Profile{"default": {}}}, "tool,,offline")
 	if err == nil || !strings.Contains(err.Error(), "empty profile") {

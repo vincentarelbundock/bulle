@@ -228,11 +228,15 @@ func handleTimeout(waitDone <-chan error, writeDone <-chan error, term *foregrou
 		_ = ctx.kill(ctx.pgid, syscall.SIGKILL)
 		<-waitDone
 	} else {
-		// The leader has already been reaped. If the group still has members
-		// (surviving background children), signal 0 succeeds and it is safe to
-		// SIGKILL them. If it is empty, signal 0 returns ESRCH; we must not
-		// SIGKILL, because a reaped PGID can be recycled by the kernel and
-		// reassigned to an unrelated process group owned by the same user.
+		// The leader has already been reaped, so its PGID can in principle be
+		// recycled by the kernel and reassigned to an unrelated same-user group.
+		// Probe with signal 0 first: if the group is already empty we skip the
+		// SIGKILL entirely, which removes the reuse hazard in the common case.
+		// This does NOT fully close the race — the group can still empty out
+		// between the probe and the SIGKILL. Eliminating it requires an
+		// identity-preserving mechanism (cgroup.kill or a PID namespace); see the
+		// deferred supervision-hardening work. Group-signalling remains
+		// best-effort against an adversarial child that calls setsid/setpgid.
 		if ctx.kill(ctx.pgid, syscall.Signal(0)) == nil {
 			_ = ctx.kill(ctx.pgid, syscall.SIGKILL)
 		}

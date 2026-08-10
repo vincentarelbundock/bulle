@@ -6,14 +6,19 @@ import (
 	"os"
 	"strconv"
 	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 func closeUnexpectedFileDescriptors() error {
 	entries, err := os.ReadDir("/proc/self/fd")
 	if err != nil {
-		// /proc may be unavailable in unusual Linux environments. Fall back to
-		// the actual descriptor ceiling (RLIMIT_NOFILE) rather than a fixed
-		// range, so an inherited fd above 1024 cannot survive into the sandbox.
+		// /proc may be unavailable in unusual Linux environments. Prefer a single
+		// close_range(2) covering every descriptor above stderr; fall back to a
+		// bounded per-fd sweep only if the kernel lacks the syscall (pre-5.9).
+		if rangeErr := unix.CloseRange(3, ^uint(0), unix.CLOSE_RANGE_CLOEXEC); rangeErr == nil {
+			return nil
+		}
 		max := fallbackFDCeiling()
 		for fd := 3; fd < max; fd++ {
 			syscall.CloseOnExec(fd)
@@ -31,9 +36,9 @@ func closeUnexpectedFileDescriptors() error {
 }
 
 // fallbackFDCeiling returns the upper bound (exclusive) for the fixed-range fd
-// sweep used when /proc/self/fd is unreadable. It uses the soft RLIMIT_NOFILE
-// so every potentially-open descriptor is covered, with a sane floor and an
-// upper cap to bound the loop when the limit is effectively unlimited.
+// sweep used when both /proc/self/fd and close_range(2) are unavailable. It uses
+// the soft RLIMIT_NOFILE so every potentially-open descriptor is covered, with a
+// sane floor and an upper cap to bound the loop when the limit is unlimited.
 func fallbackFDCeiling() int {
 	const floor = 1024
 	const ceiling = 1 << 20
@@ -41,12 +46,13 @@ func fallbackFDCeiling() int {
 	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &lim); err != nil {
 		return floor
 	}
-	max := int(lim.Cur)
-	if int64(max) != int64(lim.Cur) || max > ceiling {
+	// lim.Cur is unsigned; compare before any narrowing conversion so that
+	// RLIM_INFINITY (math.MaxUint64) does not wrap to a small or negative int.
+	if lim.Cur > uint64(ceiling) {
 		return ceiling
 	}
-	if max < floor {
+	if lim.Cur < uint64(floor) {
 		return floor
 	}
-	return max
+	return int(lim.Cur)
 }

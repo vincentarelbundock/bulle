@@ -116,6 +116,29 @@ func TestResolveRejectsSymlinkToHomeDirectory(t *testing.T) {
 	}
 }
 
+func TestResolveRejectsSymlinkToSymlinkedHomeDirectory(t *testing.T) {
+	tmp := t.TempDir()
+	realHome := filepath.Join(tmp, "real-home")
+	if err := os.Mkdir(realHome, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// HOME is itself a symlink to the physical home directory.
+	homeLink := filepath.Join(tmp, "home-link")
+	if err := os.Symlink(realHome, homeLink); err != nil {
+		t.Fatal(err)
+	}
+	// A configured grant that resolves to the same physical directory by a
+	// different path must still be refused.
+	alias := filepath.Join(tmp, "escape")
+	if err := os.Symlink(realHome, alias); err != nil {
+		t.Fatal(err)
+	}
+	_, err := ResolveList([]Input{{Path: alias, Source: SourceUser}}, Vars{"HOME": homeLink})
+	if err == nil {
+		t.Fatalf("ResolveList succeeded, want refusal for grant resolving to symlinked home")
+	}
+}
+
 func TestResolveRejectsUnknownEnvironmentVariables(t *testing.T) {
 	tmp := t.TempDir()
 	secret := filepath.Join(tmp, "secret")

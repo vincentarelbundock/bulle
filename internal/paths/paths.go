@@ -101,11 +101,33 @@ func refuseSensitiveSymlinkTarget(alias, real string, vars Vars) error {
 		return fmt.Errorf("configured path %q resolves through a symlink to the filesystem root %q; refusing to grant", alias, real)
 	}
 	if home, ok := vars["HOME"]; ok && home != "" {
-		if real == filepath.Clean(home) {
+		// Compare by filesystem identity, not lexical path: $HOME itself may be a
+		// symlink, so a configured grant resolving to the same physical directory
+		// must still be refused even though the cleaned strings differ.
+		homeReal := filepath.Clean(home)
+		if evaluated, err := filepath.EvalSymlinks(home); err == nil {
+			homeReal = filepath.Clean(evaluated)
+		}
+		if real == homeReal {
 			return fmt.Errorf("configured path %q resolves through a symlink to the home directory %q; refusing to grant", alias, real)
+		}
+		if sameFile(real, homeReal) {
+			return fmt.Errorf("configured path %q resolves through a symlink to the home directory %q; refusing to grant", alias, homeReal)
 		}
 	}
 	return nil
+}
+
+func sameFile(a, b string) bool {
+	ai, err := os.Stat(a)
+	if err != nil {
+		return false
+	}
+	bi, err := os.Stat(b)
+	if err != nil {
+		return false
+	}
+	return os.SameFile(ai, bi)
 }
 
 func expand(raw string, vars Vars) (string, error) {
