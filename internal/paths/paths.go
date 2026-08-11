@@ -78,10 +78,39 @@ func CanonicalEntryKey(raw string) string {
 	return filepath.Clean(path)
 }
 
-// IsResolverEntry reports whether a configured entry is a which:/pkg:
-// executable resolver rather than a literal path.
+// IsResolverEntry reports whether a configured entry names a resolver rather
+// than a literal path. Both spellings are covered: the executable resolvers
+// (which:NAME, pkg:NAME), where the caller supplies the right-hand side, and
+// the tool resolvers (r:libs, uv:cache), where it names one of a fixed set of
+// directories the tool knows about.
 func IsResolverEntry(path string) bool {
-	return strings.HasPrefix(path, "which:") || strings.HasPrefix(path, "pkg:")
+	_, _, ok := ResolverNamespace(path)
+	return ok
+}
+
+// ResolverNamespace splits a resolver entry into its namespace and argument.
+//
+// A leading lowercase word followed by a colon is always a resolver, never a
+// path. Colons are legal in filenames, so a literal path in that shape must be
+// written with a leading "./" or as an absolute path; that is also why the
+// prefix is only recognized at the start of the entry, before any separator.
+// Callers must reject unknown namespaces rather than falling back to treating
+// the entry as a path: a silently-not-granted path surfaces much later as an
+// unexplained denial.
+func ResolverNamespace(path string) (namespace string, argument string, ok bool) {
+	namespace, argument, found := strings.Cut(path, ":")
+	if !found || namespace == "" {
+		return "", "", false
+	}
+	for i, r := range namespace {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case i > 0 && (r >= '0' && r <= '9' || r == '-'):
+		default:
+			return "", "", false
+		}
+	}
+	return namespace, argument, true
 }
 
 func ResolveList(inputs []Input, vars Vars) ([]string, error) {

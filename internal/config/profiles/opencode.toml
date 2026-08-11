@@ -1,11 +1,17 @@
 title = "OpenCode"
 description = "OpenCode app state and config support"
-inherits = "tool"
+inherits = ["tool", "terminal", "git", "node"]
 default_app = "opencode"
-env = ["HOME", "USER", "TERM", "LANG", "SHELL"]
 rwx = [
+  # OpenCode follows XDG on Linux. Its macOS behavior is not verified, so both
+  # spellings are granted: the literal XDG paths, and the platform-neutral
+  # variables which differ from them only on macOS.
   "+$HOME/.config/opencode/",
   "+$HOME/.local/share/opencode/",
   "+$HOME/.local/state/opencode/",
   "+$HOME/.cache/opencode/",
+  "?$CONFIG/opencode",
+  "?$DATA/opencode",
+  "?$STATE/opencode",
+  "?$CACHE/opencode",
 ]

@@ -1,0 +1,188 @@
+package policy
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	bpaths "github.com/vincentarelbundock/bulle/internal/paths"
+)
+
+func writeToolTestExecutable(t *testing.T, path string, body string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func toolTestFileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func TestParseResolverOutputKeepsAbsolutePathsSorted(t *testing.T) {
+	got := parseResolverOutput("/b/two\n\n/a/one\nrelative/skipped\n/b/two\n", formatLines)
+	want := []string{"/a/one", "/b/two"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("parseResolverOutput = %v, want %v", got, want)
+	}
+}
+
+func TestParseResolverOutputSingleIgnoresUnsetValue(t *testing.T) {
+	if got := parseResolverOutput("  \n", formatSingle); len(got) != 0 {
+		t.Fatalf("parseResolverOutput = %v, want empty", got)
+	}
+	if got := parseResolverOutput("  /tmp/x  \n", formatSingle); len(got) != 1 || got[0] != "/tmp/x" {
+		t.Fatalf("parseResolverOutput = %v, want [/tmp/x]", got)
+	}
+}
+
+// A tool that prints a relative path or a diagnostic line must not turn into a
+// grant: the entry resolves to nothing and is reported, rather than silently
+// granting something relative to the working directory.
+func TestParseResolverOutputRejectsRelativePaths(t *testing.T) {
+	if got := parseResolverOutput("not-a-path", formatSingle); len(got) != 0 {
+		t.Fatalf("parseResolverOutput = %v, want empty", got)
+	}
+}
+
+func TestExpandToolResolversUnknownToolIsAnError(t *testing.T) {
+	_, _, err := expandToolResolvers([]string{"ruby:gems"}, "ro", "", nil)
+	if err == nil {
+		t.Fatal("expected an error for an unknown resolver namespace")
+	}
+	if !strings.Contains(err.Error(), "unknown resolver") {
+		t.Fatalf("error = %v, want it to name the unknown resolver", err)
+	}
+}
+
+func TestExpandToolResolversUnknownAspectListsKnownOnes(t *testing.T) {
+	_, _, err := expandToolResolvers([]string{"r:packages"}, "ro", "", nil)
+	if err == nil {
+		t.Fatal("expected an error for an unknown aspect")
+	}
+	if !strings.Contains(err.Error(), "known aspects are") || !strings.Contains(err.Error(), "libs") {
+		t.Fatalf("error = %v, want it to list the known aspects", err)
+	}
+}
+
+// Literal paths must pass through untouched, including paths that contain a
+// colon but are not written in resolver form.
+func TestExpandToolResolversPassesLiteralPathsThrough(t *testing.T) {
+	entries := []string{"/tmp/plain", "./ruby:gems", "$HOME/x", "~/y", "?/tmp/opt"}
+	out, traces, err := expandToolResolvers(entries, "ro", "", nil)
+	if err != nil {
+		t.Fatalf("expandToolResolvers: %v", err)
+	}
+	if strings.Join(out, ",") != strings.Join(entries, ",") {
+		t.Fatalf("entries = %v, want them unchanged", out)
+	}
+	if len(traces) != 0 {
+		t.Fatalf("traces = %v, want none for literal paths", traces)
+	}
+}
+
+// which:/pkg: are handled by the exec resolver pass, so the tool pass must
+// leave them alone rather than reporting them as unknown namespaces.
+func TestExpandToolResolversIgnoresExecResolvers(t *testing.T) {
+	out, _, err := expandToolResolvers([]string{"which:ls", "pkg:node"}, "rox", "", nil)
+	if err != nil {
+		t.Fatalf("expandToolResolvers: %v", err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("entries = %v, want both passed through", out)
+	}
+}
+
+func TestExpandToolResolversMissingToolIsFatalUnlessOptional(t *testing.T) {
+	// An empty PATH guarantees the tool cannot be found.
+	if _, _, err := expandToolResolvers([]string{"r:libs"}, "ro", "", nil); err == nil {
+		t.Fatal("expected a missing tool to be an error")
+	} else if !strings.Contains(err.Error(), "?") {
+		t.Fatalf("error = %v, want it to mention the optional marker", err)
+	}
+	out, traces, err := expandToolResolvers([]string{"?r:libs"}, "ro", "", nil)
+	if err != nil {
+		t.Fatalf("optional entry returned an error: %v", err)
+	}
+	if len(out) != 0 {
+		t.Fatalf("entries = %v, want none granted", out)
+	}
+	if len(traces) != 1 || !strings.HasPrefix(traces[0].Outcome, "skipped") {
+		t.Fatalf("traces = %v, want one skipped trace", traces)
+	}
+}
+
+// The registry decides what runs. A profile naming a command directly must not
+// be executed, because profiles are installable from GitHub.
+func TestExpandToolResolversDoesNotRunProfileSuppliedCommands(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "ran")
+	script := filepath.Join(dir, "evil")
+	writeToolTestExecutable(t, script, "#!/bin/sh\ntouch "+marker+"\n")
+	for _, entry := range []string{"evil:x", "sh:-c", dir + "/evil"} {
+		if _, _, err := expandToolResolvers([]string{entry}, "ro", dir, nil); err == nil && strings.Contains(entry, ":") {
+			t.Fatalf("entry %q was accepted; resolver namespaces must be registry-defined", entry)
+		}
+	}
+	if toolTestFileExists(marker) {
+		t.Fatal("a profile-supplied command was executed")
+	}
+}
+
+func TestKnownResolverToolsAreSortedAndUnique(t *testing.T) {
+	tools := KnownResolverTools()
+	for i := 1; i < len(tools); i++ {
+		if tools[i-1] >= tools[i] {
+			t.Fatalf("KnownResolverTools = %v, want sorted and unique", tools)
+		}
+	}
+}
+
+// Every registry row must be reachable through the namespace parser, or the
+// entry can never be written in a profile.
+func TestEveryRegistryEntryParsesAsAResolver(t *testing.T) {
+	for _, r := range toolResolvers {
+		entry := r.tool + ":" + r.aspect
+		namespace, aspect, ok := bpaths.ResolverNamespace(entry)
+		if !ok || namespace != r.tool || aspect != r.aspect {
+			t.Fatalf("entry %q parsed as (%q, %q, %v)", entry, namespace, aspect, ok)
+		}
+		if isExecResolverNamespace(namespace) {
+			t.Fatalf("registry entry %q collides with an executable resolver namespace", entry)
+		}
+		if len(r.argv) == 0 {
+			t.Fatalf("registry entry %q has no command", entry)
+		}
+	}
+}
+
+// Markers describe what should happen to the paths an entry names, so they
+// must survive expansion: an optional resolver whose directory does not exist
+// yet must not become a hard failure in a rw list.
+func TestExpandToolResolversPreservesMarkers(t *testing.T) {
+	cases := []struct {
+		entry  string
+		prefix string
+		suffix string
+	}{
+		{"go:path", "", ""},
+		{"?go:path", "?", ""},
+		{"+go:path", "+", "/"},
+		{"?+go:path", "?+", "/"},
+	}
+	path := os.Getenv("PATH")
+	for _, tc := range cases {
+		out, _, err := expandToolResolvers([]string{tc.entry}, "rw", path, map[string]string{"PATH": path, "HOME": os.Getenv("HOME")})
+		if err != nil {
+			t.Skipf("go toolchain unavailable: %v", err)
+		}
+		if len(out) != 1 {
+			t.Fatalf("entry %q expanded to %v, want one path", tc.entry, out)
+		}
+		if !strings.HasPrefix(out[0], tc.prefix) || !strings.HasSuffix(out[0], tc.suffix) {
+			t.Errorf("entry %q expanded to %q, want prefix %q and suffix %q", tc.entry, out[0], tc.prefix, tc.suffix)
+		}
+	}
+}

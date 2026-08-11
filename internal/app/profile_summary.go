@@ -56,6 +56,37 @@ func writeResolutionTable(p policy.Policy, w io.Writer) {
 	}
 }
 
+// writeResolverListing prints every known resolver next to what it resolves to
+// on this machine. A resolver that reports nothing is otherwise
+// indistinguishable from one that works, so unavailable and empty results are
+// listed as loudly as successful ones.
+func writeResolverListing(env map[string]string, w io.Writer) {
+	fmt.Fprintln(w, "Executable resolvers (rox and rwx lists only; NAME is a command you supply):")
+	fmt.Fprintln(w, "  which:NAME       the binary named NAME on PATH, plus a shim entry")
+	fmt.Fprintln(w, "  pkg:NAME         the same, plus the package tree above the real binary")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Tool resolvers (valid in every list; the aspect is one this tool knows):")
+	for _, listing := range policy.ListResolvers(env["PATH"], env) {
+		fmt.Fprintf(w, "  %-16s %s\n", listing.Entry, listing.Description)
+		if len(listing.Paths) == 0 {
+			fmt.Fprintf(w, "  %-16s → %s\n", "", listing.Outcome)
+			continue
+		}
+		fmt.Fprintf(w, "  %-16s → %s\n", "", listing.Paths[0])
+		// A resolver can legitimately report dozens of paths (R's search path
+		// runs to 70 entries on a Nix machine); show enough to recognize the
+		// shape without burying the rest of the listing.
+		const shown = 4
+		for i, path := range listing.Paths[1:] {
+			if i >= shown {
+				fmt.Fprintf(w, "  %-16s   (+%d more; see --policy for the full list)\n", "", len(listing.Paths)-1-shown)
+				break
+			}
+			fmt.Fprintf(w, "  %-16s   %s\n", "", path)
+		}
+	}
+}
+
 func formatTraceOutcome(trace bpaths.Trace) string {
 	if len(trace.Paths) == 0 {
 		return trace.Outcome

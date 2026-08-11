@@ -87,12 +87,13 @@ type Flags struct {
 	Last       bool `name:"last" help:"Repeat the previous bulle invocation, with any extra flags appended."`
 	NoDefaults bool `name:"no-defaults" help:"Ignore the [defaults] block of the user configuration."`
 
-	AddExec      bool   `name:"add-exec" help:"Add the resolved command executable to the sandbox."`
-	AddLibs      bool   `name:"add-libs" help:"Add runtime library access for executables."`
-	NoWorkspace  bool   `name:"no-workspace" help:"Do not automatically grant the workspace read-write access."`
-	ListProfiles bool   `name:"list-profiles" help:"List available profiles and exit."`
-	Timeout      string `name:"timeout" placeholder:"DURATION" help:"Kill the sandboxed command if it runs longer than DURATION, using Go duration syntax such as 30s, 2m, or 1h30m; 0 disables."`
-	Policy       bool   `name:"policy" help:"Print the resolved policy and exit."`
+	AddExec       bool   `name:"add-exec" help:"Add the resolved command executable to the sandbox."`
+	AddLibs       bool   `name:"add-libs" help:"Add runtime library access for executables."`
+	NoWorkspace   bool   `name:"no-workspace" help:"Do not automatically grant the workspace read-write access."`
+	ListProfiles  bool   `name:"list-profiles" help:"List available profiles and exit."`
+	ListResolvers bool   `name:"list-resolvers" help:"List path resolvers with what they resolve to on this machine, and exit."`
+	Timeout       string `name:"timeout" placeholder:"DURATION" help:"Kill the sandboxed command if it runs longer than DURATION, using Go duration syntax such as 30s, 2m, or 1h30m; 0 disables."`
+	Policy        bool   `name:"policy" help:"Print the resolved policy and exit."`
 }
 
 func normalizePolicyFormat(args []string) ([]string, string, error) {

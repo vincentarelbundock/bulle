@@ -60,19 +60,19 @@ func Resolve(in Inputs) (Policy, error) {
 	p.ReadWriteExec = append(p.ReadWriteExec, profile.ReadWriteExec...)
 	p.ReadWriteExec = append(p.ReadWriteExec, in.Options.ReadWriteExec...)
 
-	if err := rejectResolverEntries(p.ReadOnly, "ro"); err != nil {
+	if err := rejectExecResolverEntries(p.ReadOnly, "ro"); err != nil {
 		return Policy{}, err
 	}
-	if err := rejectResolverEntries(p.ReadWrite, "rw"); err != nil {
+	if err := rejectExecResolverEntries(p.ReadWrite, "rw"); err != nil {
 		return Policy{}, err
 	}
-	// which:/pkg: entries only appear after the built-in defaults prefix
+	// Resolver entries only appear after the built-in defaults prefix
 	// (built-ins are literal paths passed through one-to-one), so the
 	// builtinCount boundaries used below stay valid after expansion.
 	parentPATH := in.ParentEnv["PATH"]
 	shims := []shimEntry{}
-	// Entries produced by which:/pkg: expansion carry their own trace line
-	// (the resolver spelling); suppress the per-path duplicates below.
+	// Entries produced by resolver expansion carry their own trace line (the
+	// resolver spelling); suppress the per-path duplicates below.
 	derived := map[string]bool{}
 	for _, exec := range []struct {
 		list  *[]string
@@ -87,6 +87,30 @@ func Resolve(in Inputs) (Policy, error) {
 		}
 		*exec.list = expanded
 		shims = append(shims, found...)
+		p.Trace = append(p.Trace, traces...)
+		for _, trace := range traces {
+			for _, path := range trace.Paths {
+				derived[path] = true
+			}
+		}
+	}
+	// Tool resolvers name ordinary directories, so they are expanded for every
+	// list. Their output is written back as literal paths and re-resolved
+	// below, which is what applies the symlink and sensitive-target checks.
+	for _, grant := range []struct {
+		list  *[]string
+		label string
+	}{
+		{&p.ReadOnly, "ro"},
+		{&p.ReadOnlyExec, "rox"},
+		{&p.ReadWrite, "rw"},
+		{&p.ReadWriteExec, "rwx"},
+	} {
+		expanded, traces, err := expandToolResolvers(*grant.list, grant.label, parentPATH, in.ParentEnv)
+		if err != nil {
+			return Policy{}, err
+		}
+		*grant.list = expanded
 		p.Trace = append(p.Trace, traces...)
 		for _, trace := range traces {
 			for _, path := range trace.Paths {

@@ -1,14 +1,17 @@
 title = "Claude"
 description = "Claude Code app state, config, and login support"
-inherits = "tool"
+inherits = ["tool", "terminal", "git", "node"]
 default_app = "claude"
-env = ["HOME", "USER", "TERM", "LANG", "SHELL"]
 rw = [
   "+$HOME/.claude.json",
 ]
 rwx = [
   "+$HOME/.claude/",
+  # Claude Code uses ~/.local/share on every platform rather than the macOS
+  # convention, so this stays literal. The $DATA spelling is granted too when
+  # it exists, in case that changes.
   "+$HOME/.local/share/claude/",
+  "?$DATA/claude",
 ]
 
 [macos]

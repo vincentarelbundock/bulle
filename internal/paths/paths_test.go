@@ -177,3 +177,35 @@ func containsString(xs []string, want string) bool {
 	}
 	return false
 }
+
+func TestResolverNamespaceRecognizesResolverEntries(t *testing.T) {
+	cases := []struct {
+		raw       string
+		namespace string
+		argument  string
+		ok        bool
+	}{
+		{"which:codex", "which", "codex", true},
+		{"r:libs", "r", "libs", true},
+		{"r:libs-user", "r", "libs-user", true},
+		{"uv:cache", "uv", "cache", true},
+		// A leading separator, dot, tilde, or variable means a path, never a
+		// resolver: this is the escape hatch for literal paths with a colon.
+		{"./ruby:gems", "", "", false},
+		{"/tmp/ruby:gems", "", "", false},
+		{"~/ruby:gems", "", "", false},
+		{"$HOME/a:b", "", "", false},
+		// Uppercase and empty namespaces are paths, not resolvers.
+		{"R:libs", "", "", false},
+		{":libs", "", "", false},
+		{"/tmp/plain", "", "", false},
+		{"", "", "", false},
+	}
+	for _, tc := range cases {
+		namespace, argument, ok := ResolverNamespace(tc.raw)
+		if ok != tc.ok || namespace != tc.namespace || argument != tc.argument {
+			t.Errorf("ResolverNamespace(%q) = (%q, %q, %v), want (%q, %q, %v)",
+				tc.raw, namespace, argument, ok, tc.namespace, tc.argument, tc.ok)
+		}
+	}
+}

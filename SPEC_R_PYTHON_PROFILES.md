@@ -204,13 +204,29 @@ separate `r-build` profile and should be specified only after `r-install` works.
 
 ## 8. New resolvers required
 
+**Implemented.** The registry lives in `internal/policy/tools.go`; `--list-resolvers`
+shows every entry with what it resolves to on the current machine.
+
 | Resolver | Implementation | Output |
 | --- | --- | --- |
 | `which:NAME` | look up on parent `PATH` | binary, its realpath target, shim entry |
-| `r-home:` | `Rscript -e 'cat(R.home())'` | one directory |
-| `r-libs:` | `Rscript -e 'cat(.libPaths(), sep="\n")'` | N directories |
-| `r-libs-user:` | `Rscript -e 'cat(Sys.getenv("R_LIBS_USER"))'` | one directory |
-| `uv-dirs:KIND` | `uv cache dir`, `uv tool dir`, `uv python dir` | one directory |
+| `r:home` | `Rscript -e 'cat(R.home())'` | one directory |
+| `r:prefix` | `Rscript -e 'cat(dirname(dirname(R.home())))'` | one directory, system roots dropped |
+| `r:libs` | `Rscript -e 'cat(.libPaths(), sep="\n")'` | N directories |
+| `r:libs-user` | `Rscript -e 'cat(Sys.getenv("R_LIBS_USER"))'` | one directory |
+| `uv:cache`, `uv:tools`, `uv:python` | `uv cache dir`, `uv tool dir`, `uv python dir` | one directory |
+
+`r:prefix` exists because `R_HOME` is not the installation root: on this machine
+`R.home()` is `<prefix>/lib/R` while the executable R actually runs is
+`<prefix>/bin/exec/R`, a sibling of `R_HOME` that no other entry covers.
+Granting a prefix is narrow where a tool owns its own directory (a Nix store
+path, a Homebrew Cellar entry) and far too broad where the prefix is `/usr`, so
+the resolver drops results matching the `pkg:` system-root denylist rather than
+failing — on a distribution install the prefix is both dangerous and
+unnecessary.
+
+Grant `r:home` and `r:prefix` as **rox**, not `ro`: R's startup path runs
+executables from both.
 
 Constraints, carried over from the review of the portability plan:
 
@@ -246,6 +262,16 @@ Recommendation: option 1 as the baseline, option 2 behind `add_libs` with a
 measured time budget, and a denial-diagnostics-driven fallback for the rest —
 this is exactly the case the run-time hints were built for. Resolve before
 implementation.
+
+**This is now the blocker, confirmed by trying it.** With the resolvers in
+place, an `r` profile resolves every R-owned path correctly and R still does not
+start on this machine: the interpreter chain reaches `<prefix>/bin/exec/R`,
+which needs `libgomp`, `libblas`, `liblapack`, `libreadline`, `libgcc_s`, and
+more, each in a separate store path. `add_libs` does not find them because ELF
+discovery runs against the wrapper, not the binary several `exec` hops down.
+Following the denial hints one at a time works but does not converge quickly.
+Whatever §9 decides must handle the *interpreter's own* runtime libraries, not
+only those of installed packages.
 
 ## 10. Verification
 

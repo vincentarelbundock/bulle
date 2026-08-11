@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Tool resolvers: `TOOL:ASPECT` path entries.** A grant can ask a tool where
+  its own directories are instead of hard-coding them: `r:home`, `r:prefix`,
+  `r:libs`, `r:libs-user`, `uv:cache`, `uv:tools`, `uv:python`, `go:root`,
+  `go:path`, `go:modcache`, and `npm:cache`. Unlike `which:`/`pkg:` these name
+  ordinary directories and are valid in every list, support the `?` and `+`
+  markers, and are re-resolved as literal paths so the symlink and
+  sensitive-target checks apply. The set is a fixed registry in `bulle`; a
+  profile can never supply a command to run. Unknown namespaces are an error
+  rather than a literal path, and `r:prefix` drops results that would be a
+  system root. Motivated by R's package search path, which holds one entry per
+  installed package (70 on a Nix machine) and cannot be written down.
+- **`--list-resolvers`.** Prints every resolver with what it resolves to on the
+  current machine, so a resolver returning nothing is distinguishable from one
+  that works.
+- **`terminal` capability profile.** The environment variables an interactive
+  terminal program expects, previously repeated in every agent profile.
+
+### Changed
+
+- **Agent profiles assemble from capability profiles.** `claude`, `codex`,
+  `opencode`, and `pi` now inherit `terminal`, `git`, and `node` rather than
+  restating environment lists, so they carry git configuration and the Node
+  toolchain that agents routinely shell out to. Codex's state directory follows
+  `${CODEX_HOME:-$HOME/.codex}`. The `node` and `go` profiles ask `npm` and
+  `go env` for their cache locations, with the previous literal paths as
+  fallbacks.
+
+### Fixed
+
+- **Markers survive resolver expansion.** `?` and `+` on a resolver entry were
+  dropped when it expanded, so an optional resolver whose directory did not yet
+  exist became a hard failure in a `rw` list.
+
 - **Rerun with an added grant: `--last`.** Every real run records its
   invocation (arguments and working directory) under the user state
   directory. `bulle --last` repeats it from any shell, inserting extra flags

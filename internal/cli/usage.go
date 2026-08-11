@@ -41,6 +41,8 @@ Path entries (flags and profiles):
   which:NAME       resolve NAME on the parent PATH and grant that binary only,
                    findable by name inside the sandbox (rox/rwx entries)
   pkg:NAME         like which:, plus the tool's package tree (rox/rwx entries)
+  TOOL:ASPECT      ask a tool where its own directories are, such as r:libs or
+                   uv:cache; valid in every list (see --list-resolvers)
   dir/*/bin        single-star glob; no matches means the entry is skipped
   Variables: $WORKSPACE, $HOME, $TMP, $TMPDIR, and the per-platform
   $CONFIG, $DATA, $CACHE, $STATE (XDG dirs on Linux, ~/Library on macOS).
@@ -67,6 +69,7 @@ Profiles:
   -p, --profile NAME
                     named profile, or comma-separated profiles merged left to right
   --list-profiles  list available profiles and exit
+  --list-resolvers list path resolvers and what they resolve to here, and exit
   --install-profiles SOURCE
                     install profile TOML files from a file, directory, local git repository, or GitHub source
 `

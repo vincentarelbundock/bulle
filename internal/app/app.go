@@ -129,6 +129,10 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 		return ExitOK
 	}
+	if opts.ListResolvers {
+		writeResolverListing(parentEnv(), stdout)
+		return ExitOK
+	}
 	explicitCommand := len(opts.Command) > 0
 	if len(opts.Command) == 0 {
 		defaultApp, err := defaultAppForRun(opts, global)

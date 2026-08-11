@@ -49,11 +49,11 @@ func expandExecResolvers(entries []string, list string, parentPATH string, home 
 	traces := []bpaths.Trace{}
 	for _, entry := range entries {
 		path, optional, _ := bpaths.ParseMarkers(strings.TrimSpace(entry))
-		if !bpaths.IsResolverEntry(path) {
+		kind, name, ok := bpaths.ResolverNamespace(path)
+		if !ok || !isExecResolverNamespace(kind) {
 			out = append(out, entry)
 			continue
 		}
-		kind, name, _ := strings.Cut(path, ":")
 		trace := bpaths.Trace{Raw: entry, List: list, Source: bpaths.SourceUser}
 		if name == "" || strings.ContainsRune(name, filepath.Separator) {
 			return nil, nil, nil, fmt.Errorf("invalid %s: entry %q; expected a bare command name", kind, entry)
@@ -135,12 +135,22 @@ func createShimDir(tmpRoot string, shims []shimEntry) (string, error) {
 	return dir, nil
 }
 
-// rejectResolverEntries refuses which:/pkg: entries in non-exec lists, where
-// an executable grant makes no sense and would otherwise fail confusingly.
-func rejectResolverEntries(entries []string, list string) error {
+// isExecResolverNamespace reports whether a resolver namespace is one of the
+// executable resolvers, which grant a binary (plus a shim entry) and are
+// therefore only meaningful in an exec list. Tool resolvers name ordinary
+// directories and are valid in every list.
+func isExecResolverNamespace(namespace string) bool {
+	return namespace == "which" || namespace == "pkg"
+}
+
+// rejectExecResolverEntries refuses which:/pkg: entries in non-exec lists,
+// where an executable grant makes no sense and would otherwise fail
+// confusingly.
+func rejectExecResolverEntries(entries []string, list string) error {
 	for _, entry := range entries {
 		path, _, _ := bpaths.ParseMarkers(strings.TrimSpace(entry))
-		if bpaths.IsResolverEntry(path) {
+		namespace, _, ok := bpaths.ResolverNamespace(path)
+		if ok && isExecResolverNamespace(namespace) {
 			return fmt.Errorf("%s entry %q: which:/pkg: entries are only valid in rox and rwx lists", list, entry)
 		}
 	}

@@ -8,5 +8,10 @@ rox = [
   "$HOME/.nvm/versions/node/*/bin",
 ]
 ro = ["?$HOME/.npmrc"]
-rw = ["+$HOME/.npm/"]
+# npm reports its own cache location, which respects npmrc and
+# npm_config_cache; the literal path is the fallback when npm is absent.
+rw = [
+  "?+npm:cache",
+  "?+${npm_config_cache:-$HOME/.npm}/",
+]
 env = ["NODE_ENV", "NODE_OPTIONS", "NVM_DIR", "npm_config_cache"]

@@ -1,0 +1,11 @@
+title = "Terminal"
+description = "environment variables an interactive terminal program expects"
+env = [
+  "HOME",
+  "USER",
+  "TERM",
+  "COLORTERM",
+  "LANG",
+  "LC_ALL",
+  "SHELL",
+]

@@ -237,6 +237,7 @@ offline
 opencode
 pi
 rust
+terminal
 tool
 ```
 
@@ -244,7 +245,7 @@ Built-in helper profiles such as `default`, `network`, `offline`, `macos-dns`, `
 
 ### Capability micro-profiles
 
-The built-in `git`, `node`, `rust`, and `go` profiles are small capability bundles: each answers one tool's location questions (binary, configuration, caches) once, portably, using `which:` resolvers, platform variables, and optional/create markers. They are meant to be assembled through `inherits` rather than restating tool layouts in every agent profile:
+The built-in `git`, `node`, `rust`, `go`, and `terminal` profiles are small capability bundles, each answering one concern once and portably. The tool profiles use `which:`/`pkg:` resolvers, tool resolvers such as `npm:cache` and `go:modcache`, platform variables, and optional/create markers to settle a tool's location questions (binary, configuration, caches); `terminal` carries the environment variables an interactive program expects. They are meant to be assembled through `inherits` rather than restating tool layouts in every agent profile:
 
 ```toml
 title = "My agent"
@@ -342,6 +343,20 @@ rox = ["which:git", "which:rg", "pkg:codex"]
 ```
 
 Name lookup inside the sandbox works through a per-run shim directory of symlinks that `bulle` creates outside the sandbox's writable area, grants read+execute, prepends to `PATH`, and removes after the run. A `which:`-based profile must name every binary the tool shells out to; missing ones surface through denial diagnostics. The broad-grant `tool` profile remains the escape hatch.
+
+**Tool resolvers.** Some layouts cannot be written down at all. R's package search path holds one entry per installed package — 70 of them on a Nix machine, each a separate store path, changing on every update. Instead of guessing, ask the tool: an entry of the form `TOOL:ASPECT` runs a known query before the sandbox starts and grants whatever it reports.
+
+```toml
+rox = ["r:home", "r:prefix"]
+ro  = ["r:libs"]
+rw  = ["?+npm:cache", "?+go:modcache"]
+```
+
+Unlike `which:`/`pkg:`, these name ordinary directories and are valid in every list. Markers work as usual: `?` skips when the tool is absent, `+` creates a directory the tool reports but has not made yet. Results are re-resolved as literal paths, so the symlink pairing and sensitive-target refusals apply exactly as they do to a hand-written path.
+
+Run `bulle --list-resolvers` to see every resolver and what it points at on the current machine — a resolver that reports nothing is otherwise indistinguishable from one that works. The set is fixed by `bulle`: a profile chooses from it but can never supply a command to run, because profiles are installable from GitHub and one that could run commands would make installing a profile equivalent to running its author's code. An unknown namespace is an error rather than a literal path, and a literal path in that shape must be written `./ruby:gems` or absolute.
+
+Some aspects are guarded. `r:prefix` reports R's installation root, which is narrow where R owns its own directory (a Nix store path, a Homebrew Cellar entry) and far too broad where it is `/usr`; results matching the `pkg:` system-root denylist are dropped rather than granted.
 
 **Globs.** A `*` matches within one path segment (no `**`). No matches means the entry is skipped, so version-stamped directories stop breaking on upgrade:
 

@@ -2,8 +2,11 @@ title = "Go"
 description = "Go toolchain, module cache, and build cache"
 rox = [
   "?pkg:go",
+  "?go:root",
   "${GOPATH:-~/go}/bin",
 ]
-rwx = ["+${GOPATH:-~/go}/"]
-rw = ["+$CACHE/go-build/"]
+# go env reports the effective values, which follow GOFLAGS, the environment,
+# and go env -w settings that a literal path cannot see.
+rwx = ["?+go:path", "+${GOPATH:-~/go}/"]
+rw = ["?+go:modcache", "+$CACHE/go-build/"]
 env = ["GOPATH", "GOBIN", "GOFLAGS", "GOCACHE", "GOMODCACHE", "GOPROXY"]

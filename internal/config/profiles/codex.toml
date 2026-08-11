@@ -1,13 +1,8 @@
 title = "Codex"
 description = "Codex app state, config, network, MCP, and login support"
-inherits = ["tool", "keychain"]
+inherits = ["tool", "terminal", "keychain", "git", "node"]
 default_app = "codex"
 env = [
-  "HOME",
-  "USER",
-  "TERM",
-  "LANG",
-  "SHELL",
   "CODEX_HOME",
   "CODEX_CONNECTORS_TOKEN",
   "CODEX_CA_CERTIFICATE",
@@ -34,7 +29,7 @@ env = [
   "YARN_HTTP_PROXY",
   "YARN_NO_PROXY",
 ]
-rwx = ["+$HOME/.codex/"]
+rwx = ["+${CODEX_HOME:-$HOME/.codex}/"]
 
 [macos]
 ro = ["$HOME/Library/Preferences"]
