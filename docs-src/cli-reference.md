@@ -87,9 +87,13 @@ Profiles:
   offline           deny network socket access
   opencode          OpenCode app state and config support
   pi                Pi app state and config support
+  r                 R interpreter, library search path, and startup files
+  r-install         R plus a writable user library and CRAN access
   rust              cargo, rustup toolchains, and the registry cache
   terminal          environment variables an interactive terminal program expects
   tool              general local command support (PATH, executables, libs)
+  uv                uv-managed Python interpreters and environments
+  uv-install        uv plus a writable cache, project venv, and PyPI access
 
 Executable discovery:
   --add-exec        add the resolved command executable to the sandbox
@@ -98,6 +102,13 @@ Executable discovery:
                     macOS uses configured runtime roots; Mach-O dylibs in
                     unusual locations may need explicit --ro/--rox grants.
                     These do not add app state files or environment variables.
+
+Disposable workspaces:
+  --scratch         run against a disposable local clone of the workspace
+                    (git repositories only; uncommitted work is carried over).
+                    After the run, review the changes and keep or discard the
+                    scratch; integrate kept work with git push from the scratch.
+  --scratch-keep    skip the review prompt, keep the scratch, print its path
 
 Output and safety:
   --timeout DURATION

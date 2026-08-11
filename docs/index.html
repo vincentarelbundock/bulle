@@ -142,6 +142,14 @@
           Denial Diagnostics
         </a>
       
+        <a href="./scratch.html" style="color: inherit; opacity: 0.9; text-decoration: none; white-space: nowrap;">
+          Scratch Workspaces
+        </a>
+      
+        <a href="./profile-authoring.html" style="color: inherit; opacity: 0.9; text-decoration: none; white-space: nowrap;">
+          Writing Profiles
+        </a>
+      
     </div>
     
       
@@ -342,6 +350,58 @@
     
   
   Denial Diagnostics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./scratch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Scratch Workspaces
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./profile-authoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Writing Profiles
 
     
   </span>
@@ -952,6 +1012,7 @@ bulle<span class="w"> </span>--profile<span class="w"> </span>codex,offline
 <p>Use <code>--policy</code> to inspect the resolved sandbox policy without running the command. By default, it prints the same human-readable permissions summary that <code>bulle</code> sends to supported LLM agent profiles at startup. This is a useful safety check before launching an agent or script, especially when combining profiles with extra filesystem or environment grants.</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>codex<span class="w"> </span>--policy
 </code></pre></div>
+<p>No command is required: without one (and without a configured <code>default_app</code>), the policy is resolved and printed as-is, minus command-dependent grants such as <code>--add-exec</code> and shebang interpreter discovery.</p>
 <p>The summary ends with a <strong>resolution table</strong>: one line per configured entry showing what it resolved to — granted, skipped, created, or expanded from a <code>which:</code>/<code>pkg:</code> resolver or glob — so "why can't the agent see X" is answerable from one command. Entries whose resolved path is also granted through another list (for example when <code>$CONFIG</code> and <code>$DATA</code> collapse to the same directory on macOS) are flagged with their effective permission.</p>
 <div class="language-text highlight"><pre><span></span><code>  resolution:
     rox  which:codex        → /home/user/.local/share/mise/installs/node/22/bin/codex (+1 more)

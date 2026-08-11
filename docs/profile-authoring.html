@@ -6,19 +6,17 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="How bulle reports sandbox denials with copy-pasteable policy fixes.">
+        <meta name="description" content="bulle runs local commands in a sandbox, exposing only the essential parts of your machine.">
       
       
         <meta name="author" content="Vincent Arel-Bundock">
       
       
-        <link rel="canonical" href="https://vincentarelbundock.github.io/bulle/denial-diagnostics.html">
+        <link rel="canonical" href="https://vincentarelbundock.github.io/bulle/profile-authoring.html">
       
       
-        <link rel="prev" href="./cli-reference.html">
+        <link rel="prev" href="./scratch.html">
       
-      
-        <link rel="next" href="./scratch.html">
       
       
         
@@ -29,7 +27,7 @@
     
     
       
-        <title>Denial Diagnostics - </title>
+        <title>Profile authoring - </title>
       
     
     
@@ -87,7 +85,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#macos" class="md-skip">
+        <a href="#the-slot-checklist" class="md-skip">
           Skip to content
         </a>
       
@@ -122,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Denial Diagnostics
+              Profile authoring
             
           </span>
         </div>
@@ -142,7 +140,7 @@
           CLI Reference
         </a>
       
-        <a href="denial-diagnostics.html" style="color: inherit; opacity: 0.9; text-decoration: none; white-space: nowrap;">
+        <a href="./denial-diagnostics.html" style="color: inherit; opacity: 0.9; text-decoration: none; white-space: nowrap;">
           Denial Diagnostics
         </a>
       
@@ -150,7 +148,7 @@
           Scratch Workspaces
         </a>
       
-        <a href="./profile-authoring.html" style="color: inherit; opacity: 0.9; text-decoration: none; white-space: nowrap;">
+        <a href="profile-authoring.html" style="color: inherit; opacity: 0.9; text-decoration: none; white-space: nowrap;">
           Writing Profiles
         </a>
       
@@ -228,9 +226,7 @@
           
             
               
-                
-              
-              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" hidden>
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
                     
@@ -343,34 +339,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      
-      
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-  Denial Diagnostics
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="denial-diagnostics.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="./denial-diagnostics.html" class="md-nav__link">
         
   
   
@@ -385,75 +357,6 @@
   
 
       </a>
-      
-        
-
-
-<nav class="md-nav md-nav--secondary" aria-label="On this page">
-  
-  
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      On this page
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#macos" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        macOS
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#linux" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Linux
-      </span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Linux">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#inspecting-denials-manually" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Inspecting denials manually
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-suggestions-map-to-flags" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        How suggestions map to flags
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -488,10 +391,34 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="./profile-authoring.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Writing Profiles
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="profile-authoring.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -506,6 +433,80 @@
   
 
       </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-slot-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        The slot checklist
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#house-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        House rules
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#skeleton" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Skeleton
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-resolver" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Adding a resolver
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#debugging-a-new-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Debugging a new profile
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -517,8 +518,6 @@
               </div>
             
             
-              
-                
               
               <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
                 <div class="md-sidebar__scrollwrap">
@@ -549,10 +548,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#macos" class="md-nav__link">
+  <a href="#the-slot-checklist" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        macOS
+        The slot checklist
       </span>
     </span>
   </a>
@@ -560,38 +559,43 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#linux" class="md-nav__link">
+  <a href="#house-rules" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Linux
+        House rules
       </span>
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Linux">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#inspecting-denials-manually" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Inspecting denials manually
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-suggestions-map-to-flags" class="md-nav__link">
+  <a href="#skeleton" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        How suggestions map to flags
+        Skeleton
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-resolver" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Adding a resolver
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#debugging-a-new-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Debugging a new profile
       </span>
     </span>
   </a>
@@ -616,110 +620,149 @@
   
 
 
-<h1 id="denial-diagnostics">Denial Diagnostics<a class="headerlink" href="#denial-diagnostics" title="Permanent link">&para;</a></h1>
-<p>When a sandboxed command fails, the most common question is: <em>which path did the sandbox block?</em> On supported systems, <code>bulle</code> answers it for you. After a failed run, it reads the operating system's own record of sandbox denials and prints copy-pasteable fixes:</p>
-<div class="language-text highlight"><pre><span></span><code>$ bulle ~/project -- cat ~/.gitconfig
-cat: /home/vincent/.gitconfig: Permission denied
-bulle: the sandbox denied the following accesses during this run:
-  denied: read /home/vincent/.gitconfig — add --ro ~/.gitconfig
-</code></pre></div>
-<p>Add the suggested flag and re-run. No configuration inside <code>bulle</code> is needed — the hints appear automatically whenever the OS makes denial records available, and stay silent otherwise.</p>
-<p>These hints are diagnostics only. Enforcement is always done by the kernel (<a href="https://landlock.io/">Landlock</a> on Linux, Seatbelt on macOS) and works identically whether or not denial logging is available.</p>
-<h2 id="macos">macOS<a class="headerlink" href="#macos" title="Permanent link">&para;</a></h2>
-<p>Nothing to set up. The macOS kernel logs every sandbox violation to the unified log, and <code>bulle</code> queries it (<code>log show</code>) after a failed run. Two caveats:</p>
-<ul>
-<li>Reading the log takes a few seconds, so hints may appear with a short delay after a failure.</li>
-<li>Violation records are written asynchronously, and the unified log sometimes redacts file paths as <code>&lt;private&gt;</code>. Denials from the very end of a run, or with redacted paths, may be missing from the hints.</li>
-</ul>
-<h2 id="linux">Linux<a class="headerlink" href="#linux" title="Permanent link">&para;</a></h2>
-<p>Denial hints need two things, both common but not universal:</p>
+<h1 id="writing-profiles">Writing profiles<a class="headerlink" href="#writing-profiles" title="Permanent link">&para;</a></h1>
+<p>This page is the recipe for adding a language or tool profile to bulle. It
+distills what shipping the <code>r</code> and <code>uv</code> profiles taught: comprehensiveness
+comes from asking the tool where its files are instead of hardcoding paths,
+and constraint comes from an offline, read-only base profile with an opt-in
+<code>-install</code> variant.</p>
+<h2 id="the-slot-checklist">The slot checklist<a class="headerlink" href="#the-slot-checklist" title="Permanent link">&para;</a></h2>
+<p>Every language toolchain decomposes into the same handful of grants. Fill in
+each slot, or note why it does not apply:</p>
+<table>
+<thead>
+<tr>
+<th>Slot</th>
+<th>Typical list</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Interpreter / launcher binaries</td>
+<td><code>rox</code></td>
+<td><code>?which:R</code>, <code>?which:uv</code></td>
+</tr>
+<tr>
+<td>Tool home (stdlib, <code>etc/</code>, launch scripts)</td>
+<td><code>rox</code></td>
+<td><code>?r:home</code>, <code>?go:root</code></td>
+</tr>
+<tr>
+<td>Library search path</td>
+<td><code>ro</code></td>
+<td><code>?r:libs</code></td>
+</tr>
+<tr>
+<td>User-writable library</td>
+<td><code>rw</code> in <code>-install</code> only</td>
+<td><code>?+r:libs-user</code></td>
+</tr>
+<tr>
+<td>Package cache</td>
+<td><code>ro</code>, or redirected</td>
+<td><code>?uv:cache</code>, <code>UV_NO_CACHE=1</code></td>
+</tr>
+<tr>
+<td>Config and startup files</td>
+<td><code>ro</code>, optional</td>
+<td><code>?~/.Rprofile</code>, <code>?$CONFIG/uv</code></td>
+</tr>
+<tr>
+<td>Temp</td>
+<td>inherited from <code>tool</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Environment variables</td>
+<td><code>env</code></td>
+<td><code>R_LIBS_USER</code>, <code>UV_CACHE_DIR</code></td>
+</tr>
+<tr>
+<td>Network</td>
+<td><code>deny</code> in base, <code>allow</code> in <code>-install</code></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="house-rules">House rules<a class="headerlink" href="#house-rules" title="Permanent link">&para;</a></h2>
 <ol>
-<li><strong>A kernel with Landlock audit support</strong> — Linux 6.15 or newer (Landlock ABI v7). On older kernels, <code>bulle</code> enforces the sandbox exactly the same but cannot obtain denial records.</li>
-<li><strong>The audit subsystem enabled at runtime.</strong> Some distributions ship it on, others off:</li>
+<li><strong>Ask the tool, don't guess.</strong> Interpreter layout is not predictable (Nix
+   store paths, Homebrew kegs, version managers). Use <code>which:NAME</code> for
+   binaries and a tool resolver (<code>r:home</code>, <code>uv:cache</code>, <code>npm:cache</code>) for
+   directories. Literal paths are fallbacks for when the tool is absent.
+   <code>bulle --list-resolvers</code> shows every resolver and what it reports on the
+   current machine.</li>
+<li><strong>Base profiles are offline and read-only for libraries.</strong> A sandboxed
+   process that can write the user library or package cache can plant code
+   that the user's own non-sandboxed sessions will load later. That turns
+   "wrote in the workspace" into "wrote code that runs outside the sandbox."
+   Installation is opt-in through a separate <code>&lt;name&gt;-install</code> profile that
+   inherits the base, adds the writable library or cache, and allows network.</li>
+<li><strong>Mark machine-dependent entries optional (<code>?</code>).</strong> A resolver that finds
+   nothing, or a startup file that does not exist, must not break the run.
+   Never force an environment variable's value: list the name so an
+   explicitly configured value passes through, and let the tool compute its
+   default otherwise.</li>
+<li><strong>Do not build shared platform abstractions.</strong> uv follows XDG on macOS;
+   R uses <code>~/Library</code> there. Each profile encodes (or queries) its own
+   tool's convention.</li>
+<li><strong>Let the engine handle runtime libraries.</strong> <code>add_libs = true</code> makes bulle
+   follow wrapper scripts and shebang chains inside the granted trees, find
+   every ELF object (including package <code>libs/</code> directories on the read-only
+   search path), resolve their <code>DT_NEEDED</code>/<code>RPATH</code> closures, and grant the
+   results. Do not enumerate <code>libblas</code>/<code>libgfortran</code>-style dependencies in
+   profile text.</li>
+<li><strong>No profile ships without smoke tests.</strong> Add a row to the profile smoke
+   table in <code>internal/integration/profile_smoke_test.go</code>. The CI matrix runs
+   it on Ubuntu, macOS, and Nix; Nix is the adversarial case, and a profile
+   that survives it survives the others.</li>
 </ol>
-<table>
-<thead>
-<tr>
-<th>Distribution</th>
-<th>To enable denial logging permanently</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Fedora, RHEL, CentOS, Rocky</td>
-<td>Nothing to do — on by default</td>
-</tr>
-<tr>
-<td>openSUSE</td>
-<td>Nothing to do — on by default</td>
-</tr>
-<tr>
-<td>Debian, Ubuntu</td>
-<td><code>sudo apt install auditd</code></td>
-</tr>
-<tr>
-<td>Arch</td>
-<td><code>sudo pacman -S audit &amp;&amp; sudo systemctl enable --now auditd</code></td>
-</tr>
-<tr>
-<td>Alpine</td>
-<td><code>sudo apk add audit &amp;&amp; sudo rc-update add auditd &amp;&amp; sudo service auditd start</code></td>
-</tr>
-<tr>
-<td>NixOS</td>
-<td>Set <code>security.auditd.enable = true;</code> and rebuild</td>
-</tr>
-<tr>
-<td>Other</td>
-<td>Add <code>audit=1</code> to the kernel command line, or run <code>auditctl -e 1</code> (until reboot)</td>
-</tr>
-</tbody>
-</table>
-<p><code>bulle</code> reads the denial records back through <code>journalctl</code>, which requires your user to be able to read the journal. On most distributions the default administrator account already can (via the <code>adm</code> or <code>wheel</code> group); if not, add yourself to the <code>systemd-journal</code> group:</p>
-<div class="language-bash highlight"><pre><span></span><code>sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>systemd-journal<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$USER</span><span class="s2">&quot;</span>
+<h2 id="skeleton">Skeleton<a class="headerlink" href="#skeleton" title="Permanent link">&para;</a></h2>
+<div class="language-toml highlight"><pre><span></span><code><span class="c1"># profiles/mytool.toml</span>
+<span class="n">title</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;MyTool&quot;</span>
+<span class="n">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;mytool interpreter and libraries&quot;</span>
+<span class="n">inherits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;tool&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;terminal&quot;</span><span class="p">]</span>
+
+<span class="n">rox</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;?which:mytool&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;?mytool:home&quot;</span><span class="p">]</span>
+<span class="n">ro</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;?mytool:libs&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;?$CONFIG/mytool&quot;</span><span class="p">]</span>
+<span class="n">env</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;MYTOOL_HOME&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;MYTOOL_OPTIONS&quot;</span><span class="p">]</span>
+<span class="n">deny</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;network&quot;</span><span class="p">]</span>
+<span class="n">add_libs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 </code></pre></div>
-<p>Running <code>auditd</code> does not hide records from <code>bulle</code>: the audit daemon and the systemd journal receive kernel audit messages independently, so the hints keep working alongside a full auditd setup.</p>
-<h3 id="inspecting-denials-manually">Inspecting denials manually<a class="headerlink" href="#inspecting-denials-manually" title="Permanent link">&para;</a></h3>
-<p>The same records are available directly, with or without <code>bulle</code>:</p>
-<div class="language-bash highlight"><pre><span></span><code>journalctl<span class="w"> </span>--quiet<span class="w"> </span>--no-pager<span class="w"> </span><span class="nv">_TRANSPORT</span><span class="o">=</span>audit<span class="w"> </span>+<span class="w"> </span><span class="nv">_TRANSPORT</span><span class="o">=</span>kernel<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="nv">blockers</span><span class="o">=</span>
+<div class="language-toml highlight"><pre><span></span><code><span class="c1"># profiles/mytool-install.toml</span>
+<span class="n">title</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;MyTool (with package installation)&quot;</span>
+<span class="n">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;mytool plus a writable user library and registry access&quot;</span>
+<span class="n">inherits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;mytool&quot;</span>
+
+<span class="n">rw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;?+mytool:libs-user&quot;</span><span class="p">]</span>
+<span class="n">allow</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;network&quot;</span><span class="p">]</span>
 </code></pre></div>
-<p>Each Landlock denial looks like:</p>
-<div class="language-text highlight"><pre><span></span><code>audit: type=1423 audit(1729738800.268:30): domain=195ba459b blockers=fs.read_file path=&quot;/home/vincent/.gitconfig&quot; dev=&quot;vda2&quot; ino=1523541
+<h2 id="adding-a-resolver">Adding a resolver<a class="headerlink" href="#adding-a-resolver" title="Permanent link">&para;</a></h2>
+<p>Resolvers are a fixed registry in <code>internal/policy/tools.go</code> — profiles can
+never name an arbitrary command to run, because installing a profile must not
+be equivalent to running its author's code. Adding support for a new tool is
+usually two to four table rows of the form:</p>
+<div class="language-go highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">    </span><span class="nx">tool</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mytool&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">aspect</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;libs&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">argv</span><span class="p">:</span><span class="w">        </span><span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">&quot;mytool&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;config&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;libdir&quot;</span><span class="p">},</span>
+<span class="w">    </span><span class="nx">format</span><span class="p">:</span><span class="w">      </span><span class="nx">formatSingle</span><span class="p">,</span><span class="w"> </span><span class="c1">// or formatLines</span>
+<span class="w">    </span><span class="nx">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mytool&#39;s library directory&quot;</span><span class="p">,</span>
+<span class="p">},</span>
 </code></pre></div>
-<h2 id="how-suggestions-map-to-flags">How suggestions map to flags<a class="headerlink" href="#how-suggestions-map-to-flags" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Denied operation</th>
-<th>Suggested grant</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>read a file or directory</td>
-<td><code>--ro PATH</code></td>
-</tr>
-<tr>
-<td>write, create, delete, or truncate</td>
-<td><code>--rw PATH</code></td>
-</tr>
-<tr>
-<td>execute a program</td>
-<td><code>--rox PATH</code></td>
-</tr>
-<tr>
-<td>outbound or listening network access</td>
-<td>none — noted as restricted by the network policy</td>
-</tr>
-</tbody>
-</table>
-<p><code>bulle</code> deduplicates repeated denials, abbreviates your home directory as <code>~</code>, and caps the output at ten hints per run. Hints are only printed after a <em>failed</em> run: a command that succeeds despite probing a blocked path (many tools try optional config files) stays quiet.</p>
-<div class="admonition warning">
-<p class="admonition-title">Hints are suggestions, not automatic decisions</p>
-<p>A denial means the sandbox worked. Before copying a suggested flag, consider whether the command <em>should</em> have that access — an untrusted tool probing <code>~/.ssh</code> is exactly what the sandbox is for.</p>
-</div>
-
-  
+<p>Constraints the registry enforces for you: resolvers run against the parent
+environment before the sandbox starts, results re-enter normal path
+resolution (symlink pairing, sensitive-target refusals), failures are
+non-fatal for <code>?</code> entries, and output is deduplicated and sorted so the
+policy is stable across runs. Set <code>denySystemRoots: true</code> on any aspect that
+can report an installation prefix, so <code>/usr</code> never becomes a grant.</p>
+<h2 id="debugging-a-new-profile">Debugging a new profile<a class="headerlink" href="#debugging-a-new-profile" title="Permanent link">&para;</a></h2>
+<p>Run the target command under the profile and read the denial report: bulle
+aggregates denials inside one Nix store item or Homebrew keg into a single
+suggested grant and prints a copy-pasteable <code>bulle --last …</code> retry line.
+<code>--policy</code> shows the fully resolved grants; <code>--policy=json</code> is
+machine-readable. Recurring denials usually mean a missing slot from the
+checklist above rather than a one-off path.</p>
 
 
 
@@ -729,13 +772,8 @@ bulle: the sandbox denied the following accesses during this run:
 
 
 
-  
-  
 
 
-
-
-  
 
 
 

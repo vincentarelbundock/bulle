@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`--scratch` disposable workspaces.** Run the sandboxed command against a
+  throwaway local clone of the workspace instead of the real checkout. The
+  clone carries uncommitted work (tracked changes and untracked files) so the
+  agent starts from the state you see; git objects are hardlinked, so cloning
+  is nearly free. The real checkout is never granted to the sandbox. After
+  the run, a review gate shows what changed — including work the agent
+  committed — and offers diff, keep, or discard; a run that changed nothing
+  cleans up after itself, and a scratch with changes is never deleted
+  implicitly. Integration is git-native: keep prints a `git push
+  origin HEAD:scratch/<id>` recipe, and the result lands as a ref in the
+  origin, never as working-tree changes. `--scratch-keep` skips the prompt
+  for non-interactive runs, `[scratch] dir` in `config.toml` relocates
+  scratches (with a warning when the location defeats hardlinking), and
+  denial hints from scratch runs are rewritten to origin-relative paths so
+  suggested grants stay meaningful. Worktree-based isolation is deliberately
+  not offered: worktrees share the origin's `.git`, including hooks.
 - **`--policy` works without a command.** `bulle -p uv --policy` prints the
   resolved policy even when no command is supplied and no `default_app` is
   configured; command-dependent grants (`add_exec`, shebang discovery) are
@@ -28,7 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   closure with package stores trusted as RPATH roots. This makes interpreters
   reached through several exec hops (Nix wrappers, version managers) work
   without manual grants. The scan is budgeted, and a truncated scan is
-  reported as a policy note.
+  reported as a policy note. It also follows symlinks between store items
+  (gcc's `libgcc_s` living in a separate output), `nix-support` flag files
+  (propagated link-time inputs), and store paths baked into the dynamic
+  loader itself (Nix patches ld.so with a default libgcc directory used for
+  lazy unwinder loads that appear in no ELF header).
 - **Denial hints collapse package-store paths.** Denials inside one Nix store
   item or Homebrew keg now produce a single suggested grant for the package
   root, so the `bulle --last` retry line converges in one step instead of one
@@ -45,11 +65,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pairs) and cannot reach outside the sandbox, while async runtimes (tokio,
   libuv) need one for signal handling before doing any real work. `socket`,
   `connect`, `bind`, `listen`, and `accept` remain denied.
-- **The `tool` profile grants common runtime probes.** `/bin/sh` (rox),
-  `/dev/null` (rw), and read-only `/proc/stat`, `/proc/cpuinfo`, cgroup
-  limits, CPU topology, transparent-hugepage flags, and glibc locale
-  archives — files that shells, OpenMP, BLAS, and allocators touch on
-  startup.
+- **The `tool` profile grants common runtime probes.** `/bin/sh` and `bash`
+  (rox), `/dev/null` and `/dev/tty` (rw), and read-only `/proc/stat`,
+  `/proc/cpuinfo`, cgroup limits, CPU topology, transparent-hugepage flags,
+  timezone data, `/etc/os-release`, glibc locale archives, and the NixOS
+  nix-ld loader directory — files that shells, OpenMP, BLAS, allocators, and
+  language runtimes touch on startup. `NIX_LD`, `NIX_LD_LIBRARY_PATH`, and
+  `LD_LIBRARY_PATH` pass through so foreign binaries (rustup toolchains)
+  resolve their libraries the same way they do outside the sandbox.
+- **The `git`, `go`, `node`, and `rust` profiles work standalone and are
+  smoke-tested.** They now inherit `tool` and `terminal` instead of being
+  mixin-only. `git` grants its package tree for libexec subcommands and its
+  config files by name (so symlinked dotfiles carry their targets); `go` can
+  `go run` (executable sandbox tmp, telemetry dir); `rust` can
+  `cargo run --offline` end to end (linker via `cc`/`ld`, executable
+  `target/`, the cargo global cache, git config for vcs metadata).
 
 - **Tool resolvers: `TOOL:ASPECT` path entries.** A grant can ask a tool where
   its own directories are instead of hard-coding them: `r:home`, `r:prefix`,

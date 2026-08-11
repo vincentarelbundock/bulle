@@ -6,19 +6,19 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Command-line reference for bulle.">
+        <meta name="description" content="Run an agent against a disposable clone of your repository, then review and integrate the changes with git.">
       
       
         <meta name="author" content="Vincent Arel-Bundock">
       
       
-        <link rel="canonical" href="https://vincentarelbundock.github.io/bulle/cli-reference.html">
+        <link rel="canonical" href="https://vincentarelbundock.github.io/bulle/scratch.html">
       
       
-        <link rel="prev" href="./index.html#quick-start">
+        <link rel="prev" href="./denial-diagnostics.html">
       
       
-        <link rel="next" href="./denial-diagnostics.html">
+        <link rel="next" href="./profile-authoring.html">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>CLI Reference - </title>
+        <title>Scratch Workspaces - </title>
       
     
     
@@ -86,7 +86,8 @@
     <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
     <div data-md-component="skip">
       
-        <a href="#__skip" class="md-skip">
+        
+        <a href="#how-it-works" class="md-skip">
           Skip to content
         </a>
       
@@ -121,7 +122,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              CLI Reference
+              Scratch Workspaces
             
           </span>
         </div>
@@ -137,7 +138,7 @@
           Quick Start
         </a>
       
-        <a href="cli-reference.html" style="color: inherit; opacity: 0.9; text-decoration: none; white-space: nowrap;">
+        <a href="./cli-reference.html" style="color: inherit; opacity: 0.9; text-decoration: none; white-space: nowrap;">
           CLI Reference
         </a>
       
@@ -145,7 +146,7 @@
           Denial Diagnostics
         </a>
       
-        <a href="./scratch.html" style="color: inherit; opacity: 0.9; text-decoration: none; white-space: nowrap;">
+        <a href="scratch.html" style="color: inherit; opacity: 0.9; text-decoration: none; white-space: nowrap;">
           Scratch Workspaces
         </a>
       
@@ -316,17 +317,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      
-      
-      
-      
-      <a href="cli-reference.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="./cli-reference.html" class="md-nav__link">
         
   
   
@@ -341,7 +335,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -376,10 +369,34 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="./scratch.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Scratch Workspaces
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="scratch.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -394,6 +411,69 @@
   
 
       </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        How it works
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integrating-the-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Integrating the changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-not-a-worktree" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Why not a worktree?
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#details-and-edge-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Details and edge cases
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -441,6 +521,11 @@
                     
                     
                     
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
                   
                   <div class="md-sidebar__inner">
                     
@@ -450,6 +535,58 @@
   
   
   
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        How it works
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integrating-the-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Integrating the changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-not-a-worktree" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Why not a worktree?
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#details-and-edge-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Details and edge cases
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -467,131 +604,106 @@
   
 
 
-<h1 id="cli-reference">CLI Reference<a class="headerlink" href="#cli-reference" title="Permanent link">&para;</a></h1>
-<p>This page is generated from bulle --help.</p>
-<div class="language-text highlight"><pre><span></span><code>bulle runs local coding agents inside a controlled workspace.
-
-It exposes one CLI and one policy model across Linux and macOS. Linux uses an
-embedded Landlock backend; macOS uses a generated Seatbelt profile. The sandbox
-restricts filesystem and environment access, and can optionally deny network access.
-
-Usage:
-  bulle [flags] [workspace] [-- command [args...]]
-  bulle help | version
-
-The workspace is the command&#39;s working directory and writable area. If omitted,
-it defaults to the current directory. Use --no-workspace to run without the
-automatic read-write workspace grant.
-If no command is given after --, the configured default_app is used.
-The -- separator may be omitted when unambiguous: the first positional that is
-an existing directory reads as the workspace, and the first positional that is
-not starts the command (announced on stderr).
-
-Filesystem flags (repeatable, comma-separated; executables must be allowed
-explicitly with --rox or --rwx):
-  --ro path        grant read-only access
-  --rox path       grant read-only access plus execute
-  --rw path        grant read-write access
-  --rwx path       grant read-write access plus execute
-  --no-workspace   do not automatically grant the workspace read-write access
-
-Path entries (flags and profiles):
-  ?path            optional: skip silently when the path does not exist
-  +path            create an empty file when missing (rw/rwx entries)
-  +path/           create a directory when missing (rw/rwx entries)
-  which:NAME       resolve NAME on the parent PATH and grant that binary only,
-                   findable by name inside the sandbox (rox/rwx entries)
-  pkg:NAME         like which:, plus the tool&#39;s package tree (rox/rwx entries)
-  TOOL:ASPECT      ask a tool where its own directories are, such as r:libs or
-                   uv:cache; valid in every list (see --list-resolvers)
-  dir/*/bin        single-star glob; no matches means the entry is skipped
-  Variables: $WORKSPACE, $HOME, $TMP, $TMPDIR, and the per-platform
-  $CONFIG, $DATA, $CACHE, $STATE (XDG dirs on Linux, ~/Library on macOS).
-  ${NAME:-fallback} falls back when NAME is unset.
-
-Environment flags (no variables are passed unless requested):
-  --env NAME        pass NAME from the current environment, if it is set
-  --env NAME=VALUE  set NAME to VALUE inside the sandbox
-  --env &#39;GLOB&#39;      pass every parent variable matching a name glob (GIT_*)
-  --env-file PATH   load NAME=VALUE entries from a dotenv-style file
-  --env-all-except NAME,...
-                    pass the whole parent environment except the named variables
-
-State and reruns:
-  --last            repeat the previous invocation, with extra flags inserted
-                    before the command (e.g. bulle --last --ro ~/.gitconfig)
-
-Configuration:
-  --config PATH     path to a configuration directory
-  --var NAME=VALUE  define a custom path variable usable in grants as $NAME
-  --no-defaults     ignore the [defaults] block of the user configuration
-
-Profiles:
-  -p, --profile NAME
-                    named profile, or comma-separated profiles merged left to right
-  --list-profiles  list available profiles and exit
-  --list-resolvers list path resolvers and what they resolve to here, and exit
-  --install-profiles SOURCE
-                    install profile TOML files from a file, directory, local git repository, or GitHub source
-  claude            Claude Code app state, config, and login support
-  codex             Codex app state, config, network, MCP, and login support
-  default           default sandbox profile
-  git               git binary, user configuration, and global ignores
-  go                Go toolchain, module cache, and build cache
-  keychain          macOS Keychain file and service access
-  macos-certs       macOS certificate trust service lookup
-  macos-dns         macOS DNS and directory service lookups
-  network           network socket access capability
-  node              Node.js runtime, npm, and package caches
-  offline           deny network socket access
-  opencode          OpenCode app state and config support
-  pi                Pi app state and config support
-  r                 R interpreter, library search path, and startup files
-  r-install         R plus a writable user library and CRAN access
-  rust              cargo, rustup toolchains, and the registry cache
-  terminal          environment variables an interactive terminal program expects
-  tool              general local command support (PATH, executables, libs)
-  uv                uv-managed Python interpreters and environments
-  uv-install        uv plus a writable cache, project venv, and PyPI access
-
-Executable discovery:
-  --add-exec        add the resolved command executable to the sandbox
-  --add-libs        add runtime library access for executables
-                    Linux discovers ELF shared-library dependencies precisely.
-                    macOS uses configured runtime roots; Mach-O dylibs in
-                    unusual locations may need explicit --ro/--rox grants.
-                    These do not add app state files or environment variables.
-
-Disposable workspaces:
-  --scratch         run against a disposable local clone of the workspace
-                    (git repositories only; uncommitted work is carried over).
-                    After the run, review the changes and keep or discard the
-                    scratch; integrate kept work with git push from the scratch.
-  --scratch-keep    skip the review prompt, keep the scratch, print its path
-
-Output and safety:
-  --timeout DURATION
-                    kill the sandboxed command if it runs longer than DURATION.
-                    Uses Go duration syntax such as 30s, 2m, or 1h30m.
-                    Use 0 to disable. Timed-out commands exit 124.
-  --policy[=summary|json]
-                    print the resolved policy and exit; summary by default.
-                    Works without a command
-  -h, --help        show this help and exit
-  -V, --version     show version information and exit
-
-Examples:
-  bulle --profile claude ~/repos/project   # Claude Code in a workspace
-  bulle --add-exec -- /bin/ls
-  bulle --profile codex --ro ~/.cache/uv
-  bulle . --profile secrets --env OPENAI_API_KEY -- codex
-  bulle . --rox /bin --policy=json -- /bin/bash
-  bulle --profile codex --policy
-  bulle --profile codex,offline
-  bulle --install-profiles agent.toml
-  bulle --install-profiles ./profiles
-  bulle --install-profiles github:vincentarelbundock/bulle/custom_profiles
+<h1 id="scratch-workspaces">Scratch Workspaces<a class="headerlink" href="#scratch-workspaces" title="Permanent link">&para;</a></h1>
+<p>The sandbox limits <em>where</em> a command can write. <code>--scratch</code> limits whether
+those writes reach your real checkout at all: the command runs against a
+disposable local clone, and its changes become a reviewable diff.</p>
+<div class="language-text highlight"><pre><span></span><code>$ bulle --scratch --profile claude
+bulle: scratch ~/.local/state/bulle/scratch/project-a1b2c3d4 (origin ~/project, from HEAD + 3 modified, 1 untracked)
+# ... agent works ...
+scratch: 4 files changed, 1 added, 0 deleted
+  M internal/policy/resolve.go
+  M internal/policy/policy.go
+  A internal/policy/scratch.go
+[d]iff  [k]eep  [D]iscard?
 </code></pre></div>
+<p>The whole model in three sentences: <code>--scratch</code> clones the repository locally
+(carrying your uncommitted work), runs the sandboxed command there, and shows
+a diff at the end. You keep or discard. Nothing reaches your checkout except a
+deliberate <code>git push</code> from outside the sandbox.</p>
+<h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Clone.</strong> <code>git clone --local</code> creates a self-contained copy under
+   <code>$XDG_STATE_HOME/bulle/scratch/</code>. Git objects are hardlinked, not copied,
+   so cloning is nearly free even on repositories with deep history; only the
+   working-tree checkout costs real disk.</li>
+<li><strong>Carry your uncommitted work.</strong> A fresh clone would start at <code>HEAD</code>, a
+   state you are not looking at. So the scratch always starts from what you
+   see: uncommitted tracked changes are applied and untracked, non-ignored
+   files are copied. To start from a clean <code>HEAD</code> instead, commit or stash
+   first. What was carried is reported on stderr.</li>
+<li><strong>Run.</strong> The scratch becomes the workspace: <code>$WORKSPACE</code> and the automatic
+   read-write grant follow it. Your real checkout is <strong>not</strong> granted — during
+   the run, nothing in the sandbox can reach it.</li>
+<li><strong>Review.</strong> After the command exits — on success, failure, and timeout
+   alike — bulle shows what changed and prompts. A run that changed nothing
+   removes the scratch silently. Changes are detected against the recorded
+   starting state, so work the agent <em>committed</em> inside the scratch is
+   counted too, not just dirty files.</li>
+</ol>
+<p>At the prompt: <code>d</code> pages the full diff and asks again, <code>k</code> keeps the scratch
+and prints the integration recipe, <code>D</code> discards it after a confirmation.
+Without a terminal, or with <code>--scratch-keep</code>, the scratch is kept and the
+recipe printed. <strong>A scratch is never deleted implicitly</strong> — not on timeout,
+signal, or crash. Losing an agent's work to a cleanup path is worse than
+leaving a directory behind.</p>
+<h2 id="integrating-the-changes">Integrating the changes<a class="headerlink" href="#integrating-the-changes" title="Permanent link">&para;</a></h2>
+<p>There is no bespoke apply step. The scratch is a real repository whose
+<code>origin</code> remote points at your checkout, so integration is ordinary git, done
+by you, outside the sandbox:</p>
+<div class="language-text highlight"><pre><span></span><code>cd ~/.local/state/bulle/scratch/project-a1b2c3d4
+git diff                          # review again if desired
+git add -A &amp;&amp; git commit
+git push origin HEAD:scratch/a1b2c3d4
+cd ~/project
+git merge scratch/a1b2c3d4        # or rebase, cherry-pick, diff first
+rm -rf ~/.local/state/bulle/scratch/project-a1b2c3d4
+</code></pre></div>
+<p><code>k</code> prints exactly this recipe with your paths filled in.</p>
+<p>This is safe by construction. During the run, the sandbox denies your
+checkout's path, so a push from inside fails on filesystem permissions; after
+the run, a push is a deliberate act in your trusted shell. And git refuses
+pushes to the checked-out branch, so the result always lands as a ref —
+never as files silently appearing in your working tree.</p>
+<h2 id="why-not-a-worktree">Why not a worktree?<a class="headerlink" href="#why-not-a-worktree" title="Permanent link">&para;</a></h2>
+<p>Tools like Worktrunk's <code>wt</code> already automate "run an agent in a separate
+directory" with <code>git worktree add</code>. They are good at what they do — templated
+paths, setup hooks, a merge command — and they compose with bulle today:
+<code>wt switch -c feature-x</code> then <code>bulle --profile claude</code> inside the worktree.</p>
+<p>But a worktree's <code>.git</code> is a pointer file into your real repository. For git
+to work there at all, the sandbox would have to grant read-write access to
+your repository's <code>.git</code> — objects, refs, config, and <code>.git/hooks</code>, which all
+worktrees share. An untrusted agent could write a <code>pre-commit</code> hook that runs
+on <em>your</em> next commit, outside the sandbox. That re-exposes exactly what
+scratch exists to contain, which is why <code>--scratch=worktree</code> is not offered.
+<code>git clone --local</code> gives the same separate-directory experience with a
+genuinely severed <code>.git</code>: hooks are not carried over, and no write access to
+your repository is needed.</p>
+<p>The rule of thumb: for parallel <em>trusted</em> sessions, use a worktree manager
+around bulle; for reviewable <em>untrusted</em> runs, use <code>--scratch</code>.</p>
+<h2 id="details-and-edge-cases">Details and edge cases<a class="headerlink" href="#details-and-edge-cases" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Git only.</strong> <code>--scratch</code> requires a git repository with at least one
+  commit. For a plain directory, <code>git init &amp;&amp; git add -A &amp;&amp; git commit</code> takes
+  three commands and also buys you the review diff.</li>
+<li><strong>Location.</strong> Scratches live under <code>$XDG_STATE_HOME/bulle/scratch/</code> — not
+  inside your repository (where <code>git status</code>, indexers, and build tools would
+  pick them up) and not in <code>/tmp</code> (whose cleaners are not patient enough to
+  wait for your review). Override with <code>[scratch] dir = "..."</code> in
+  <code>config.toml</code>, useful when your repositories live on a different filesystem
+  than your state directory: hardlinks cannot cross filesystems, and bulle
+  warns when objects would be copied instead.</li>
+<li><strong>Metadata.</strong> A <code>meta.toml</code> beside each scratch records its origin, base
+  commit, and the invocation that created it.</li>
+<li><strong>Denial hints</strong> report paths in origin-relative form, so a suggested
+  <code>--ro</code> grant from a scratch run is meaningful on the next one.</li>
+<li><strong><code>--last</code></strong> replays as a <em>new</em> scratch carrying your current uncommitted
+  state, rather than reusing the previous one.</li>
+<li><strong>Submodules</strong> are not carried into the scratch (bulle warns when the
+  origin has them).</li>
+<li><strong><code>--scratch --policy</code></strong> prints the scratch-to-origin mapping and the
+  resolved policy without running anything, then removes the unused clone.</li>
+</ul>
 
   
 
