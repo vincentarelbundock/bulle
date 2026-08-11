@@ -1,15 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-      <url>
-        <loc>https://vincentarelbundock.github.io/bulle/cli-reference.html</loc>
-      </url>
-      <url>
-        <loc>https://vincentarelbundock.github.io/bulle/denial-diagnostics.html</loc>
-      </url>
-      <url>
-        <loc>https://vincentarelbundock.github.io/bulle/scratch.html</loc>
-      </url>
-      <url>
-        <loc>https://vincentarelbundock.github.io/bulle/profile-authoring.html</loc>
-      </url>
+  <url><loc>https://vincentarelbundock.github.io/bulle/cli-reference.html</loc></url>
+  <url><loc>https://vincentarelbundock.github.io/bulle/denial-diagnostics.html</loc></url>
+  <url><loc>https://vincentarelbundock.github.io/bulle/</loc></url>
+  <url><loc>https://vincentarelbundock.github.io/bulle/permissions.html</loc></url>
+  <url><loc>https://vincentarelbundock.github.io/bulle/profiles.html</loc></url>
+  <url><loc>https://vincentarelbundock.github.io/bulle/scratch.html</loc></url>
 </urlset>

@@ -1,6 +1,6 @@
 
 
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Diagnostics</title>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Profiles</title>
     
     
     <meta name="description" content="bulle runs local commands in a sandbox, exposing only the essential parts of your machine.">
@@ -14,12 +14,12 @@
     
     
     
-    <meta property="og:title" content="Diagnostics | bulle">
+    <meta property="og:title" content="Profiles | bulle">
     
     
     
-    <link rel="canonical" href="https://vincentarelbundock.github.io/bulle/denial-diagnostics.html">
-    <meta property="og:url" content="https://vincentarelbundock.github.io/bulle/denial-diagnostics.html">
+    <link rel="canonical" href="https://vincentarelbundock.github.io/bulle/profiles.html">
+    <meta property="og:url" content="https://vincentarelbundock.github.io/bulle/profiles.html">
     
     
     <link rel="icon" href="assets/favicon.png">
@@ -2608,7 +2608,7 @@ html:not([data-theme]) {
                 
                                 <li><a href="permissions.html" aria-label="Permissions">Permissions</a></li>
                 
-                                <li><a href="profiles.html" aria-label="Profiles">Profiles</a></li>
+                                <li><a href="profiles.html" aria-label="Profiles" aria-current="page">Profiles</a></li>
                 
                                 <li><a href="cli-reference.html" aria-label="CLI reference">CLI reference</a></li>
                 
@@ -2645,7 +2645,7 @@ html:not([data-theme]) {
                     
                                     <li><a href="permissions.html" aria-label="Permissions">Permissions</a></li>
                     
-                                    <li><a href="profiles.html" aria-label="Profiles">Profiles</a></li>
+                                    <li><a href="profiles.html" aria-label="Profiles" aria-current="page">Profiles</a></li>
                     
                                     <li><a href="cli-reference.html" aria-label="CLI reference">CLI reference</a></li>
                     
@@ -2678,7 +2678,7 @@ html:not([data-theme]) {
 
                         
                         
-<li class="calepin-website-sidebar-link"><a href="profiles.html" aria-label="Profiles">Profiles</a></li>
+<li class="calepin-website-sidebar-link"><a href="profiles.html" aria-label="Profiles" class="active" aria-current="page">Profiles</a></li>
 
                         
                         
@@ -2686,7 +2686,7 @@ html:not([data-theme]) {
 
                         
                         
-<li class="calepin-website-sidebar-link"><a href="denial-diagnostics.html" aria-label="Diagnostics" class="active" aria-current="page">Diagnostics</a></li>
+<li class="calepin-website-sidebar-link"><a href="denial-diagnostics.html" aria-label="Diagnostics">Diagnostics</a></li>
 
                         
                         
@@ -2701,14 +2701,89 @@ html:not([data-theme]) {
             </nav>
         </aside>
         <main class="calepin-website-main calepin-content" data-pagefind-body>
-            <h1 id="diagnostics">Diagnostics</h1><p>When a sandboxed command fails, the most common question is: <em>which path did the sandbox block?</em> On supported systems, <code>bulle</code> answers it for you. After a failed run, it reads the operating system’s own record of sandbox denials and prints copy-pasteable fixes:</p><div class="sourceCode" data-lang="text"><pre><code data-lang="text">$ bulle ~/project -- cat ~/.gitconfig
-cat: /home/vincent/.gitconfig: Permission denied
-bulle: the sandbox denied the following accesses during this run:
-  denied: read /home/vincent/.gitconfig — add --ro ~/.gitconfig</code></pre></div><p>Add the suggested flag and re-run. No configuration inside <code>bulle</code> is needed — the hints appear automatically whenever the OS makes denial records available, and stay silent otherwise.</p><p>These hints are diagnostics only. Enforcement is always done by the kernel (<a href="https://landlock.io/">Landlock</a> on Linux, Seatbelt on macOS) and works identically whether or not denial logging is available.</p><h2 id="macos">macOS</h2><p>Nothing to set up. The macOS kernel logs every sandbox violation to the unified log, and <code>bulle</code> queries it (<code>log show</code>) after a failed run. Two caveats:</p><ul><li>Reading the log takes a few seconds, so hints may appear with a short delay after a failure.</li><li>Violation records are written asynchronously, and the unified log sometimes redacts file paths as <code>&lt;private></code>. Denials from the very end of a run, or with redacted paths, may be missing from the hints.</li></ul><h2 id="linux">Linux</h2><p>Denial hints need two things, both common but not universal:</p><ol><li><strong>A kernel with Landlock audit support</strong> — Linux 6.15 or newer (Landlock ABI v7). On older kernels, <code>bulle</code> enforces the sandbox exactly the same but cannot obtain denial records.</li><li><strong>The audit subsystem enabled at runtime.</strong> Some distributions ship it on, others off:</li></ol><table><thead><tr><th>Distribution</th><th>To enable denial logging permanently</th></tr></thead><tbody><tr><td>Fedora, RHEL, CentOS, Rocky</td><td>Nothing to do — on by default</td></tr><tr><td>openSUSE</td><td>Nothing to do — on by default</td></tr><tr><td>Debian, Ubuntu</td><td><code>sudo apt install auditd</code></td></tr><tr><td>Arch</td><td><code>sudo pacman -S audit &amp;&amp; sudo systemctl enable --now auditd</code></td></tr><tr><td>Alpine</td><td><code>sudo apk add audit &amp;&amp; sudo rc-update add auditd &amp;&amp; sudo service auditd start</code></td></tr><tr><td>NixOS</td><td>Set <code>security.auditd.enable = true;</code> and rebuild</td></tr><tr><td>Other</td><td>Add <code>audit=1</code> to the kernel command line, or run <code>auditctl -e 1</code> (until reboot)</td></tr></tbody></table><p><code>bulle</code> reads the denial records back through <code>journalctl</code>, which requires your user to be able to read the journal. On most distributions the default administrator account already can (via the <code>adm</code> or <code>wheel</code> group); if not, add yourself to the <code>systemd-journal</code> group:</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-1">sudo</span> usermod<span class="calepin-syntax-scope-3"> -</span><span class="calepin-syntax-scope-5">aG</span> systemd-journal <span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">$</span>USER<span class="calepin-syntax-scope-3">"</span>
-</code></pre></div><p>Running <code>auditd</code> does not hide records from <code>bulle</code>: the audit daemon and the systemd journal receive kernel audit messages independently, so the hints keep working alongside a full auditd setup.</p><h3 id="inspecting-denials-manually">Inspecting denials manually</h3><p>The same records are available directly, with or without <code>bulle</code>:</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-1">journalctl</span><span class="calepin-syntax-scope-3"> --</span><span class="calepin-syntax-scope-5">quiet</span><span class="calepin-syntax-scope-3"> --</span><span class="calepin-syntax-scope-5">no-pager</span> _TRANSPORT=audit + _TRANSPORT=kernel <span class="calepin-syntax-scope-3">|</span> <span class="calepin-syntax-scope-1">grep</span> blockers=
-</code></pre></div><p>Each Landlock denial looks like:</p><div class="sourceCode" data-lang="text"><pre><code data-lang="text">audit: type=1423 audit(1729738800.268:30): domain=195ba459b blockers=fs.read_file path="/home/vincent/.gitconfig" dev="vda2" ino=1523541</code></pre></div><h2 id="how-suggestions-map-to-flags">How suggestions map to flags</h2><table><thead><tr><th>Denied operation</th><th>Suggested grant</th></tr></thead><tbody><tr><td>read a file or directory</td><td><code>--ro PATH</code></td></tr><tr><td>write, create, delete, or truncate</td><td><code>--rw PATH</code></td></tr><tr><td>execute a program</td><td><code>--rox PATH</code></td></tr><tr><td>outbound or listening network access</td><td>none — noted as restricted by the network policy</td></tr></tbody></table><p><code>bulle</code> deduplicates repeated denials, abbreviates your home directory as <code>~</code>, and caps the output at ten hints per run. Hints are only printed after a <em>failed</em> run: a command that succeeds despite probing a blocked path (many tools try optional config files) stays quiet.</p><div class="calepin-callout calepin-callout-warning"><div class="calepin-callout-title">Hints are suggestions, not automatic decisions</div><div class="calepin-callout-body">A denial means the sandbox worked. Before copying a suggested flag, consider whether the command <em>should</em> have that access — an untrusted tool probing <code>~/.ssh</code> is exactly what the sandbox is for.</div></div><h2 id="rerun">Rerunning with added grants</h2><p>A sandboxed run often fails because one grant is missing. Alongside the hints above, <code>bulle</code> prints a copy-pasteable retry line:</p><div class="sourceCode" data-lang="text"><pre><code data-lang="text">bulle: the sandbox denied the following accesses during this run:
-  denied: read /home/user/.gitconfig — add --ro ~/.gitconfig
-bulle: retry with these grants: bulle rerun --ro ~/.gitconfig</code></pre></div><p><code>bulle rerun</code> repeats the previous invocation — from any shell, restoring the original working directory — and inserts any extra flags before the command, so the retry line works as-is. Each run overwrites the recorded invocation, and repeated <code>rerun</code> invocations accumulate their added grants. The sandbox is restarted rather than widened: Landlock cannot extend a live sandbox, and agents resume from their own session state.</p><p>The invocation is recorded in <code>$XDG_STATE_HOME/bulle/last-run.json</code> (usually <code>~/.local/state/bulle/</code>) on Linux and <code>~/Library/Application Support/bulle/</code> on macOS.</p>
+            <h1 id="profiles">Profiles</h1><p>A profile is a named bundle of path, environment, network, and platform grants. It saves you from spelling out the same permissions every time you run a tool.</p><div class="calepin-callout calepin-callout-warning"><div class="calepin-callout-body">Profiles can grant broad filesystem, environment, network, and platform access. Use <code>bulle policy</code> to inspect the resolved permissions before running an unfamiliar profile or combining profiles.</div></div><h2 id="selection-and-inference">Selection and inference</h2><p>There are two ways a profile gets applied to a run.</p><p><strong>Explicit selection</strong> with <code>--profile</code> names the profile directly. When the profile declares a <code>default_app</code>, you do not even need to pass a command — this launches Claude Code with appropriate permissions and constraints:</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-1">bulle</span><span class="calepin-syntax-scope-3"> --</span><span class="calepin-syntax-scope-5">profile</span> claude
+</code></pre></div><p><strong>Inference</strong> goes the other way: you pass the command, and <code>bulle</code> finds the profile made for it. When no <code>--profile</code> is given and the command cannot run under the default profile, <code>bulle</code> checks whether exactly one installed profile declares that command as its <code>default_app</code>. If so, it selects that profile, announces the choice, and continues:</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-1">bulle</span><span class="calepin-syntax-scope-3"> --</span> claude
+</code></pre></div><div class="sourceCode" data-lang="text"><pre><code data-lang="text">bulle: selected profile "claude" because its default_app runs "claude" and
+the default profile cannot; pass --profile to choose explicitly</code></pre></div><p>Inference is deliberately conservative, because applying a profile changes what the sandbox grants:</p><ul><li>It only ever rescues a run that would otherwise fail command discovery. A command that already works under the default profile is never re-profiled.</li><li>It never fires when you pass <code>--profile</code> — an explicit selection always wins.</li><li>If several profiles declare the same command, <code>bulle</code> refuses to guess, lists the candidates, and asks you to choose with <code>--profile</code>.</li><li>The selection is always announced on stderr, and <code>bulle policy</code> shows the resulting permissions (<code>bulle policy -- claude</code>).</li></ul><p>Without a profile or an explicit grant, <code>bulle</code> cannot find or execute anything, so command discovery fails before the sandbox starts:</p><div class="sourceCode" data-lang="text"><pre><code data-lang="text">bulle -- ping google.com
+
+command not found before sandbox setup: "ping" is not on policy PATH, parent PATH, or executable roots. Add --env PATH with matching --rox/--rwx roots, add a --rox/--rwx root containing the command, choose a profile, or pass an explicit executable path after --</code></pre></div><p>The built-in <code>tool</code> profile adds <code>PATH</code>, executable discovery, temporary directory access, runtime library access, and network access:</p><div class="sourceCode" data-lang="text"><pre><code data-lang="text">bulle --profile tool -- ping google.com
+
+PING google.com (...): 56 data bytes
+64 bytes from ...</code></pre></div><p>Comma-separated profiles merge from left to right. Adding <code>offline</code> after <code>tool</code> keeps the command setup but removes network access:</p><div class="sourceCode" data-lang="text"><pre><code data-lang="text">bulle --profile tool,offline -- ping google.com
+
+ping: cannot resolve google.com: Unknown host</code></pre></div><p>You can still add one-off permissions on top of a profile:</p><div class="sourceCode" data-lang="text"><pre><code data-lang="text">bulle --profile claude --ro README.qmd --rw ~/Desktop --env GITHUB_TOKEN</code></pre></div><h2 id="built-in-and-installed-profiles">Built-in and installed profiles</h2><p>Use <code>bulle profiles list</code> to print available profiles:</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-1">bulle</span> profiles list
+
+<span class="calepin-syntax-scope-1">claude</span>
+<span class="calepin-syntax-scope-1">codex</span>
+<span class="calepin-syntax-scope-1">default</span>
+<span class="calepin-syntax-scope-1">git</span>
+<span class="calepin-syntax-scope-1">go</span>
+<span class="calepin-syntax-scope-1">keychain</span>
+<span class="calepin-syntax-scope-1">macos-certs</span>
+<span class="calepin-syntax-scope-1">macos-dns</span>
+<span class="calepin-syntax-scope-1">network</span>
+<span class="calepin-syntax-scope-1">node</span>
+<span class="calepin-syntax-scope-1">offline</span>
+<span class="calepin-syntax-scope-1">opencode</span>
+<span class="calepin-syntax-scope-1">pi</span>
+<span class="calepin-syntax-scope-1">rust</span>
+<span class="calepin-syntax-scope-1">terminal</span>
+<span class="calepin-syntax-scope-1">tool</span>
+</code></pre></div><p>Built-in helper profiles such as <code>default</code>, <code>network</code>, <code>offline</code>, <code>macos-dns</code>, <code>macos-certs</code>, and <code>keychain</code> are ordinary profiles that can be inherited directly or selected explicitly when you pass a command.</p><h3 id="capability-micro-profiles">Capability micro-profiles</h3><p>The built-in <code>git</code>, <code>node</code>, <code>rust</code>, <code>go</code>, and <code>terminal</code> profiles are small capability bundles, each answering one concern once and portably. The tool profiles use <code>which:</code>/<code>pkg:</code> resolvers, tool resolvers such as <code>npm:cache</code> and <code>go:modcache</code>, platform variables, and optional/create markers to settle a tool’s location questions (binary, configuration, caches); <code>terminal</code> carries the environment variables an interactive program expects. They are meant to be assembled through <code>inherits</code> rather than restating tool layouts in every agent profile:</p><div class="sourceCode" data-lang="toml"><pre><code data-lang="toml">title <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">"</span>My agent<span class="calepin-syntax-scope-3">"</span>
+inherits <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>tool<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">"</span>git<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">"</span>node<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+default_app <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">"</span>my-agent<span class="calepin-syntax-scope-3">"</span></code></pre></div><p>They can also be combined on the command line: <code>bulle --profile tool,git,rust -- cargo build</code>.</p><h3 id="installing-profiles">Installing profiles</h3><p>Install or override profiles with <code>bulle profiles install SOURCE</code>. The source can be one <code>.toml</code> file, a directory containing <code>.toml</code> files, a local git repository, or a GitHub source such as <code>github:vincentarelbundock/bulle/custom_profiles</code>.</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-1">bulle</span> profiles install agent.toml
+<span class="calepin-syntax-scope-1">bulle</span> profiles install ./profiles
+<span class="calepin-syntax-scope-1">bulle</span> profiles install github:vincentarelbundock/bulle/custom_profiles
+</code></pre></div><p>By default, profiles are installed under the operating system user config directory: usually <code>$XDG_CONFIG_HOME/bulle/profiles/</code> or <code>~/.config/bulle/profiles/</code> on Linux, and <code>~/Library/Application Support/bulle/profiles/</code> on macOS. Use <code>--config PATH</code> to install into a different config directory; <code>bulle</code> creates its <code>profiles/</code> subdirectory if needed. The filename becomes the profile name, so <code>profiles/agent.toml</code> is selected with <code>--profile agent</code>.</p><p>When installing from a local git repository root or <code>github:owner/repo</code>, <code>bulle</code> uses <code>profiles/*.toml</code> if that directory exists. When a GitHub source includes a subdirectory, such as <code>github:owner/repo/custom_profiles</code>, that subdirectory is used as the profile source.</p><h2 id="toml">The TOML format</h2><p>Built-in and user profiles use the same one-profile TOML format. The filename is the profile name, and profile fields live at the top level of that file. This example shows all profile option groups:</p><div class="sourceCode" data-lang="toml"><pre><code data-lang="toml">title <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">"</span>Agent<span class="calepin-syntax-scope-3">"</span>
+description <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">"</span>custom Codex profile<span class="calepin-syntax-scope-3">"</span>
+inherits <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>tool<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">"</span>keychain<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+default_app <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">"</span>codex<span class="calepin-syntax-scope-3">"</span>
+
+ro <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>README.md<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+rox <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>/usr/bin<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+rw <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>$TMP/bulle/tmp<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+rwx <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>$HOME/.cache/example-agent<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+
+env <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>HOME<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">"</span>USER<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">"</span>NODE_ENV=development<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+allow <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>network<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+deny <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">]</span>
+
+add_exec <span class="calepin-syntax-scope-3">=</span> true
+add_libs <span class="calepin-syntax-scope-3">=</span> true
+
+<span class="calepin-syntax-scope-3">[</span>macos<span class="calepin-syntax-scope-3">]</span>
+ro <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>$HOME/Library/Preferences<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+mach_lookup <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>com.apple.trustd.agent<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+deny_mach_lookup <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>com.apple.SystemConfiguration.configd<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+
+<span class="calepin-syntax-scope-3">[</span>linux<span class="calepin-syntax-scope-3">]</span>
+ro <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>$HOME/.config<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+rox <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>/usr/bin<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span></code></pre></div><p>Available top-level options are <code>title</code>, <code>description</code>, <code>inherits</code>, <code>default_app</code>, path grants (<code>ro</code>, <code>rox</code>, <code>rw</code>, <code>rwx</code>), <code>env</code>, network settings (<code>allow</code>, <code>deny</code>), macOS Mach services (<code>mach_lookup</code>, <code>deny_mach_lookup</code>), executable discovery defaults (<code>add_exec</code>, <code>add_libs</code>), and platform tables (<code>[macos]</code>, <code>[linux]</code>). Only <code>title</code> and <code>description</code> are metadata fields.</p><p>Path grants can use variables and entry markers; see <a href="#portable-profiles">Portable profiles</a> below.</p><p><code>inherits</code> can be one profile name or an array of profile names. Parents are merged left to right and the child is applied last. Path grants merge by path and promote permissions, so <code>rox</code> plus <code>rw</code> for the same path becomes <code>rwx</code>. Environment entries merge by variable name with later values winning. Network and Mach allow/deny entries supersede by name.</p><p><code>env</code> entries can be variable names copied from the parent environment or explicit <code>KEY=value</code> assignments. The only current network capability name is <code>network</code>, so <code>allow = ["network"]</code> enables network access and <code>deny = ["network"]</code> disables it.</p><p>The <code>[macos]</code> and <code>[linux]</code> tables are applied only on that platform. They accept <code>default_app</code>, path grants, <code>env</code>, <code>allow</code>, <code>deny</code>, <code>mach_lookup</code>, <code>deny_mach_lookup</code>, <code>add_exec</code>, and <code>add_libs</code>. They do not accept profile metadata or <code>inherits</code>.</p><h2 id="portable-profiles">Portable profiles</h2><p>A profile written on one machine should work on another, even when tools are installed in different places. Several features make path entries portable.</p><h3 id="path-variables">Path variables</h3><p><code>$WORKSPACE</code> is the workspace path; <code>$HOME</code>, <code>$TMP</code>, and <code>$TMPDIR</code> are fixed. Four variables resolve per platform, so one entry covers both operating systems:</p><table><thead><tr><th>Variable</th><th>Linux</th><th>macOS</th></tr></thead><tbody><tr><td><code>$CONFIG</code></td><td><code>$XDG_CONFIG_HOME</code> or <code>~/.config</code></td><td><code>~/Library/Application Support</code></td></tr><tr><td><code>$DATA</code></td><td><code>$XDG_DATA_HOME</code> or <code>~/.local/share</code></td><td><code>~/Library/Application Support</code></td></tr><tr><td><code>$CACHE</code></td><td><code>$XDG_CACHE_HOME</code> or <code>~/.cache</code></td><td><code>~/Library/Caches</code></td></tr><tr><td><code>$STATE</code></td><td><code>$XDG_STATE_HOME</code> or <code>~/.local/state</code></td><td><code>~/Library/Application Support</code></td></tr></tbody></table><p>On Linux, the raw <code>XDG_CONFIG_HOME</code>, <code>XDG_DATA_HOME</code>, <code>XDG_CACHE_HOME</code>, and <code>XDG_STATE_HOME</code> names are also available and honor the parent environment when set. On macOS, several of these collapse to the same directory; the <code>bulle policy</code> resolution table flags entries whose grants merge because of that.</p><h3 id="optional-and-created-entries">Optional and created entries</h3><p>Read-only entries (<code>ro</code>, <code>rox</code>) are always skipped silently when the path does not exist. Writable entries (<code>rw</code>, <code>rwx</code>) fail hard on a missing path unless marked:</p><div class="sourceCode" data-lang="toml"><pre><code data-lang="toml">rw  <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>?$HOME/.netrc<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>        <span class="calepin-syntax-scope-3">#</span> ? optional: skip when missing
+rwx <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>+$HOME/.codex/<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>       <span class="calepin-syntax-scope-3">#</span> + trailing slash: create the directory when missing
+rw  <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>+$HOME/.claude.json<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>  <span class="calepin-syntax-scope-3">#</span> + no slash: create an empty file when missing</code></pre></div><p>Creation is the right default for a tool’s own state: silently skipping a missing writable grant would produce a mysterious permission error later, and the built-in agent profiles use <code>+</code> for their state directories so they work on a fresh machine.</p><h3 id="executable-resolvers">Executable resolvers</h3><p><code>which:NAME</code> looks up <code>NAME</code> on the parent <code>PATH</code> at policy-build time and grants exactly that binary (and its symlink chain) — never its containing directory, so <code>which:codex</code> does not hand over everything else in the same <code>bin</code>. <code>pkg:NAME</code> additionally grants the tool’s package tree (two levels above the real binary), which Node- and Python-based tools need for their libraries; it refuses to expand when that tree would be a system directory such as <code>/usr</code>. Both are valid only in <code>rox</code> and <code>rwx</code>:</p><div class="sourceCode" data-lang="toml"><pre><code data-lang="toml">rox <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>which:git<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">"</span>which:rg<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">"</span>pkg:codex<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span></code></pre></div><p>Name lookup inside the sandbox works through a per-run shim directory of symlinks that <code>bulle</code> creates outside the sandbox’s writable area, grants read+execute, prepends to <code>PATH</code>, and removes after the run. A <code>which:</code>-based profile must name every binary the tool shells out to; missing ones surface through <a href="denial-diagnostics.html">denial diagnostics</a>. The broad-grant <code>tool</code> profile remains the escape hatch.</p><h3 id="tool-resolvers">Tool resolvers</h3><p>Some layouts cannot be written down at all. R’s package search path holds one entry per installed package — 70 of them on a Nix machine, each a separate store path, changing on every update. Instead of guessing, ask the tool: an entry of the form <code>TOOL:ASPECT</code> runs a known query before the sandbox starts and grants whatever it reports.</p><div class="sourceCode" data-lang="toml"><pre><code data-lang="toml">rox <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>r:home<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">"</span>r:prefix<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+ro  <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>r:libs<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+rw  <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>?+npm:cache<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">"</span>?+go:modcache<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span></code></pre></div><p>Unlike <code>which:</code>/<code>pkg:</code>, these name ordinary directories and are valid in every list. Markers work as usual: <code>?</code> skips when the tool is absent, <code>+</code> creates a directory the tool reports but has not made yet. Results are re-resolved as literal paths, so the symlink pairing and sensitive-target refusals apply exactly as they do to a hand-written path.</p><p>Run <code>bulle resolvers</code> to see every resolver and what it points at on the current machine — a resolver that reports nothing is otherwise indistinguishable from one that works. The set is fixed by <code>bulle</code>: a profile chooses from it but can never supply a command to run, because profiles are installable from GitHub and one that could run commands would make installing a profile equivalent to running its author’s code. An unknown namespace is an error rather than a literal path, and a literal path in that shape must be written <code>./ruby:gems</code> or absolute.</p><p>Some aspects are guarded. <code>r:prefix</code> reports R’s installation root, which is narrow where R owns its own directory (a Nix store path, a Homebrew Cellar entry) and far too broad where it is <code>/usr</code>; results matching the <code>pkg:</code> system-root denylist are dropped rather than granted.</p><h3 id="globs">Globs</h3><p>A <code>*</code> matches within one path segment (no <code>**</code>). No matches means the entry is skipped, so version-stamped directories stop breaking on upgrade:</p><div class="sourceCode" data-lang="toml"><pre><code data-lang="toml">rox <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>$HOME/.nvm/versions/node/*/bin<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span></code></pre></div><h3 id="custom-variables">Custom variables</h3><p>Machine-specific layouts live in a <code>[vars]</code> table in <code>&lt;config>/config.toml</code> (usually <code>~/.config/bulle/config.toml</code>), or one-off with <code>--var NAME=VALUE</code>:</p><div class="sourceCode" data-lang="toml"><pre><code data-lang="toml"><span class="calepin-syntax-scope-3">[</span>vars<span class="calepin-syntax-scope-3">]</span>
+PROJECTS <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">"</span>/mnt/work/repos<span class="calepin-syntax-scope-3">"</span></code></pre></div><p>Profiles then reference <code>$PROJECTS</code>, and <code>${NAME:-fallback}</code> supplies a default when a variable is unset. A small allowlist of well-known tool environment variables (<code>CARGO_HOME</code>, <code>GOPATH</code>, <code>NVM_DIR</code>, <code>PYENV_ROOT</code>, and similar) may also be referenced; their values come from the parent environment and are treated as untrusted — values that are not absolute paths, or that resolve to <code>/</code> or the home directory, are ignored so a hostile environment cannot widen a grant. Custom variable names are uppercase, and reserved names (<code>HOME</code>, <code>WORKSPACE</code>, <code>TMP</code>, <code>CONFIG</code>, <code>DATA</code>, <code>CACHE</code>, <code>STATE</code>, <code>XDG_*</code>, …) cannot be redefined.</p><h2 id="writing-profiles">Writing a tool profile</h2><p>This section is the recipe for adding a language or tool profile to bulle. It distills what shipping the <code>r</code> and <code>uv</code> profiles taught: comprehensiveness comes from asking the tool where its files are instead of hardcoding paths, and constraint comes from an offline, read-only base profile with an opt-in <code>-install</code> variant.</p><h3 id="the-slot-checklist">The slot checklist</h3><p>Every language toolchain decomposes into the same handful of grants. Fill in each slot, or note why it does not apply:</p><table><thead><tr><th>Slot</th><th>Typical list</th><th>Example</th></tr></thead><tbody><tr><td>Interpreter / launcher binaries</td><td><code>rox</code></td><td><code>?which:R</code>, <code>?which:uv</code></td></tr><tr><td>Tool home (stdlib, <code>etc/</code>, launch scripts)</td><td><code>rox</code></td><td><code>?r:home</code>, <code>?go:root</code></td></tr><tr><td>Library search path</td><td><code>ro</code></td><td><code>?r:libs</code></td></tr><tr><td>User-writable library</td><td><code>rw</code> in <code>-install</code> only</td><td><code>?+r:libs-user</code></td></tr><tr><td>Package cache</td><td><code>ro</code>, or redirected</td><td><code>?uv:cache</code>, <code>UV_NO_CACHE=1</code></td></tr><tr><td>Runtime cache the tool insists on writing</td><td>redirect into sandbox tmp</td><td><code>DENO_DIR=$TMP/bulle/tmp/deno</code></td></tr><tr><td>Config and startup files</td><td><code>ro</code>, optional</td><td><code>?~/.Rprofile</code>, <code>?$CONFIG/uv</code></td></tr><tr><td>Temp</td><td>inherited from <code>tool</code></td><td>—</td></tr><tr><td>Environment variables</td><td><code>env</code></td><td><code>R_LIBS_USER</code>, <code>UV_CACHE_DIR</code></td></tr><tr><td>Network</td><td><code>deny</code> in base, <code>allow</code> in <code>-install</code></td><td>—</td></tr></tbody></table><h3 id="house-rules">House rules</h3><ol><li><strong>Ask the tool, don’t guess.</strong> Interpreter layout is not predictable (Nix store paths, Homebrew kegs, version managers). Use <code>which:NAME</code> for binaries and a tool resolver (<code>r:home</code>, <code>uv:cache</code>, <code>npm:cache</code>) for directories. Literal paths are fallbacks for when the tool is absent. <code>bulle resolvers</code> shows every resolver and what it reports on the current machine.</li><li><strong>Base profiles are offline and read-only for libraries.</strong> A sandboxed process that can write the user library or package cache can plant code that the user’s own non-sandboxed sessions will load later. That turns “wrote in the workspace” into “wrote code that runs outside the sandbox.” Installation is opt-in through a separate <code>&lt;name>-install</code> profile that inherits the base, adds the writable library or cache, and allows network.</li><li><strong>Mark machine-dependent entries optional (<code>?</code>).</strong> A resolver that finds nothing, or a startup file that does not exist, must not break the run. Never force an environment variable’s value: list the name so an explicitly configured value passes through, and let the tool compute its default otherwise. When a tool insists on a writable cache even for offline runs, do not grant its real cache: set an explicit value that redirects it into the sandbox tmp — profile <code>env</code> values expand path variables, so <code>"DENO_DIR=$TMP/bulle/tmp/deno"</code> works on every platform (<code>UV_NO_CACHE=1</code> and quarto’s <code>DENO_DIR</code> are the shipped examples).</li><li><strong>Do not build shared platform abstractions.</strong> uv follows XDG on macOS; R uses <code>~/Library</code> there. Each profile encodes (or queries) its own tool’s convention.</li><li><strong>Let the engine handle runtime libraries.</strong> <code>add_libs = true</code> makes bulle follow wrapper scripts and shebang chains inside the granted trees, find every ELF object (including package <code>libs/</code> directories on the read-only search path), resolve their <code>DT_NEEDED</code>/<code>RPATH</code> closures, and grant the results. Do not enumerate <code>libblas</code>/<code>libgfortran</code>-style dependencies in profile text.</li><li><strong>No profile ships without smoke tests.</strong> Add a row to the profile smoke table in <code>internal/integration/profile_smoke_test.go</code>. The CI matrix runs it on Ubuntu, macOS, and Nix; Nix is the adversarial case, and a profile that survives it survives the others.</li></ol><h3 id="skeleton">Skeleton</h3><div class="sourceCode" data-lang="toml"><pre><code data-lang="toml"><span class="calepin-syntax-scope-3">#</span> profiles/mytool.toml
+title <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">"</span>MyTool<span class="calepin-syntax-scope-3">"</span>
+description <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">"</span>mytool interpreter and libraries<span class="calepin-syntax-scope-3">"</span>
+inherits <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>tool<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">"</span>terminal<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+
+rox <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>?which:mytool<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">"</span>?mytool:home<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+ro <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>?mytool:libs<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">"</span>?$CONFIG/mytool<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+env <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>MYTOOL_HOME<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">"</span>MYTOOL_OPTIONS<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+deny <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>network<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+add_libs <span class="calepin-syntax-scope-3">=</span> true</code></pre></div><div class="sourceCode" data-lang="toml"><pre><code data-lang="toml"><span class="calepin-syntax-scope-3">#</span> profiles/mytool-install.toml
+title <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">"</span>MyTool (with package installation)<span class="calepin-syntax-scope-3">"</span>
+description <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">"</span>mytool plus a writable user library and registry access<span class="calepin-syntax-scope-3">"</span>
+inherits <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">"</span>mytool<span class="calepin-syntax-scope-3">"</span>
+
+rw <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>?+mytool:libs-user<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+allow <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>network<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span></code></pre></div><h3 id="adding-a-resolver">Adding a resolver</h3><p>Resolvers are a fixed registry in <code>internal/policy/tools.go</code> — profiles can never name an arbitrary command to run, because installing a profile must not be equivalent to running its author’s code. Adding support for a new tool is usually two to four table rows of the form:</p><div class="sourceCode" data-lang="go"><pre><code data-lang="go">{
+    tool<span class="calepin-syntax-scope-3">:</span> <span class="calepin-syntax-scope-3">"</span>mytool<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> aspect<span class="calepin-syntax-scope-3">:</span> <span class="calepin-syntax-scope-3">"</span>libs<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span>
+    argv<span class="calepin-syntax-scope-3">:</span>        []string{<span class="calepin-syntax-scope-3">"</span>mytool<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">"</span>config<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">"</span>libdir<span class="calepin-syntax-scope-3">"</span>}<span class="calepin-syntax-scope-3">,</span>
+    format<span class="calepin-syntax-scope-3">:</span>      formatSingle<span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">//</span> or formatLines
+    description<span class="calepin-syntax-scope-3">:</span> <span class="calepin-syntax-scope-3">"</span>mytool's library directory<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span>
+}<span class="calepin-syntax-scope-3">,</span></code></pre></div><p>Constraints the registry enforces for you: resolvers run against the parent environment before the sandbox starts, results re-enter normal path resolution (symlink pairing, sensitive-target refusals), failures are non-fatal for <code>?</code> entries, and output is deduplicated and sorted so the policy is stable across runs. Set <code>denySystemRoots: true</code> on any aspect that can report an installation prefix, so <code>/usr</code> never becomes a grant.</p><h3 id="debugging-a-new-profile">Debugging a new profile</h3><p>Run the target command under the profile and read the denial report: bulle aggregates denials inside one Nix store item or Homebrew keg into a single suggested grant and prints a copy-pasteable <code>bulle rerun …</code> retry line. <code>bulle policy</code> shows the fully resolved grants; <code>bulle policy --json</code> is machine-readable. Recurring denials usually mean a missing slot from the checklist above rather than a one-off path.</p>
         </main>
                 
         <aside class="calepin-website-toc is-floating">
@@ -2716,15 +2791,41 @@ bulle: retry with these grants: bulle rerun --ro ~/.gitconfig</code></pre></div>
             <nav aria-label="On this page">
                 <ul>
                     
-                    <li class="level-2"><a href="#macos">macOS</a></li>
+                    <li class="level-2"><a href="#selection-and-inference">Selection and inference</a></li>
                     
-                    <li class="level-2"><a href="#linux">Linux</a></li>
+                    <li class="level-2"><a href="#built-in-and-installed-profiles">Built-in and installed profiles</a></li>
                     
-                    <li class="level-3"><a href="#inspecting-denials-manually">Inspecting denials manually</a></li>
+                    <li class="level-3"><a href="#capability-micro-profiles">Capability micro-profiles</a></li>
                     
-                    <li class="level-2"><a href="#how-suggestions-map-to-flags">How suggestions map to flags</a></li>
+                    <li class="level-3"><a href="#installing-profiles">Installing profiles</a></li>
                     
-                    <li class="level-2"><a href="#rerun">Rerunning with added grants</a></li>
+                    <li class="level-2"><a href="#toml">The TOML format</a></li>
+                    
+                    <li class="level-2"><a href="#portable-profiles">Portable profiles</a></li>
+                    
+                    <li class="level-3"><a href="#path-variables">Path variables</a></li>
+                    
+                    <li class="level-3"><a href="#optional-and-created-entries">Optional and created entries</a></li>
+                    
+                    <li class="level-3"><a href="#executable-resolvers">Executable resolvers</a></li>
+                    
+                    <li class="level-3"><a href="#tool-resolvers">Tool resolvers</a></li>
+                    
+                    <li class="level-3"><a href="#globs">Globs</a></li>
+                    
+                    <li class="level-3"><a href="#custom-variables">Custom variables</a></li>
+                    
+                    <li class="level-2"><a href="#writing-profiles">Writing a tool profile</a></li>
+                    
+                    <li class="level-3"><a href="#the-slot-checklist">The slot checklist</a></li>
+                    
+                    <li class="level-3"><a href="#house-rules">House rules</a></li>
+                    
+                    <li class="level-3"><a href="#skeleton">Skeleton</a></li>
+                    
+                    <li class="level-3"><a href="#adding-a-resolver">Adding a resolver</a></li>
+                    
+                    <li class="level-3"><a href="#debugging-a-new-profile">Debugging a new profile</a></li>
                     
                 </ul>
             </nav>
@@ -2750,6 +2851,17 @@ bulle: retry with these grants: bulle rerun --ro ~/.gitconfig</code></pre></div>
     
         
         
+            
+            
+        
+        
+        
+    
+        
+        
+            
+            
+        
         
             
         
@@ -2763,17 +2875,6 @@ bulle: retry with these grants: bulle rerun --ro ~/.gitconfig</code></pre></div>
         
     
         
-        
-            
-            
-        
-        
-        
-    
-        
-        
-            
-            
         
         
             
@@ -2785,20 +2886,20 @@ bulle: retry with these grants: bulle rerun --ro ~/.gitconfig</code></pre></div>
     <footer class="calepin-website-page-nav" aria-label="Page navigation">
       <div class="calepin-website-page-nav-inner">
         
-        <a class="calepin-website-page-nav-link calepin-website-page-nav-link--prev outline secondary" href="scratch.html" role="button">
+        <a class="calepin-website-page-nav-link calepin-website-page-nav-link--prev outline secondary" href="permissions.html" role="button">
           <span class="calepin-website-page-nav-arrow" aria-hidden="true">&larr;</span>
           <span class="calepin-website-page-nav-content">
             <span class="calepin-website-page-nav-kind">Previous</span>
-            <span class="calepin-website-page-nav-title">Scratch Workspaces</span>
+            <span class="calepin-website-page-nav-title">Permissions</span>
           </span>
         </a>
         
 
         
-        <a class="calepin-website-page-nav-link calepin-website-page-nav-link--next outline secondary" href="cli-reference.html" role="button">
+        <a class="calepin-website-page-nav-link calepin-website-page-nav-link--next outline secondary" href="scratch.html" role="button">
           <span class="calepin-website-page-nav-content">
             <span class="calepin-website-page-nav-kind">Next</span>
-            <span class="calepin-website-page-nav-title">CLI Reference</span>
+            <span class="calepin-website-page-nav-title">Scratch Workspaces</span>
           </span>
           <span class="calepin-website-page-nav-arrow" aria-hidden="true">&rarr;</span>
         </a>

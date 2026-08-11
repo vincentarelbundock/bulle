@@ -1,6 +1,6 @@
 
 
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Diagnostics</title>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Permissions</title>
     
     
     <meta name="description" content="bulle runs local commands in a sandbox, exposing only the essential parts of your machine.">
@@ -14,12 +14,12 @@
     
     
     
-    <meta property="og:title" content="Diagnostics | bulle">
+    <meta property="og:title" content="Permissions | bulle">
     
     
     
-    <link rel="canonical" href="https://vincentarelbundock.github.io/bulle/denial-diagnostics.html">
-    <meta property="og:url" content="https://vincentarelbundock.github.io/bulle/denial-diagnostics.html">
+    <link rel="canonical" href="https://vincentarelbundock.github.io/bulle/permissions.html">
+    <meta property="og:url" content="https://vincentarelbundock.github.io/bulle/permissions.html">
     
     
     <link rel="icon" href="assets/favicon.png">
@@ -2606,7 +2606,7 @@ html:not([data-theme]) {
             </ul>
             <ul>
                 
-                                <li><a href="permissions.html" aria-label="Permissions">Permissions</a></li>
+                                <li><a href="permissions.html" aria-label="Permissions" aria-current="page">Permissions</a></li>
                 
                                 <li><a href="profiles.html" aria-label="Profiles">Profiles</a></li>
                 
@@ -2643,7 +2643,7 @@ html:not([data-theme]) {
                 <p><strong>Site</strong></p>
                 <ul>
                     
-                                    <li><a href="permissions.html" aria-label="Permissions">Permissions</a></li>
+                                    <li><a href="permissions.html" aria-label="Permissions" aria-current="page">Permissions</a></li>
                     
                                     <li><a href="profiles.html" aria-label="Profiles">Profiles</a></li>
                     
@@ -2674,7 +2674,7 @@ html:not([data-theme]) {
 
                         
                         
-<li class="calepin-website-sidebar-link"><a href="permissions.html" aria-label="Permissions">Permissions</a></li>
+<li class="calepin-website-sidebar-link"><a href="permissions.html" aria-label="Permissions" class="active" aria-current="page">Permissions</a></li>
 
                         
                         
@@ -2686,7 +2686,7 @@ html:not([data-theme]) {
 
                         
                         
-<li class="calepin-website-sidebar-link"><a href="denial-diagnostics.html" aria-label="Diagnostics" class="active" aria-current="page">Diagnostics</a></li>
+<li class="calepin-website-sidebar-link"><a href="denial-diagnostics.html" aria-label="Diagnostics">Diagnostics</a></li>
 
                         
                         
@@ -2701,14 +2701,41 @@ html:not([data-theme]) {
             </nav>
         </aside>
         <main class="calepin-website-main calepin-content" data-pagefind-body>
-            <h1 id="diagnostics">Diagnostics</h1><p>When a sandboxed command fails, the most common question is: <em>which path did the sandbox block?</em> On supported systems, <code>bulle</code> answers it for you. After a failed run, it reads the operating system’s own record of sandbox denials and prints copy-pasteable fixes:</p><div class="sourceCode" data-lang="text"><pre><code data-lang="text">$ bulle ~/project -- cat ~/.gitconfig
-cat: /home/vincent/.gitconfig: Permission denied
-bulle: the sandbox denied the following accesses during this run:
-  denied: read /home/vincent/.gitconfig — add --ro ~/.gitconfig</code></pre></div><p>Add the suggested flag and re-run. No configuration inside <code>bulle</code> is needed — the hints appear automatically whenever the OS makes denial records available, and stay silent otherwise.</p><p>These hints are diagnostics only. Enforcement is always done by the kernel (<a href="https://landlock.io/">Landlock</a> on Linux, Seatbelt on macOS) and works identically whether or not denial logging is available.</p><h2 id="macos">macOS</h2><p>Nothing to set up. The macOS kernel logs every sandbox violation to the unified log, and <code>bulle</code> queries it (<code>log show</code>) after a failed run. Two caveats:</p><ul><li>Reading the log takes a few seconds, so hints may appear with a short delay after a failure.</li><li>Violation records are written asynchronously, and the unified log sometimes redacts file paths as <code>&lt;private></code>. Denials from the very end of a run, or with redacted paths, may be missing from the hints.</li></ul><h2 id="linux">Linux</h2><p>Denial hints need two things, both common but not universal:</p><ol><li><strong>A kernel with Landlock audit support</strong> — Linux 6.15 or newer (Landlock ABI v7). On older kernels, <code>bulle</code> enforces the sandbox exactly the same but cannot obtain denial records.</li><li><strong>The audit subsystem enabled at runtime.</strong> Some distributions ship it on, others off:</li></ol><table><thead><tr><th>Distribution</th><th>To enable denial logging permanently</th></tr></thead><tbody><tr><td>Fedora, RHEL, CentOS, Rocky</td><td>Nothing to do — on by default</td></tr><tr><td>openSUSE</td><td>Nothing to do — on by default</td></tr><tr><td>Debian, Ubuntu</td><td><code>sudo apt install auditd</code></td></tr><tr><td>Arch</td><td><code>sudo pacman -S audit &amp;&amp; sudo systemctl enable --now auditd</code></td></tr><tr><td>Alpine</td><td><code>sudo apk add audit &amp;&amp; sudo rc-update add auditd &amp;&amp; sudo service auditd start</code></td></tr><tr><td>NixOS</td><td>Set <code>security.auditd.enable = true;</code> and rebuild</td></tr><tr><td>Other</td><td>Add <code>audit=1</code> to the kernel command line, or run <code>auditctl -e 1</code> (until reboot)</td></tr></tbody></table><p><code>bulle</code> reads the denial records back through <code>journalctl</code>, which requires your user to be able to read the journal. On most distributions the default administrator account already can (via the <code>adm</code> or <code>wheel</code> group); if not, add yourself to the <code>systemd-journal</code> group:</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-1">sudo</span> usermod<span class="calepin-syntax-scope-3"> -</span><span class="calepin-syntax-scope-5">aG</span> systemd-journal <span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">$</span>USER<span class="calepin-syntax-scope-3">"</span>
-</code></pre></div><p>Running <code>auditd</code> does not hide records from <code>bulle</code>: the audit daemon and the systemd journal receive kernel audit messages independently, so the hints keep working alongside a full auditd setup.</p><h3 id="inspecting-denials-manually">Inspecting denials manually</h3><p>The same records are available directly, with or without <code>bulle</code>:</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-1">journalctl</span><span class="calepin-syntax-scope-3"> --</span><span class="calepin-syntax-scope-5">quiet</span><span class="calepin-syntax-scope-3"> --</span><span class="calepin-syntax-scope-5">no-pager</span> _TRANSPORT=audit + _TRANSPORT=kernel <span class="calepin-syntax-scope-3">|</span> <span class="calepin-syntax-scope-1">grep</span> blockers=
-</code></pre></div><p>Each Landlock denial looks like:</p><div class="sourceCode" data-lang="text"><pre><code data-lang="text">audit: type=1423 audit(1729738800.268:30): domain=195ba459b blockers=fs.read_file path="/home/vincent/.gitconfig" dev="vda2" ino=1523541</code></pre></div><h2 id="how-suggestions-map-to-flags">How suggestions map to flags</h2><table><thead><tr><th>Denied operation</th><th>Suggested grant</th></tr></thead><tbody><tr><td>read a file or directory</td><td><code>--ro PATH</code></td></tr><tr><td>write, create, delete, or truncate</td><td><code>--rw PATH</code></td></tr><tr><td>execute a program</td><td><code>--rox PATH</code></td></tr><tr><td>outbound or listening network access</td><td>none — noted as restricted by the network policy</td></tr></tbody></table><p><code>bulle</code> deduplicates repeated denials, abbreviates your home directory as <code>~</code>, and caps the output at ten hints per run. Hints are only printed after a <em>failed</em> run: a command that succeeds despite probing a blocked path (many tools try optional config files) stays quiet.</p><div class="calepin-callout calepin-callout-warning"><div class="calepin-callout-title">Hints are suggestions, not automatic decisions</div><div class="calepin-callout-body">A denial means the sandbox worked. Before copying a suggested flag, consider whether the command <em>should</em> have that access — an untrusted tool probing <code>~/.ssh</code> is exactly what the sandbox is for.</div></div><h2 id="rerun">Rerunning with added grants</h2><p>A sandboxed run often fails because one grant is missing. Alongside the hints above, <code>bulle</code> prints a copy-pasteable retry line:</p><div class="sourceCode" data-lang="text"><pre><code data-lang="text">bulle: the sandbox denied the following accesses during this run:
-  denied: read /home/user/.gitconfig — add --ro ~/.gitconfig
-bulle: retry with these grants: bulle rerun --ro ~/.gitconfig</code></pre></div><p><code>bulle rerun</code> repeats the previous invocation — from any shell, restoring the original working directory — and inserts any extra flags before the command, so the retry line works as-is. Each run overwrites the recorded invocation, and repeated <code>rerun</code> invocations accumulate their added grants. The sandbox is restarted rather than widened: Landlock cannot extend a live sandbox, and agents resume from their own session state.</p><p>The invocation is recorded in <code>$XDG_STATE_HOME/bulle/last-run.json</code> (usually <code>~/.local/state/bulle/</code>) on Linux and <code>~/Library/Application Support/bulle/</code> on macOS.</p>
+            <h1 id="permissions">Permissions</h1><p>Every run resolves to one policy: the paths the command may read, write, or execute, the environment variables it inherits, and whether it may reach the network. This page covers the grants you write by hand, how to inspect the result, and how the operating system enforces it. <a href="profiles.html">Profiles</a> bundle the same grants under a name so you do not repeat them.</p><h2 id="filesystem">Filesystem</h2><p>The workspace is the command’s working directory and writable area. If omitted, it defaults to the current directory. Use <code>--no-workspace</code> when you do not want this automatic read-write grant.</p><p>Additional filesystem access is explicit. Use these flags to add paths to the active policy:</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-1">--ro</span> path        <span class="calepin-syntax-scope-3">#</span> read-only
+<span class="calepin-syntax-scope-1">--rox</span> path       <span class="calepin-syntax-scope-3">#</span> read-only plus execute
+<span class="calepin-syntax-scope-1">--rw</span> path        <span class="calepin-syntax-scope-3">#</span> read-write
+<span class="calepin-syntax-scope-1">--rwx</span> path       <span class="calepin-syntax-scope-3">#</span> read-write plus execute
+<span class="calepin-syntax-scope-1">--no-workspace   </span><span class="calepin-syntax-scope-3">#</span><span class="calepin-syntax-scope-1"> do not automatically grant the workspace read-write access</span>
+</code></pre></div><div class="calepin-callout calepin-callout-note"><div class="calepin-callout-body">Grant the narrowest paths that are practical. Use <code>--rw</code> or <code>--rwx</code> only for paths outside the workspace that the command should be allowed to modify.</div></div><p>The <code>--</code> separator may be omitted when the reading is unambiguous. The first positional argument that is an existing directory reads as the workspace; the first positional that is not an existing directory starts the command, and <code>bulle</code> announces the split on stderr:</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-1">bulle</span> ~/repos/project git status
+<span class="calepin-syntax-scope-3">#</span> bulle: treating "git" as the start of the command; use -- to separate the command explicitly
+</code></pre></div><p>Ambiguity resolves toward the workspace reading, so <code>--</code> remains the explicit way to force a directory name to be treated as a command.</p><p>Path entries written in a profile can also use variables, globs, and optional/create markers so one entry works on every machine; see <a href="profiles.html#portable-profiles">Portable profiles</a>.</p><h2 id="environment">Environment</h2><p>Environment variables are also explicit. By default, <code>bulle</code> does not pass your shell environment into the sandbox. Use <code>--env NAME</code> to pass a variable from the parent environment, or <code>--env NAME=VALUE</code> to define one on the fly:</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-1">bulle</span><span class="calepin-syntax-scope-3"> --</span><span class="calepin-syntax-scope-5">rox</span> /usr/bin<span class="calepin-syntax-scope-3"> --</span><span class="calepin-syntax-scope-5">env</span> HELLO=WORLD<span class="calepin-syntax-scope-3"> --</span> printenv HELLO
+</code></pre></div><p>This is important for secrets. A command cannot read <code>OPENAI_API_KEY</code>, <code>GITHUB_TOKEN</code>, or similar variables unless you explicitly pass them.</p><p>Three conveniences cover common cases:</p><ul><li><strong>Name globs.</strong> <code>--env 'GIT_*'</code> passes every parent variable whose name matches the glob. Quote the pattern so your shell does not expand it. Globs also work in profile <code>env</code> lists.</li><li><strong>Dotenv files.</strong> <code>--env-file PATH</code> loads <code>NAME=VALUE</code> entries from a dotenv-style file: blank lines and <code>#</code> comments are ignored, an optional <code>export<span style="white-space: pre-wrap">&#x20;</span></code> prefix is stripped, and matching single or double quotes around values are removed.</li><li><strong>Everything except.</strong> <code>--env-all-except SECRET_KEY,GITHUB_TOKEN</code> passes the whole parent environment minus the named variables, for throwaway commands that want your shell environment without specific secrets.</li></ul><p>When sources conflict, the most explicit wins: profile entries, then <code>--env-all-except</code>, then <code>--env-file</code>, then <code>--env</code>.</p><p>The summary and JSON views list environment variables by name only; neither view prints their values.</p><h2 id="network">Network</h2><p>Network access is controlled by profiles. The built-in <code>network</code> profile allows it, and the built-in <code>offline</code> profile denies it. On macOS, the <code>network</code> profile also inherits DNS and certificate service bundles that network clients normally need. Built-in agent profiles inherit network access for compatibility with package managers and remote services.</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-1">bulle</span><span class="calepin-syntax-scope-3"> --</span><span class="calepin-syntax-scope-5">profile</span> offline<span class="calepin-syntax-scope-3"> --</span><span class="calepin-syntax-scope-5">rox</span> /bin<span class="calepin-syntax-scope-3"> --</span> /bin/ls
+<span class="calepin-syntax-scope-1">bulle</span><span class="calepin-syntax-scope-3"> --</span><span class="calepin-syntax-scope-5">profile</span> codex,offline
+</code></pre></div><p>In a profile the capability is named <code>network</code>, so <code>allow = ["network"]</code> enables access and <code>deny = ["network"]</code> disables it.</p><h2 id="executables-and-libraries">Executables and libraries</h2><p>For quick local commands, <code>--add-exec</code> can save you from spelling out executable grants by hand. It resolves the command before the sandbox starts and adds the executable to the policy:</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-1">bulle</span><span class="calepin-syntax-scope-3"> --</span><span class="calepin-syntax-scope-5">add-exec</span><span class="calepin-syntax-scope-3"> --</span> /bin/ls
+</code></pre></div><p>On Linux, dynamically linked executables also need access to runtime libraries. <code>--add-libs</code> discovers the shared libraries needed by the executable and adds read-only grants for them:</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-1">bulle</span><span class="calepin-syntax-scope-3"> --</span><span class="calepin-syntax-scope-5">add-exec</span><span class="calepin-syntax-scope-3"> --</span><span class="calepin-syntax-scope-5">add-libs</span><span class="calepin-syntax-scope-3"> --</span> /usr/bin/git status
+</code></pre></div><p>These flags are conveniences for executables and runtime libraries. They do not add app state files, config directories, caches, secrets, or shell environment variables. Use <a href="profiles.html">profiles</a> for agents and other tools that need a larger, repeatable policy.</p><p>Profiles can enable these conveniences with <code>add_exec = true</code> and <code>add_libs = true</code>. Boolean settings inherit like other scalar profile settings: an explicit value in a later inherited profile or child profile overrides the earlier value.</p><h2 id="policy">Inspecting the policy</h2><p>Use <code>bulle policy</code> to inspect the resolved sandbox policy without running the command. By default, it prints the same human-readable permissions summary that <code>bulle</code> sends to supported LLM agent profiles at startup. This is a useful safety check before launching an agent or script, especially when combining profiles with extra filesystem or environment grants.</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-1">bulle</span> policy<span class="calepin-syntax-scope-3"> --</span><span class="calepin-syntax-scope-5">profile</span> codex
+</code></pre></div><p>No command is required: without one (and without a configured <code>default_app</code>), the policy is resolved and printed as-is, minus command-dependent grants such as <code>--add-exec</code> and shebang interpreter discovery.</p><h3 id="the-resolution-table">The resolution table</h3><p>The summary ends with a <strong>resolution table</strong>: one line per configured entry showing what it resolved to — granted, skipped, created, or expanded from a <code>which:</code>/<code>pkg:</code> resolver or glob — so “why can’t the agent see X” is answerable from one command. Entries whose resolved path is also granted through another list (for example when <code>$CONFIG</code> and <code>$DATA</code> collapse to the same directory on macOS) are flagged with their effective permission.</p><div class="sourceCode" data-lang="text"><pre><code data-lang="text">  resolution:
+    rox  which:codex        → /home/user/.local/share/mise/installs/node/22/bin/codex (+1 more)
+    rwx  +$HOME/.codex/     → created (dir) /home/user/.codex
+    rw   ?$HOME/.netrc      → skipped (does not exist)</code></pre></div><h3 id="json-output">JSON output</h3><p>Stable machine-readable output is available with <code>bulle policy --json</code>:</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-1">bulle</span> policy<span class="calepin-syntax-scope-3"> --</span><span class="calepin-syntax-scope-5">json</span> ~/Desktop<span class="calepin-syntax-scope-3"> --</span><span class="calepin-syntax-scope-5">rox</span> /bin<span class="calepin-syntax-scope-3"> --</span> /bin/ls
+</code></pre></div><div class="sourceCode" data-lang="json"><pre><code data-lang="json">{
+  <span class="calepin-syntax-scope-3">"</span>backend<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">:</span> <span class="calepin-syntax-scope-3">"</span>macos-seatbelt<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span>
+  <span class="calepin-syntax-scope-3">"</span>workspace_path<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">:</span> <span class="calepin-syntax-scope-3">"</span>/home/user/Desktop<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span>
+  <span class="calepin-syntax-scope-3">"</span>command<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">:</span> [<span class="calepin-syntax-scope-3">"</span>/bin/ls<span class="calepin-syntax-scope-3">"</span>]<span class="calepin-syntax-scope-3">,</span>
+  <span class="calepin-syntax-scope-3">"</span>ro<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">:</span> []<span class="calepin-syntax-scope-3">,</span>
+  <span class="calepin-syntax-scope-3">"</span>rox<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">:</span> [<span class="calepin-syntax-scope-3">"</span>/bin<span class="calepin-syntax-scope-3">"</span>]<span class="calepin-syntax-scope-3">,</span>
+  <span class="calepin-syntax-scope-3">"</span>rw<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">:</span> [<span class="calepin-syntax-scope-3">"</span>/home/user/Desktop<span class="calepin-syntax-scope-3">"</span>]<span class="calepin-syntax-scope-3">,</span>
+  <span class="calepin-syntax-scope-3">"</span>rwx<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">:</span> []<span class="calepin-syntax-scope-3">,</span>
+  <span class="calepin-syntax-scope-3">"</span>env_keys<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">:</span> []<span class="calepin-syntax-scope-3">,</span>
+  <span class="calepin-syntax-scope-3">"</span>add_exec<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">:</span> false<span class="calepin-syntax-scope-3">,</span>
+  <span class="calepin-syntax-scope-3">"</span>add_libs<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">:</span> false<span class="calepin-syntax-scope-3">,</span>
+  <span class="calepin-syntax-scope-3">"</span>mach_lookup<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">:</span> []<span class="calepin-syntax-scope-3">,</span>
+  <span class="calepin-syntax-scope-3">"</span>network<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">:</span> <span class="calepin-syntax-scope-3">"</span>full<span class="calepin-syntax-scope-3">"</span>
+}</code></pre></div><p>In the <code>bulle policy --json</code> example, <code>workspace_path</code> is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to <code>/home/user/Desktop</code>, shown in the <code>rw</code> array. The <code>command</code> field is the command that would be executed, and the <code>ro</code>, <code>rox</code>, <code>rw</code>, and <code>rwx</code> arrays show the readable, executable, writable, and writable-executable path grants. The <code>env_keys</code> array lists environment variables that would be passed into the sandbox. The <code>mach_lookup</code> array lists configured macOS Mach services. The <code>network</code> field shows the resolved network state. The <code>backend</code> value depends on your operating system.</p><h2 id="configuration-defaults">Configuration defaults</h2><p>A <code>[defaults]</code> block in <code>&lt;config>/config.toml</code> (usually <code>~/.config/bulle/config.toml</code>) supplies values used when the corresponding flag is absent, so bare <code>bulle</code> does the usual thing in a repository:</p><div class="sourceCode" data-lang="toml"><pre><code data-lang="toml"><span class="calepin-syntax-scope-3">[</span>defaults<span class="calepin-syntax-scope-3">]</span>
+profile <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">"</span>claude<span class="calepin-syntax-scope-3">"</span>
+timeout <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">"</span>2h<span class="calepin-syntax-scope-3">"</span>
+env <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>GITHUB_TOKEN<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
+ro <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>?~/.gitconfig<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span></code></pre></div><p>Explicit flags always win: <code>--profile codex</code> overrides the default profile, <code>--timeout</code> the default timeout, and list-valued defaults (<code>env</code>, <code>ro</code>, <code>rox</code>, <code>rw</code>, <code>rwx</code>) are merged with command-line entries taking precedence. Pass <code>--no-defaults</code> to ignore the block entirely.</p><p>The same file holds the <code>[vars]</code> table used by <a href="profiles.html#portable-profiles">portable profiles</a>, and the <code>[scratch]</code> table that relocates <a href="scratch.html">scratch workspaces</a>.</p><h2 id="os-level-sandboxing">OS-level sandboxing</h2><p><code>bulle</code> builds a policy before the command starts. The policy is assembled from the workspace, selected profile, command-line flags, selected environment variables, network profile settings, executable discovery, and runtime library defaults. Paths are resolved before sandbox setup, and <code>bulle policy</code> prints the resulting policy without running the command.</p><h3 id="linux">Linux</h3><p>On Linux, <code>bulle</code> applies the policy with <a href="https://docs.kernel.org/userspace-api/landlock.html">Landlock</a>. Landlock is a kernel feature, not a package to install; basic filesystem sandboxing requires Linux 5.13 or later with Landlock enabled. The Linux backend restricts filesystem access for the process and its children according to the resolved read, write, and execute grants. When the resolved network setting is denied, it also installs a seccomp filter before <code>exec</code> to deny socket-related system calls.</p><h3 id="macos">macOS</h3><p>On macOS, <code>bulle</code> generates a <a href="https://www.unix.com/man_page/osx/5/sandbox/">Seatbelt</a> profile and runs the command with <code>/usr/bin/sandbox-exec</code>. The macOS backend maps the same policy model to Seatbelt rules, including filesystem rules, optional network allowance, and selected Mach service access from configured <code>mach_lookup</code> entries. This is useful for local workflows, but its behavior is not identical to Linux Landlock.</p><p>When a run fails because the kernel blocked something, <a href="denial-diagnostics.html">denial diagnostics</a> report which path it was.</p>
         </main>
                 
         <aside class="calepin-website-toc is-floating">
@@ -2716,15 +2743,27 @@ bulle: retry with these grants: bulle rerun --ro ~/.gitconfig</code></pre></div>
             <nav aria-label="On this page">
                 <ul>
                     
-                    <li class="level-2"><a href="#macos">macOS</a></li>
+                    <li class="level-2"><a href="#filesystem">Filesystem</a></li>
                     
-                    <li class="level-2"><a href="#linux">Linux</a></li>
+                    <li class="level-2"><a href="#environment">Environment</a></li>
                     
-                    <li class="level-3"><a href="#inspecting-denials-manually">Inspecting denials manually</a></li>
+                    <li class="level-2"><a href="#network">Network</a></li>
                     
-                    <li class="level-2"><a href="#how-suggestions-map-to-flags">How suggestions map to flags</a></li>
+                    <li class="level-2"><a href="#executables-and-libraries">Executables and libraries</a></li>
                     
-                    <li class="level-2"><a href="#rerun">Rerunning with added grants</a></li>
+                    <li class="level-2"><a href="#policy">Inspecting the policy</a></li>
+                    
+                    <li class="level-3"><a href="#the-resolution-table">The resolution table</a></li>
+                    
+                    <li class="level-3"><a href="#json-output">JSON output</a></li>
+                    
+                    <li class="level-2"><a href="#configuration-defaults">Configuration defaults</a></li>
+                    
+                    <li class="level-2"><a href="#os-level-sandboxing">OS-level sandboxing</a></li>
+                    
+                    <li class="level-3"><a href="#linux">Linux</a></li>
+                    
+                    <li class="level-3"><a href="#macos">macOS</a></li>
                     
                 </ul>
             </nav>
@@ -2743,6 +2782,17 @@ bulle: retry with these grants: bulle rerun --ro ~/.gitconfig</code></pre></div>
     
         
         
+            
+            
+        
+        
+        
+    
+        
+        
+            
+            
+        
         
             
         
@@ -2763,17 +2813,6 @@ bulle: retry with these grants: bulle rerun --ro ~/.gitconfig</code></pre></div>
         
     
         
-        
-            
-            
-        
-        
-        
-    
-        
-        
-            
-            
         
         
             
@@ -2785,20 +2824,20 @@ bulle: retry with these grants: bulle rerun --ro ~/.gitconfig</code></pre></div>
     <footer class="calepin-website-page-nav" aria-label="Page navigation">
       <div class="calepin-website-page-nav-inner">
         
-        <a class="calepin-website-page-nav-link calepin-website-page-nav-link--prev outline secondary" href="scratch.html" role="button">
+        <a class="calepin-website-page-nav-link calepin-website-page-nav-link--prev outline secondary" href="index.html" role="button">
           <span class="calepin-website-page-nav-arrow" aria-hidden="true">&larr;</span>
           <span class="calepin-website-page-nav-content">
             <span class="calepin-website-page-nav-kind">Previous</span>
-            <span class="calepin-website-page-nav-title">Scratch Workspaces</span>
+            <span class="calepin-website-page-nav-title">Home</span>
           </span>
         </a>
         
 
         
-        <a class="calepin-website-page-nav-link calepin-website-page-nav-link--next outline secondary" href="cli-reference.html" role="button">
+        <a class="calepin-website-page-nav-link calepin-website-page-nav-link--next outline secondary" href="profiles.html" role="button">
           <span class="calepin-website-page-nav-content">
             <span class="calepin-website-page-nav-kind">Next</span>
-            <span class="calepin-website-page-nav-title">CLI Reference</span>
+            <span class="calepin-website-page-nav-title">Profiles</span>
           </span>
           <span class="calepin-website-page-nav-arrow" aria-hidden="true">&rarr;</span>
         </a>
