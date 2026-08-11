@@ -15,8 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   agent starts from the state you see; git objects are hardlinked, so cloning
   is nearly free. The real checkout is never granted to the sandbox. After
   the run, a review gate shows what changed — including work the agent
-  committed — and offers diff, keep, a subshell inside the scratch, or
-  discard; a run that changed nothing
+  committed — and offers diff, pull-into-origin, keep, a subshell inside the
+  scratch, or wipe; pull never commits on your behalf (a dirty scratch routes
+  through the subshell to commit first), and a failed pull changes nothing
+  and keeps the scratch. A run that changed nothing
   cleans up after itself, and a scratch with changes is never deleted
   implicitly. Integration is git-native: keep prints a one-command
   `git pull` recipe run from the origin side (warning first when the scratch

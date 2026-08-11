@@ -217,7 +217,7 @@ func reviewScratch(s *scratchState, skipPrompt bool, stdout, stderr io.Writer) {
 	}
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Fprint(stdout, "[d]iff  [k]eep  [s]hell  [D]iscard? ")
+		fmt.Fprint(stdout, "[d]iff  [p]ull  [k]eep  [s]hell  [w]ipe? ")
 		answer, err := reader.ReadString('\n')
 		if err != nil {
 			printScratchRecipe(s, stdout)
@@ -226,25 +226,69 @@ func reviewScratch(s *scratchState, skipPrompt bool, stdout, stderr io.Writer) {
 		switch strings.TrimSpace(answer) {
 		case "d":
 			pageScratchDiff(s, final, stderr)
+		case "p":
+			// Pull moves commits only, and committing is the user's call: a
+			// dirty scratch routes through [s] rather than an auto-commit.
+			if scratchIsDirty(s) {
+				fmt.Fprintln(stdout, "the scratch has uncommitted changes; use [s] to open a shell there and commit (or clean the tree), then [p] again")
+				continue
+			}
+			if pullScratch(s, stdout, stderr) {
+				return
+			}
+			// Failed pull: the scratch is untouched; re-prompt so the user
+			// can inspect or keep it.
 		case "k":
 			printScratchRecipe(s, stdout)
 			return
 		case "s":
 			openScratchShell(s, stdout, stderr)
-			printScratchRecipe(s, stdout)
-			return
-		case "D":
-			fmt.Fprintf(stdout, "discard %d changed files? [y/N] ", changed+added)
+			// The user may have committed, amended, or cleaned in the shell;
+			// recompute so [p] and an emptied scratch behave correctly.
+			newFinal, err := worktreeTree(s.Dir)
+			if err == nil {
+				final = newFinal
+			}
+			if final == s.BaselineTree && !scratchIsDirty(s) {
+				removeScratch(s)
+				fmt.Fprintln(stderr, "bulle: scratch removed: no changes remain")
+				return
+			}
+		case "w":
+			fmt.Fprintf(stdout, "wipe %d changed files? [y/N] ", changed+added)
 			confirm, err := reader.ReadString('\n')
 			if err == nil && strings.TrimSpace(confirm) == "y" {
 				removeScratch(s)
-				fmt.Fprintln(stdout, "scratch discarded")
+				fmt.Fprintln(stdout, "scratch wiped")
 				return
 			}
 		default:
 			// re-prompt
 		}
 	}
+}
+
+func scratchIsDirty(s *scratchState) bool {
+	status, err := runGit(s.Dir, "status", "--porcelain")
+	return err != nil || status != ""
+}
+
+// pullScratch integrates the scratch's commits into the origin with git pull
+// run from the origin side, so the merge updates the origin working tree
+// properly. Only called on a clean scratch. On success the scratch is
+// removed; on failure (conflicts, dirty origin) nothing is retried and the
+// scratch is kept untouched.
+func pullScratch(s *scratchState, stdout, stderr io.Writer) bool {
+	cmd := exec.Command("git", "-C", s.Origin, "pull", "--no-rebase", s.Dir)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(stderr, "bulle: pull failed; the scratch is untouched at %s\n", s.Dir)
+		return false
+	}
+	removeScratch(s)
+	fmt.Fprintf(stdout, "pulled into %s; scratch removed\n", s.Origin)
+	return true
 }
 
 func scratchChangeSummary(s *scratchState, final string) (lines []string, added, deleted, changed int) {

@@ -19,13 +19,14 @@ scratch: 4 files changed, 1 added, 0 deleted
   M	internal/policy/resolve.go
   M	internal/policy/policy.go
   A	internal/policy/scratch.go
-[d]iff  [k]eep  [s]hell  [D]iscard?
+[d]iff  [p]ull  [k]eep  [s]hell  [w]ipe?
 ~~~
 
 The whole model in three sentences: `--scratch` clones the repository locally
 (carrying your uncommitted work), runs the sandboxed command there, and shows
-a diff at the end. You keep or discard. Nothing reaches your checkout except a
-deliberate `git push` from outside the sandbox.
+a diff at the end. You pull the changes in, keep the scratch, or wipe it.
+Nothing reaches your checkout except a deliberate pull or push from outside
+the sandbox.
 
 ## How it works
 
@@ -52,12 +53,21 @@ scratch (its working directory and `$WORKSPACE` point there), and when it
 exits you are back at your own prompt, which never moved. The review summary
 and the integration recipe print right there.
 
-At the prompt: `d` pages the full diff and asks again, `k` keeps the scratch
-and prints the integration recipe, `s` keeps it and opens your shell inside
-the scratch (unsandboxed — the run is over; exit to return to where you
-were), and `D` discards it after a confirmation. A subshell is as close as
-any program can get to "cd into the scratch": a child process can never
-change its parent shell's directory.
+At the prompt: `d` pages the full diff and asks again; `p` pulls the
+scratch's commits into your repository and removes the scratch on success;
+`k` keeps the scratch and prints the integration recipe; `s` keeps it and
+opens your shell inside the scratch (unsandboxed — the run is over; exit to
+return to the prompt); `w` wipes it after a confirmation. A subshell is as
+close as any program can get to "cd into the scratch": a child process can
+never change its parent shell's directory.
+
+`p` never commits on your behalf: pull moves commits only, so if the scratch
+has uncommitted changes, bulle points you at `s` to commit them (or clean the
+tree) yourself — when you exit the shell you are back at the prompt, ready to
+`p`. A failed pull (conflicts, uncommitted origin changes in the same files)
+changes nothing and keeps the scratch; and if you leave the shell with the
+scratch back at its starting state, bulle removes it like any other
+changeless run.
 Without a terminal, or with `--scratch-keep`, the scratch is kept and the
 recipe printed. **A scratch is never deleted implicitly** — not on timeout,
 signal, or crash. Losing an agent's work to a cleanup path is worse than

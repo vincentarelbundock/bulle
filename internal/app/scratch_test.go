@@ -209,6 +209,63 @@ func TestScratchPushIntegration(t *testing.T) {
 	}
 }
 
+func TestPullScratchIntegratesAndRemoves(t *testing.T) {
+	origin := makeOrigin(t)
+	var stderr, stdout bytes.Buffer
+	s, err := createScratch(origin, t.TempDir(), nil, &stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(s.Dir, "agent.txt"), []byte("work\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !scratchIsDirty(s) {
+		t.Fatal("expected dirty scratch before commit")
+	}
+	gitT(t, s.Dir, "add", "-A")
+	gitT(t, s.Dir, "commit", "-q", "-m", "agent work")
+	if scratchIsDirty(s) {
+		t.Fatal("expected clean scratch after commit")
+	}
+	if !pullScratch(s, &stdout, &stderr) {
+		t.Fatalf("pullScratch failed: %s", stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(origin, "agent.txt")); err != nil {
+		t.Fatalf("origin missing pulled file: %v", err)
+	}
+	if _, err := os.Stat(s.Dir); !os.IsNotExist(err) {
+		t.Fatal("scratch not removed after successful pull")
+	}
+}
+
+func TestPullScratchKeepsScratchOnFailure(t *testing.T) {
+	origin := makeOrigin(t)
+	var stderr, stdout bytes.Buffer
+	s, err := createScratch(origin, t.TempDir(), nil, &stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer removeScratch(s)
+	if err := os.WriteFile(filepath.Join(s.Dir, "tracked.txt"), []byte("scratch version\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitT(t, s.Dir, "add", "-A")
+	gitT(t, s.Dir, "commit", "-q", "-m", "agent work")
+	// A conflicting uncommitted edit in the origin makes the merge refuse.
+	if err := os.WriteFile(filepath.Join(origin, "tracked.txt"), []byte("origin version\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if pullScratch(s, &stdout, &stderr) {
+		t.Fatal("pullScratch should fail when the origin would be overwritten")
+	}
+	if _, err := os.Stat(s.Dir); err != nil {
+		t.Fatalf("scratch must survive a failed pull: %v", err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(origin, "tracked.txt")); string(data) != "origin version\n" {
+		t.Fatalf("origin working tree modified by failed pull: %q", data)
+	}
+}
+
 func TestRewriteScratchPaths(t *testing.T) {
 	s := &scratchState{Dir: "/home/u/.local/state/bulle/scratch/proj-ab12cd34", Origin: "/home/u/proj"}
 	hints := []string{
