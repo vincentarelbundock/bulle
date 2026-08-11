@@ -1,0 +1,30 @@
+title = "LaTeX"
+description = "TeX Live engines, the distribution tree, and font caches"
+inherits = ["tool", "terminal"]
+
+# kpsewhich answers where the trees are, so the same profile works for a
+# distribution TeX Live, a Nix one, and MacTeX. Engines beyond pdflatex are
+# optional: a minimal installation may ship only some of them.
+rox = [
+  "?which:kpsewhich",
+  "?which:pdflatex",
+  "?which:xelatex",
+  "?which:lualatex",
+  "?which:latexmk",
+  "?which:bibtex",
+  "?which:biber",
+  "?which:makeindex",
+  "?tex:dist",
+  "?tex:sysvar",
+]
+ro = ["?tex:home", "?/etc/fonts", "?$CONFIG/fontconfig"]
+# TEXMFVAR and TEXMFCONFIG must be writable: engines regenerate format files
+# and per-user font caches there on demand (lualatex builds its font database
+# on first run). Fontconfig keeps its cache under $CACHE.
+rw = [
+  "?+tex:var",
+  "?+tex:config",
+  "?+$CACHE/fontconfig/",
+]
+env = ["TEXINPUTS", "BIBINPUTS", "BSTINPUTS", "TEXMFHOME", "TEXMFVAR", "TEXMFCONFIG", "SOURCE_DATE_EPOCH"]
+deny = ["network"]

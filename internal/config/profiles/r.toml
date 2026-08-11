@@ -7,9 +7,7 @@ inherits = ["tool", "terminal"]
 # read-only; compiled package code loads via mmap, which needs only read under
 # both backends, and add_libs discovers the external libraries those packages
 # dlopen.
-# uname, sed, and rm are called by name from R's own launch scripts and
-# session-temp cleanup, which run before and after the real binary.
-rox = ["?which:R", "?which:Rscript", "?which:uname", "?which:sed", "?which:rm", "?r:home", "?r:prefix"]
+rox = ["?which:R", "?which:Rscript", "?r:home", "?r:prefix"]
 ro = [
   "?r:libs",
   "?~/.Rprofile",

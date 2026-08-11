@@ -1,0 +1,7 @@
+title = "Pandoc"
+description = "pandoc document converter and its data directory"
+inherits = ["tool", "terminal"]
+
+rox = ["?which:pandoc"]
+ro = ["?$DATA/pandoc", "?$HOME/.pandoc"]
+deny = ["network"]

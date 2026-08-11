@@ -97,6 +97,36 @@ except OSError:
 			want: "smoke-ok",
 		},
 		{
+			name:     "pandoc-converts",
+			profile:  "pandoc",
+			requires: "pandoc",
+			setup: func(t *testing.T, workspace string) {
+				writeFile(t, workspace, "doc.md", "# Hi\n\nHello *world*.\n")
+			},
+			args: []string{"sh", "-c", "pandoc doc.md -o doc.html && echo smoke-ok"},
+			want: "smoke-ok",
+		},
+		{
+			name:     "latex-compiles-pdf",
+			profile:  "latex",
+			requires: "pdflatex",
+			setup: func(t *testing.T, workspace string) {
+				writeFile(t, workspace, "t.tex", "\\documentclass{article}\\begin{document}Hello TeX\\end{document}\n")
+			},
+			args: []string{"sh", "-c", "pdflatex -interaction=batchmode t.tex >/dev/null; test -f t.pdf && echo smoke-ok"},
+			want: "smoke-ok",
+		},
+		{
+			name:     "quarto-renders-html",
+			profile:  "quarto",
+			requires: "quarto",
+			setup: func(t *testing.T, workspace string) {
+				writeFile(t, workspace, "q.qmd", "---\ntitle: Smoke\n---\n\nHello **quarto**.\n")
+			},
+			args: []string{"quarto", "render", "q.qmd", "--to", "html"},
+			want: "Output created",
+		},
+		{
 			name:     "rust-builds-and-runs",
 			profile:  "rust",
 			requires: "cargo",

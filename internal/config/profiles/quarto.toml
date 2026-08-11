@@ -1,0 +1,25 @@
+title = "Quarto"
+description = "quarto rendering with pandoc, LaTeX, R, and Python support"
+# Quarto is composition: it drives pandoc and LaTeX for output, and knitr (R)
+# or jupyter (Python via uv) for execution. On machines without R or uv the
+# inherited entries are optional and simply skip.
+inherits = ["pandoc", "latex", "r", "uv"]
+
+# quarto --paths reports the bin and share directories; on some installs they
+# are separate store paths, and share/ carries the bundled deno and pandoc
+# that quarto executes.
+rox = ["?which:quarto", "?quarto:paths"]
+# The Dart VM inside quarto's SASS compiler reads /proc/self/maps to find its
+# stack bounds and aborts without it. /proc/self resolves to a different pid
+# for every child, so only a whole-/proc read grant covers it. Tradeoff: this
+# lets sandboxed code read other same-uid processes' /proc entries
+# (cmdline, environ), which the other profiles do not allow.
+ro = ["?/proc", "?$HOME/.npmrc"]
+# DENO_DIR points quarto's bundled deno at an ephemeral cache inside the
+# sandbox tmp: a writable real cache would let sandboxed code plant compiled
+# JS that later non-sandboxed quarto runs execute.
+rw = ["?+$CACHE/quarto/"]
+env = [
+  "QUARTO_PRINT_STACK", "QUARTO_LOG_LEVEL", "QUARTO_DENO", "QUARTO_PANDOC",
+  "DENO_DIR=$TMP/bulle/tmp/deno",
+]

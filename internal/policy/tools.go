@@ -95,6 +95,42 @@ var toolResolvers = []toolResolver{
 		description: "uv-managed Python interpreters",
 	},
 	{
+		tool: "tex", aspect: "dist",
+		argv:        []string{"kpsewhich", "-var-value", "TEXMFDIST"},
+		format:      formatSingle,
+		description: "TeX distribution tree (TEXMFDIST)",
+	},
+	{
+		tool: "tex", aspect: "sysvar",
+		argv:        []string{"kpsewhich", "-var-value", "TEXMFSYSVAR"},
+		format:      formatSingle,
+		description: "TeX system-wide runtime tree (TEXMFSYSVAR: format files, font caches)",
+	},
+	{
+		tool: "tex", aspect: "var",
+		argv:        []string{"kpsewhich", "-var-value", "TEXMFVAR"},
+		format:      formatSingle,
+		description: "TeX per-user runtime tree (TEXMFVAR: generated formats and font caches)",
+	},
+	{
+		tool: "tex", aspect: "config",
+		argv:        []string{"kpsewhich", "-var-value", "TEXMFCONFIG"},
+		format:      formatSingle,
+		description: "TeX per-user configuration tree (TEXMFCONFIG)",
+	},
+	{
+		tool: "tex", aspect: "home",
+		argv:        []string{"kpsewhich", "-var-value", "TEXMFHOME"},
+		format:      formatSingle,
+		description: "personal texmf tree (TEXMFHOME)",
+	},
+	{
+		tool: "quarto", aspect: "paths",
+		argv:        []string{"quarto", "--paths"},
+		format:      formatLines,
+		description: "quarto's bin and share directories",
+	},
+	{
 		tool: "go", aspect: "root",
 		argv:        []string{"go", "env", "GOROOT"},
 		format:      formatSingle,

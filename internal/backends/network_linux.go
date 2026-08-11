@@ -59,10 +59,14 @@ func installDenySocketSeccompFilter() error {
 }
 
 func deniedNetworkSyscalls() []uintptr {
-	// SYS_SOCKETPAIR is deliberately absent: a socketpair is a connected
-	// in-process pipe (Linux only supports AF_UNIX pairs) and cannot reach
-	// anything outside the sandbox, while async runtimes (tokio, libuv) need
-	// one for signal handling before doing any real work.
+	// SYS_SOCKETPAIR and the send/recv family are deliberately absent. A
+	// socketpair is a connected in-process pipe (Linux only supports AF_UNIX
+	// pairs) and cannot reach anything outside the sandbox, while async
+	// runtimes (tokio, libuv) and signal-handling crates (signal-hook) need
+	// one before doing any real work. With socket and connect denied, the
+	// only sockets a sandboxed process can hold are connected socketpair
+	// ends, and addressed sends on a connected AF_UNIX socket fail with
+	// EISCONN, so send*/recv* cannot reach the abstract namespace either.
 	return []uintptr{
 		unix.SYS_SOCKET,
 		unix.SYS_CONNECT,
@@ -70,12 +74,6 @@ func deniedNetworkSyscalls() []uintptr {
 		unix.SYS_LISTEN,
 		unix.SYS_ACCEPT,
 		unix.SYS_ACCEPT4,
-		unix.SYS_SENDTO,
-		unix.SYS_RECVFROM,
-		unix.SYS_SENDMSG,
-		unix.SYS_RECVMSG,
-		unix.SYS_SENDMMSG,
-		unix.SYS_RECVMMSG,
 	}
 }
 

@@ -6,7 +6,10 @@ inherits = "network"
 ro = [
   "?/proc/stat",
   "?/proc/cpuinfo",
+  "?/proc/meminfo",
+  "?/proc/sys/kernel/osrelease",
   "?/proc/sys/vm/overcommit_memory",
+  "?/proc/sys/vm/max_map_count",
   "?/sys/devices/system/cpu",
   "?/sys/kernel/mm/transparent_hugepage",
   "?/sys/fs/cgroup",
@@ -21,7 +24,21 @@ ro = [
 # through it at some point. The nix-ld directory is NixOS's loader shim for
 # foreign binaries (rustup toolchains, downloaded tools): a farm of symlinks
 # into store items that the add_libs scan follows and grants.
-rox = ["?/bin/sh", "?which:bash", "?/run/current-system/sw/share/nix-ld/lib"]
+# The which: entries are the coreutils staples that launcher scripts call by
+# bare name (R's wrapper probes with uname and sed, quarto's uses dirname and
+# basename, R cleans its session temp with rm). Granting them here gives
+# every tool profile a working wrapper-script baseline.
+rox = [
+  "?/bin/sh",
+  "?which:bash",
+  "?which:env",
+  "?which:uname",
+  "?which:sed",
+  "?which:dirname",
+  "?which:basename",
+  "?which:rm",
+  "?/run/current-system/sw/share/nix-ld/lib",
+]
 rw = ["$TMP/bulle/tmp", "?/dev/null", "?/dev/tty"]
 env = ["PATH", "NIX_LD", "NIX_LD_LIBRARY_PATH", "LD_LIBRARY_PATH"]
 add_exec = true

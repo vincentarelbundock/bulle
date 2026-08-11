@@ -18,6 +18,7 @@ each slot, or note why it does not apply:
 | Library search path | `ro` | `?r:libs` |
 | User-writable library | `rw` in `-install` only | `?+r:libs-user` |
 | Package cache | `ro`, or redirected | `?uv:cache`, `UV_NO_CACHE=1` |
+| Runtime cache the tool insists on writing | redirect into sandbox tmp | `DENO_DIR=$TMP/bulle/tmp/deno` |
 | Config and startup files | `ro`, optional | `?~/.Rprofile`, `?$CONFIG/uv` |
 | Temp | inherited from `tool` | — |
 | Environment variables | `env` | `R_LIBS_USER`, `UV_CACHE_DIR` |
@@ -41,7 +42,11 @@ each slot, or note why it does not apply:
    nothing, or a startup file that does not exist, must not break the run.
    Never force an environment variable's value: list the name so an
    explicitly configured value passes through, and let the tool compute its
-   default otherwise.
+   default otherwise. When a tool insists on a writable cache even for
+   offline runs, do not grant its real cache: set an explicit value that
+   redirects it into the sandbox tmp — profile `env` values expand path
+   variables, so `"DENO_DIR=$TMP/bulle/tmp/deno"` works on every platform
+   (`UV_NO_CACHE=1` and quarto's `DENO_DIR` are the shipped examples).
 4. **Do not build shared platform abstractions.** uv follows XDG on macOS;
    R uses `~/Library` there. Each profile encodes (or queries) its own
    tool's convention.

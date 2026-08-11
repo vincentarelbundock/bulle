@@ -319,6 +319,13 @@ func sameFile(a, b string) bool {
 	return os.SameFile(ai, bi)
 }
 
+// ExpandValue substitutes path variables in a non-path string, for profile
+// environment values such as "DENO_DIR=$TMP/bulle/tmp/deno". Unlike path
+// resolution it performs no cleaning, globbing, or symlink work.
+func ExpandValue(raw string, vars Vars) (string, error) {
+	return expand(raw, vars)
+}
+
 func expand(raw string, vars Vars) (string, error) {
 	if strings.HasPrefix(raw, "~/") {
 		home, ok := vars["HOME"]

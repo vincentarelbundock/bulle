@@ -54,6 +54,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (propagated link-time inputs), and store paths baked into the dynamic
   loader itself (Nix patches ld.so with a default libgcc directory used for
   lazy unwinder loads that appear in no ELF header).
+- **Built-in `latex`, `pandoc`, and `quarto` profiles.** `latex` asks
+  `kpsewhich` where the TeX trees live (new `tex:dist`, `tex:sysvar`,
+  `tex:var`, `tex:config`, and `tex:home` resolvers) and keeps the per-user
+  runtime trees writable for format and font-cache regeneration; verified
+  with pdflatex and lualatex. `pandoc` is a thin converter profile. `quarto`
+  is the composition showcase: it inherits `pandoc`, `latex`, `r`, and `uv`,
+  grants the directories `quarto --paths` reports, and renders HTML, knitr
+  (R execution), and PDF documents offline. Its bundled deno cache is
+  redirected into the sandbox tmp via `DENO_DIR`, and it carries a scoped
+  whole-`/proc` read grant because the Dart VM in quarto's SASS compiler
+  aborts without `/proc/self/maps` — a documented tradeoff no other profile
+  makes.
+- **Profile `env` values expand path variables.** An explicit value in a
+  profile's `env` list ("DENO_DIR=$TMP/bulle/tmp/deno") resolves `$TMP`,
+  `$HOME`, `$CONFIG`-style variables, so a profile can redirect a tool's
+  cache into a sandbox-owned directory portably. `--env` flags and
+  `--env-file` contents pass through verbatim.
 - **Denial hints collapse package-store paths.** Denials inside one Nix store
   item or Homebrew keg now produce a single suggested grant for the package
   root, so the `bulle --last` retry line converges in one step instead of one
@@ -65,13 +82,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **`deny = ["network"]` no longer blocks `socketpair(2)` on Linux.** A
-  socketpair is a connected in-process pipe (Linux only supports `AF_UNIX`
-  pairs) and cannot reach outside the sandbox, while async runtimes (tokio,
-  libuv) need one for signal handling before doing any real work. `socket`,
-  `connect`, `bind`, `listen`, and `accept` remain denied.
-- **The `tool` profile grants common runtime probes.** `/bin/sh` and `bash`
-  (rox), `/dev/null` and `/dev/tty` (rw), and read-only `/proc/stat`,
+- **`deny = ["network"]` no longer blocks `socketpair(2)` or the
+  `send*`/`recv*` syscalls on Linux.** A socketpair is a connected
+  in-process pipe (Linux only supports `AF_UNIX` pairs) and cannot reach
+  outside the sandbox, while async runtimes (tokio, libuv) and
+  signal-handling crates (signal-hook, used by deno) need one before doing
+  any real work. With `socket` and `connect` denied the only sockets a
+  process can hold are connected socketpair ends, and addressed sends on a
+  connected `AF_UNIX` socket fail with `EISCONN`, so the send/recv family
+  cannot reach the abstract namespace either. `socket`, `connect`, `bind`,
+  `listen`, and `accept` remain denied.
+- **The `tool` profile grants common runtime probes.** `/bin/sh`, `bash`,
+  and the coreutils staples launcher scripts call by bare name (`env`,
+  `uname`, `sed`, `dirname`, `basename`, `rm`), `/dev/null` and `/dev/tty`
+  (rw), and read-only `/proc/stat`,
   `/proc/cpuinfo`, cgroup limits, CPU topology, transparent-hugepage flags,
   timezone data, `/etc/os-release`, glibc locale archives, and the NixOS
   nix-ld loader directory — files that shells, OpenMP, BLAS, allocators, and

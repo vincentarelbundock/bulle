@@ -5,13 +5,31 @@ import (
 	"os"
 	"sort"
 	"strings"
+
+	bpaths "github.com/vincentarelbundock/bulle/internal/paths"
 )
 
 // composeEnvEntries assembles the environment entry list in increasing order
 // of explicitness: profile entries, --env-all-except passthrough, --env-file
 // contents, then --env flags, so the most explicit source wins on conflict.
-func composeEnvEntries(profileEnv []string, parentEnv map[string]string, allExcept []string, envFiles []string, flagEnv []string) ([]string, error) {
-	entries := append([]string{}, profileEnv...)
+// Explicit values in profile entries ("DENO_DIR=$TMP/bulle/tmp/deno") have
+// path variables expanded so a profile can point a tool at a sandbox-owned
+// directory; flag and env-file entries pass through verbatim, since a user's
+// literal value may legitimately contain a dollar sign.
+func composeEnvEntries(profileEnv []string, vars bpaths.Vars, parentEnv map[string]string, allExcept []string, envFiles []string, flagEnv []string) ([]string, error) {
+	entries := make([]string, 0, len(profileEnv))
+	for _, entry := range profileEnv {
+		name, value, explicit := strings.Cut(entry, "=")
+		if !explicit || !strings.Contains(value, "$") {
+			entries = append(entries, entry)
+			continue
+		}
+		expanded, err := bpaths.ExpandValue(value, vars)
+		if err != nil {
+			return nil, fmt.Errorf("env entry %q: %w", entry, err)
+		}
+		entries = append(entries, name+"="+expanded)
+	}
 	if len(allExcept) > 0 {
 		entries = append(entries, allEnvExcept(parentEnv, allExcept)...)
 	}
