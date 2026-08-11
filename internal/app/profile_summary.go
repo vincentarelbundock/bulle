@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -16,44 +17,86 @@ func shouldPrintProfileSummary(opts cli.Options) bool {
 	return opts.Profile != "" && !opts.Policy
 }
 
-func writeProfilePermissionSummary(profileName string, p policy.Policy, w io.Writer) {
+func writeProfilePermissionSummary(profileName string, p policy.Policy, w io.Writer, shortenStore bool) {
 	view := policy.NewView(p)
 	paths := newPathSummaryFormatter(p)
+	paths.shortenStore = shortenStore
 	fmt.Fprintf(w, "bulle profile %q permissions:\n", profileName)
 	fmt.Fprintf(w, "  backend: %s\n", view.Backend)
 	fmt.Fprintf(w, "  command: %s\n", formatCommand(view.Command))
 	fmt.Fprintf(w, "  workspace: %s\n", paths.formatProject(view.ProjectPath))
 	fmt.Fprintln(w, "  filesystem:")
-	writePermissionGroup(w, "ro", view.ReadOnly, paths)
-	writePermissionGroup(w, "rox", view.ReadOnlyExec, paths)
-	writePermissionGroup(w, "rw", view.ReadWrite, paths)
-	writePermissionGroup(w, "rwx", view.ReadWriteExec, paths)
+	writePermissionGroup(w, "ro", view.ReadOnly, paths, summaryRO)
+	writePermissionGroup(w, "rox", view.ReadOnlyExec, paths, summaryROX)
+	writePermissionGroup(w, "rw", view.ReadWrite, paths, summaryRW)
+	writePermissionGroup(w, "rwx", view.ReadWriteExec, paths, summaryRWX)
 	fmt.Fprintf(w, "  environment: %s\n", formatInlineList(view.EnvKeys))
 	fmt.Fprintf(w, "  network: %s\n", formatNetwork(view.Network))
 	if view.Timeout != "" {
 		fmt.Fprintf(w, "  timeout: %s\n", view.Timeout)
 	}
-	fmt.Fprintf(w, "  add_exec: %s\n", formatEnabled(view.AddExec))
-	fmt.Fprintf(w, "  add_libs: %s\n", formatEnabled(view.AddLibs))
-	fmt.Fprintf(w, "  mach_lookup: %s\n", formatInlineList(view.MachLookup))
+	// With a command, add_exec and add_libs have already materialized into the
+	// filesystem lists above; the flags add nothing. Without one, the lists
+	// under-state a real run, so say what would be added.
+	if len(view.Command) == 0 {
+		if note := formatDiscoveryNote(view.AddExec, view.AddLibs); note != "" {
+			fmt.Fprintf(w, "  note: %s\n", note)
+		}
+	}
+	if len(view.MachLookup) > 0 {
+		fmt.Fprintf(w, "  mach_lookup: %s\n", formatInlineList(view.MachLookup))
+	}
 }
 
-// writeResolutionTable prints one line per configured entry with its
-// resolution outcome. Shown only for --policy: the session paste stays
-// compact, but "why can't the agent see X" is answerable from one command.
+func formatDiscoveryNote(addExec bool, addLibs bool) string {
+	switch {
+	case addExec && addLibs:
+		return "a real run also grants the command executable and its runtime libraries (add_exec, add_libs)"
+	case addExec:
+		return "a real run also grants the command executable (add_exec)"
+	case addLibs:
+		return "a real run also grants the command's runtime libraries (add_libs)"
+	default:
+		return ""
+	}
+}
+
+// writeResolutionTable prints configured entries whose resolution needs
+// attention: skipped, created, or granted with a wider effective right through
+// another list. Entries granted as specified restate the summary above and
+// are collapsed into a count; --policy=json holds the full mapping. Shown
+// only for --policy: "why can't the agent see X" is answerable from one
+// command.
 func writeResolutionTable(p policy.Policy, w io.Writer) {
 	if len(p.Trace) == 0 {
 		return
 	}
 	rights := resolvedRights(p)
-	fmt.Fprintln(w, "  resolution:")
+	granted, skipped := 0, 0
+	lines := []string{}
 	for _, trace := range p.Trace {
+		note := unionNote(trace, rights)
+		if note == "" && strings.HasPrefix(trace.Outcome, "granted") {
+			granted++
+			continue
+		}
+		// A skipped entry grants nothing: it is absent from the actual access
+		// above, so it only earns a line in the count.
+		if note == "" && strings.HasPrefix(trace.Outcome, "skipped") {
+			skipped++
+			continue
+		}
 		line := fmt.Sprintf("    %-4s %-40s → %s", trace.List, trace.Raw, formatTraceOutcome(trace))
-		if note := unionNote(trace, rights); note != "" {
+		if note != "" {
 			line += " " + note
 		}
+		lines = append(lines, line)
+	}
+	fmt.Fprintln(w, "  resolution:")
+	for _, line := range lines {
 		fmt.Fprintln(w, line)
 	}
+	fmt.Fprintf(w, "    %d entries granted, %d skipped as absent; --policy=json lists every entry\n", granted, skipped)
 }
 
 // writeResolverListing prints every known resolver next to what it resolves to
@@ -91,7 +134,7 @@ func formatTraceOutcome(trace bpaths.Trace) string {
 	if len(trace.Paths) == 0 {
 		return trace.Outcome
 	}
-	out := trace.Paths[0]
+	out := shortenStorePath(trace.Paths[0])
 	if trace.Outcome != "granted" {
 		out = trace.Outcome + " " + out
 	}
@@ -134,7 +177,9 @@ func preRunSessionPaste(opts cli.Options, p policy.Policy) string {
 		return ""
 	}
 	var b strings.Builder
-	writeProfilePermissionSummary(opts.Profile, p, &b)
+	// Agents get exact paths: an abbreviated store hash is not a real path
+	// and would mislead any reasoning about what the sandbox grants.
+	writeProfilePermissionSummary(opts.Profile, p, &b, false)
 	return "For context, bulle launched this session with the following sandbox permissions. Use this as background information; no response is required.\n\n" + b.String()
 }
 
@@ -160,25 +205,54 @@ func commandWithSessionPermissions(profileName string, command []string, summary
 	return append(out, command[1:]...)
 }
 
-func writePermissionGroup(w io.Writer, label string, values []string, paths pathSummaryFormatter) {
+// Right bits for display-time subsumption checks; strongest last so
+// overlapping grants keep their widest right.
+const (
+	summaryRead  = 1 << 0
+	summaryExec  = 1 << 1
+	summaryWrite = 1 << 2
+
+	summaryRO  = summaryRead
+	summaryROX = summaryRead | summaryExec
+	summaryRW  = summaryRead | summaryWrite
+	summaryRWX = summaryRead | summaryWrite | summaryExec
+)
+
+func writePermissionGroup(w io.Writer, label string, values []string, paths pathSummaryFormatter, rights int) {
 	if len(values) == 0 {
 		fmt.Fprintf(w, "    %s: none\n", label)
 		return
 	}
-	writeWrappedItems(w, fmt.Sprintf("    %s: ", label), "        ", paths.formatList(values))
+	writeWrappedItems(w, fmt.Sprintf("    %s: ", label), "        ", paths.formatList(values, rights))
 }
 
 type pathSummaryFormatter struct {
-	project string
-	home    string
-	tmp     string
+	project      string
+	home         string
+	tmp          string
+	shortenStore bool
+	granted      map[string]int
 }
 
 func newPathSummaryFormatter(p policy.Policy) pathSummaryFormatter {
+	granted := map[string]int{}
+	for _, group := range []struct {
+		rights int
+		paths  []string
+	}{
+		{summaryRO, p.ReadOnly}, {summaryROX, p.ReadOnlyExec}, {summaryRW, p.ReadWrite}, {summaryRWX, p.ReadWriteExec},
+	} {
+		for _, path := range group.paths {
+			if clean := cleanPath(path); clean != "" {
+				granted[clean] |= group.rights
+			}
+		}
+	}
 	return pathSummaryFormatter{
 		project: cleanPath(p.ProjectPath),
 		home:    cleanPath(p.Env["HOME"]),
 		tmp:     cleanPath(firstSet(p.Env["TMP"], p.Env["TMPDIR"], p.Env["TEMP"], p.Env["BUN_TMPDIR"])),
+		granted: granted,
 	}
 }
 
@@ -186,13 +260,78 @@ func (f pathSummaryFormatter) formatProject(path string) string {
 	return f.formatPath(path, false)
 }
 
-func (f pathSummaryFormatter) formatList(values []string) []string {
-	collapsed := f.collapsePrivateAliases(values)
+func (f pathSummaryFormatter) formatList(values []string, rights int) []string {
+	kept := f.dropSubsumed(values, rights)
+	kept, aliases := collapseSymlinkAliases(kept)
+	collapsed := f.collapsePrivateAliases(kept)
 	grouped := groupSiblingPaths(collapsed)
 	if len(grouped) == 0 {
 		return []string{"none"}
 	}
+	if aliases > 0 {
+		grouped = append(grouped, fmt.Sprintf("(+%d symlink aliases)", aliases))
+	}
 	return grouped
+}
+
+// dropSubsumed removes entries already covered by another grant: an exact
+// duplicate in a strictly stronger list (/dev/null in both ro and rw), or a
+// non-symlink path whose ancestor directory is granted with at least the same
+// rights. A child that is itself a symlink stays: a granted path carries its
+// symlink target with it, while a directory grant does not cover symlink
+// targets inside it.
+func (f pathSummaryFormatter) dropSubsumed(values []string, rights int) []string {
+	out := []string{}
+	for _, value := range values {
+		clean := cleanPath(value)
+		if clean == "" || !strings.HasPrefix(clean, "/") {
+			out = append(out, value)
+			continue
+		}
+		if held := f.granted[clean]; held&rights == rights && held != rights {
+			continue
+		}
+		subsumed := false
+		if info, err := os.Lstat(clean); err == nil && info.Mode()&os.ModeSymlink == 0 {
+			for dir := filepath.Dir(clean); ; dir = filepath.Dir(dir) {
+				if held, ok := f.granted[dir]; ok && held&rights == rights {
+					subsumed = true
+					break
+				}
+				if dir == "/" || dir == "." {
+					break
+				}
+			}
+		}
+		if !subsumed {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+// collapseSymlinkAliases keeps one path per distinct filesystem object: a
+// which: grant carries its whole symlink chain, and on layered systems
+// (NixOS, home-manager) the same binary appears under half a dozen alias
+// directories. The first spelling wins; the rest are counted, since they name
+// the same access.
+func collapseSymlinkAliases(values []string) ([]string, int) {
+	seen := map[string]bool{}
+	out := []string{}
+	dropped := 0
+	for _, value := range values {
+		key := cleanPath(value)
+		if resolved, err := filepath.EvalSymlinks(key); err == nil {
+			key = resolved
+		}
+		if seen[key] {
+			dropped++
+			continue
+		}
+		seen[key] = true
+		out = append(out, value)
+	}
+	return out, dropped
 }
 
 func (f pathSummaryFormatter) collapsePrivateAliases(values []string) []string {
@@ -258,7 +397,26 @@ func (f pathSummaryFormatter) formatPath(path string, aliasProject bool) string 
 			return "~/" + strings.TrimPrefix(clean, f.home+"/")
 		}
 	}
+	if f.shortenStore {
+		return shortenStorePath(clean)
+	}
 	return clean
+}
+
+// shortenStorePath abbreviates the 32-character hash in a Nix store path for
+// display (/nix/store/y4nr67a…-hosts). A 7-character prefix keeps distinct
+// items distinguishable; display-only, never used where a real path is needed.
+func shortenStorePath(path string) string {
+	rest, ok := strings.CutPrefix(path, "/nix/store/")
+	if !ok || len(rest) < 33 || rest[32] != '-' {
+		return path
+	}
+	for _, r := range rest[:32] {
+		if !(r >= '0' && r <= '9' || r >= 'a' && r <= 'z') {
+			return path
+		}
+	}
+	return "/nix/store/" + rest[:7] + "…" + rest[32:]
 }
 
 func groupSiblingPaths(values []string) []string {
