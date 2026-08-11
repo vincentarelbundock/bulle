@@ -331,3 +331,22 @@ func TestParseHelpAndVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestParseScratchFlags(t *testing.T) {
+	opts, err := Parse([]string{"bulle", "--scratch", "--scratch-keep", "--", "claude"})
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if !opts.Scratch || !opts.ScratchKeep {
+		t.Fatalf("Scratch = %v, ScratchKeep = %v; want both true", opts.Scratch, opts.ScratchKeep)
+	}
+}
+
+func TestParseScratchRejectsValues(t *testing.T) {
+	if _, err := Parse([]string{"bulle", "--scratch=worktree"}); err == nil || !strings.Contains(err.Error(), "worktree") {
+		t.Fatalf("want worktree-specific error, got %v", err)
+	}
+	if _, err := Parse([]string{"bulle", "--scratch=clone"}); err == nil || !strings.Contains(err.Error(), "takes no value") {
+		t.Fatalf("want no-value error, got %v", err)
+	}
+}

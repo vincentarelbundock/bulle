@@ -23,6 +23,15 @@ type Config struct {
 	Platform        PlatformSettings           `toml:"platform"`
 	Vars            map[string]string          `toml:"vars"`
 	Defaults        DefaultsSettings           `toml:"defaults"`
+	Scratch         ScratchSettings            `toml:"scratch"`
+}
+
+// ScratchSettings is the [scratch] block of the user configuration.
+type ScratchSettings struct {
+	// Dir overrides where scratch clones are created; useful when the default
+	// state directory is on a different filesystem than the repositories, which
+	// would defeat object hardlinking.
+	Dir string `toml:"dir"`
 }
 
 // DefaultsSettings is the [defaults] block of the user configuration: values

@@ -38,6 +38,9 @@ func Parse(args []string) (Options, error) {
 	if err != nil {
 		return opts, err
 	}
+	if err := rejectScratchValue(cliArgs); err != nil {
+		return opts, err
+	}
 	var parsed runCLI
 	if err := parseKong(&parsed, cliArgs); err != nil {
 		return opts, err
@@ -84,6 +87,9 @@ type Flags struct {
 	Help    bool `name:"help" short:"h" help:"Show this help and exit."`
 	Version bool `name:"version" short:"V" help:"Show version information and exit."`
 
+	Scratch     bool `name:"scratch" help:"Run against a disposable local clone of the workspace, then review the changes."`
+	ScratchKeep bool `name:"scratch-keep" help:"Skip the review prompt, keep the scratch, and print its path."`
+
 	Last       bool `name:"last" help:"Repeat the previous bulle invocation, with any extra flags appended."`
 	NoDefaults bool `name:"no-defaults" help:"Ignore the [defaults] block of the user configuration."`
 
@@ -115,6 +121,23 @@ func normalizePolicyFormat(args []string) ([]string, string, error) {
 		out = append(out, "--policy")
 	}
 	return out, format, nil
+}
+
+// rejectScratchValue turns kong's generic bool-parse failure for
+// --scratch=<value> into a message that names the design: scratch has no
+// modes, and worktree isolation is deliberately not offered.
+func rejectScratchValue(args []string) error {
+	for _, arg := range args {
+		value, ok := strings.CutPrefix(arg, "--scratch=")
+		if !ok {
+			continue
+		}
+		if value == "worktree" {
+			return fmt.Errorf("--scratch does not offer a worktree mode: worktrees share the origin's .git (including hooks), which defeats scratch isolation; for trusted parallel sessions use a worktree manager such as wt around bulle")
+		}
+		return fmt.Errorf("--scratch takes no value; it always clones the workspace")
+	}
+	return nil
 }
 
 func normalizeTimeoutValue(args []string) []string {

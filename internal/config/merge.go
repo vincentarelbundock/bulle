@@ -14,6 +14,7 @@ func MergeConfigs(parent Config, child Config) Config {
 	out.ProfileMetadata = mergeProfileMetadata(parent.ProfileMetadata, child.ProfileMetadata)
 	out.Vars = mergeVars(parent.Vars, child.Vars)
 	out.Defaults = mergeDefaults(parent.Defaults, child.Defaults)
+	out.Scratch = ScratchSettings{Dir: choose(child.Scratch.Dir, parent.Scratch.Dir)}
 	if out.Profiles == nil {
 		out.Profiles = map[string]Profile{}
 	}
@@ -402,6 +403,7 @@ func cloneConfig(c Config) Config {
 		Platform:        clonePlatformSettings(c.Platform),
 		Vars:            mergeVars(c.Vars, nil),
 		Defaults:        mergeDefaults(DefaultsSettings{}, c.Defaults),
+		Scratch:         c.Scratch,
 	}
 }
 
