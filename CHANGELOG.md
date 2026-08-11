@@ -45,18 +45,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writable user library or cache and network access. The `uv` base profile
   sets `UV_NO_CACHE=1` so offline runs use an ephemeral cache inside the
   sandbox tmp instead of needing write access to the real one.
-- **Exec-chain-aware library discovery.** With `add_libs`, bulle now scans the
-  granted trees for ELF objects (exec trees fully, read-only trees under
-  `libs/` directories), follows wrapper scripts' shebang interpreters and
-  package-store references, and grants the combined `DT_NEEDED`/`RPATH`
-  closure with package stores trusted as RPATH roots. This makes interpreters
-  reached through several exec hops (Nix wrappers, version managers) work
-  without manual grants. The scan is budgeted, and a truncated scan is
-  reported as a policy note. It also follows symlinks between store items
-  (gcc's `libgcc_s` living in a separate output), `nix-support` flag files
-  (propagated link-time inputs), and store paths baked into the dynamic
-  loader itself (Nix patches ld.so with a default libgcc directory used for
-  lazy unwinder loads that appear in no ELF header).
 - **Built-in `latex`, `pandoc`, and `quarto` profiles.** `latex` asks
   `kpsewhich` where the TeX trees live (new `tex:dist`, `tex:sysvar`,
   `tex:var`, `tex:config`, and `tex:home` resolvers) and keeps the per-user
@@ -69,19 +57,122 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whole-`/proc` read grant because the Dart VM in quarto's SASS compiler
   aborts without `/proc/self/maps` — a documented tradeoff no other profile
   makes.
+- **Capability micro-profiles: `git`, `node`, `rust`, `go`, `terminal`.**
+  Small built-in profiles that answer one tool's location questions portably
+  (binaries via `which:`/`pkg:`, configuration, caches) plus the environment
+  variables an interactive terminal program expects, meant to be assembled
+  through `inherits` or combined with `--profile tool,git,rust`.
+- **Profile smoke-test harness.** A table-driven verification suite
+  (`internal/integration/profile_smoke_test.go`) proves each shipped profile
+  can run its tool — including `cargo run --offline`, `go run`, a knitr
+  render, and a network-denial probe; CI runs it on Ubuntu, macOS, and Nix.
+  A profile authoring guide with the slot checklist and house rules ships in
+  the website docs.
+
+#### Portable profiles
+
+- **Path entries adapt to the machine.** A profile written on one machine
+  works on another:
+    - `?path` marks a writable entry optional (skip when missing); `+path/`
+      creates a missing directory and `+path` a missing file. Read-only
+      entries keep their existing skip-if-missing behavior. The built-in
+      agent profiles now create their state directories on first run instead
+      of failing on a fresh machine.
+    - `which:NAME` resolves a command on the parent `PATH` and grants exactly
+      that binary (plus its symlink chain) — never its containing directory.
+      Name lookup inside the sandbox goes through a per-run, read-only shim
+      directory that `bulle` creates and removes automatically. `pkg:NAME`
+      additionally grants the tool's package tree, refusing system
+      directories such as `/usr`.
+    - Platform-neutral variables `$CONFIG`, `$DATA`, `$CACHE`, and `$STATE`
+      resolve to XDG directories on Linux (honoring `XDG_*` overrides) and
+      `~/Library` equivalents on macOS.
+    - Single-star globs (`~/.nvm/versions/node/*/bin`); no matches means the
+      entry is skipped.
+    - Custom variables from a `[vars]` table in `<config>/config.toml` or
+      `--var NAME=VALUE`, with `${NAME:-fallback}` defaults. A small
+      allowlist of well-known tool environment variables (`CARGO_HOME`,
+      `GOPATH`, `NVM_DIR`, ...) may be referenced; untrusted values that are
+      relative or resolve to `/` or the home directory are ignored.
+- **Tool resolvers: `TOOL:ASPECT` path entries.** A grant can ask a tool
+  where its own directories are instead of hard-coding them: `r:home`,
+  `r:libs`, `uv:cache`, `go:modcache`, `npm:cache`, `tex:dist`, and friends.
+  Unlike `which:`/`pkg:` these name ordinary directories and are valid in
+  every list, support the `?` and `+` markers, and are re-resolved as literal
+  paths so the symlink and sensitive-target checks apply. The set is a fixed
+  registry in `bulle`; a profile can never supply a command to run. Unknown
+  namespaces are an error rather than a literal path, and prefix-shaped
+  aspects drop results that would be a system root. Motivated by R's package
+  search path, which holds one entry per installed package (70 on a Nix
+  machine) and cannot be written down. `--list-resolvers` prints every
+  resolver with what it resolves to on the current machine, so a resolver
+  returning nothing is distinguishable from one that works.
 - **Profile `env` values expand path variables.** An explicit value in a
-  profile's `env` list ("DENO_DIR=$TMP/bulle/tmp/deno") resolves `$TMP`,
+  profile's `env` list (`"DENO_DIR=$TMP/bulle/tmp/deno"`) resolves `$TMP`,
   `$HOME`, `$CONFIG`-style variables, so a profile can redirect a tool's
   cache into a sandbox-owned directory portably. `--env` flags and
   `--env-file` contents pass through verbatim.
-- **Denial hints collapse package-store paths.** Denials inside one Nix store
-  item or Homebrew keg now produce a single suggested grant for the package
-  root, so the `bulle --last` retry line converges in one step instead of one
-  file at a time.
-- **Profile smoke-test harness.** A table-driven verification suite
-  (`internal/integration/profile_smoke_test.go`) runs each shipped profile
-  against its tool; CI runs it on Ubuntu, macOS, and Nix. A profile authoring
-  guide with the slot checklist and house rules ships in the website docs.
+- **Exec-chain-aware library discovery.** With `add_libs`, bulle scans the
+  granted trees for ELF objects (exec trees fully, read-only trees under
+  `libs/` directories), follows wrapper scripts' shebang interpreters and
+  package-store references, and grants the combined `DT_NEEDED`/`RPATH`
+  closure with package stores trusted as RPATH roots. This makes
+  interpreters reached through several exec hops (Nix wrappers, version
+  managers) work without manual grants. It also follows symlinks between
+  store items (gcc's `libgcc_s` living in a separate output), `nix-support`
+  flag files (propagated link-time inputs), and store paths baked into the
+  dynamic loader itself (Nix patches ld.so with a default libgcc directory
+  used for lazy unwinder loads that appear in no ELF header). The scan is
+  budgeted, and a truncated scan is reported as a policy note.
+
+#### Diagnostics
+
+- **Failed runs explain what the sandbox blocked.** After a sandboxed
+  command fails, `bulle` reads the operating system's own record of sandbox
+  denials and prints copy-pasteable fixes, e.g.
+  `denied: read /home/user/.gitconfig — add --ro ~/.gitconfig`. On Linux
+  this uses Landlock audit records (kernel 6.15+ with the audit subsystem
+  enabled); on macOS it queries the unified log, which needs no setup. Hints
+  are best-effort and print nothing when denial records are unavailable.
+  Denials inside one Nix store item or Homebrew keg collapse into a single
+  suggested grant for the package root, so following the hints converges in
+  one step instead of one file at a time. See the new *Denial Diagnostics*
+  documentation page, including one-line setup instructions per Linux
+  distribution.
+- **Rerun with an added grant: `--last`.** Every real run records its
+  invocation (arguments and working directory) under the user state
+  directory. `bulle --last` repeats it from any shell, inserting extra flags
+  before the command, and denial diagnostics end with a copy-pasteable
+  `bulle: retry with these grants: bulle --last --ro ...` line. The sandbox
+  restarts rather than widens.
+- **Resolution table in `--policy`.** The policy summary now ends with one
+  line per configured entry showing its outcome (granted, skipped, created,
+  resolver expansion), and flags entries whose grants collapse into a
+  stronger permission on the current platform. `--policy` also works without
+  a command: command-dependent grants (`add_exec`, shebang discovery) are
+  simply absent from the output.
+
+#### Command-line conveniences
+
+- **Profile inference: `bulle -- claude` selects the matching profile.** When
+  no `--profile` is given and the command cannot run under the default
+  profile, `bulle` checks whether exactly one installed profile declares that
+  command as its `default_app`, selects it, and announces the choice on
+  stderr. Inference only rescues runs that would otherwise fail command
+  discovery, never overrides an explicit `--profile`, and refuses to guess
+  when several profiles match.
+- **Configuration defaults: `[defaults]` block.** `config.toml` can supply
+  `profile`, `timeout`, `env`, and path grants used when the corresponding
+  flag is absent, so bare `bulle` does the usual thing in a repository.
+  Explicit flags win; `--no-defaults` ignores the block.
+- **The `--` separator may be omitted when unambiguous.** The first
+  positional that is an existing directory reads as the workspace; the first
+  positional that is not starts the command, announced on stderr. Ambiguity
+  resolves toward the workspace, and `--` remains the explicit override.
+- **Environment conveniences.** `--env 'GIT_*'` name globs against the
+  parent environment (also in profile `env` lists), `--env-file PATH` for
+  dotenv-style files, and `--env-all-except NAME,...` for the whole parent
+  environment minus named secrets.
 
 ### Changed
 
@@ -111,112 +202,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   config files by name (so symlinked dotfiles carry their targets); `go` can
   `go run` (executable sandbox tmp, telemetry dir); `rust` can
   `cargo run --offline` end to end (linker via `cc`/`ld`, executable
-  `target/`, the cargo global cache, git config for vcs metadata).
-
-- **Tool resolvers: `TOOL:ASPECT` path entries.** A grant can ask a tool where
-  its own directories are instead of hard-coding them: `r:home`, `r:prefix`,
-  `r:libs`, `r:libs-user`, `uv:cache`, `uv:tools`, `uv:python`, `go:root`,
-  `go:path`, `go:modcache`, and `npm:cache`. Unlike `which:`/`pkg:` these name
-  ordinary directories and are valid in every list, support the `?` and `+`
-  markers, and are re-resolved as literal paths so the symlink and
-  sensitive-target checks apply. The set is a fixed registry in `bulle`; a
-  profile can never supply a command to run. Unknown namespaces are an error
-  rather than a literal path, and `r:prefix` drops results that would be a
-  system root. Motivated by R's package search path, which holds one entry per
-  installed package (70 on a Nix machine) and cannot be written down.
-- **`--list-resolvers`.** Prints every resolver with what it resolves to on the
-  current machine, so a resolver returning nothing is distinguishable from one
-  that works.
-- **`terminal` capability profile.** The environment variables an interactive
-  terminal program expects, previously repeated in every agent profile.
-
-### Changed
-
+  `target/`, the cargo global cache, git config for vcs metadata). The
+  `node` and `go` profiles ask `npm` and `go env` for their cache locations,
+  with the previous literal paths as fallbacks.
 - **Agent profiles assemble from capability profiles.** `claude`, `codex`,
   `opencode`, and `pi` now inherit `terminal`, `git`, and `node` rather than
   restating environment lists, so they carry git configuration and the Node
-  toolchain that agents routinely shell out to. Codex's state directory follows
-  `${CODEX_HOME:-$HOME/.codex}`. The `node` and `go` profiles ask `npm` and
-  `go env` for their cache locations, with the previous literal paths as
-  fallbacks.
-
-### Fixed
-
-- **Markers survive resolver expansion.** `?` and `+` on a resolver entry were
-  dropped when it expanded, so an optional resolver whose directory did not yet
-  exist became a hard failure in a `rw` list.
-
-- **Rerun with an added grant: `--last`.** Every real run records its
-  invocation (arguments and working directory) under the user state
-  directory. `bulle --last` repeats it from any shell, inserting extra flags
-  before the command, and denial diagnostics now end with a copy-pasteable
-  `bulle: retry with these grants: bulle --last --ro ...` line. The sandbox
-  restarts rather than widens.
-- **Configuration defaults: `[defaults]` block.** `config.toml` can supply
-  `profile`, `timeout`, `env`, and path grants used when the corresponding
-  flag is absent, so bare `bulle` does the usual thing in a repository.
-  Explicit flags win; `--no-defaults` ignores the block.
-- **The `--` separator may be omitted when unambiguous.** The first
-  positional that is an existing directory reads as the workspace; the first
-  positional that is not starts the command, announced on stderr. Ambiguity
-  resolves toward the workspace, and `--` remains the explicit override.
-- **Capability micro-profiles: `git`, `node`, `rust`, `go`.** Small built-in
-  profiles that answer one tool's location questions portably (binaries via
-  `which:`/`pkg:`, configuration, caches), meant to be assembled through
-  `inherits` or combined with `--profile tool,git,rust`.
-- **Environment conveniences.** `--env 'GIT_*'` name globs against the
-  parent environment (also in profile `env` lists), `--env-file PATH` for
-  dotenv-style files, and `--env-all-except NAME,...` for the whole parent
-  environment minus named secrets.
-
-- **Portable profiles: path entries now adapt to the machine.** A profile
-  written on one machine works on another:
-    - `?path` marks a writable entry optional (skip when missing); `+path/`
-      creates a missing directory and `+path` a missing file. Read-only
-      entries keep their existing skip-if-missing behavior. The built-in
-      `claude`, `codex`, `opencode`, and `pi` profiles now create their state
-      directories on first run instead of failing on a fresh machine.
-    - `which:NAME` resolves a command on the parent `PATH` and grants exactly
-      that binary (plus its symlink chain) — never its containing directory.
-      Name lookup inside the sandbox goes through a per-run, read-only shim
-      directory that `bulle` creates and removes automatically. `pkg:NAME`
-      additionally grants the tool's package tree, refusing system
-      directories such as `/usr`.
-    - Platform-neutral variables `$CONFIG`, `$DATA`, `$CACHE`, and `$STATE`
-      resolve to XDG directories on Linux (honoring `XDG_*` overrides) and
-      `~/Library` equivalents on macOS.
-    - Single-star globs (`~/.nvm/versions/node/*/bin`); no matches means the
-      entry is skipped.
-    - Custom variables from a `[vars]` table in `<config>/config.toml` or
-      `--var NAME=VALUE`, with `${NAME:-fallback}` defaults. A small
-      allowlist of well-known tool environment variables (`CARGO_HOME`,
-      `GOPATH`, `NVM_DIR`, ...) may be referenced; untrusted values that are
-      relative or resolve to `/` or the home directory are ignored.
-- **Resolution table in `--policy`.** The policy summary now ends with one
-  line per configured entry showing its outcome (granted, skipped, created,
-  resolver expansion), and flags entries whose grants collapse into a
-  stronger permission on the current platform.
-
-- **Denial diagnostics: failed runs explain what the sandbox blocked.** After a
-  sandboxed command fails, `bulle` reads the operating system's own record of
-  sandbox denials and prints copy-pasteable fixes, e.g.
-  `denied: read /home/user/.gitconfig — add --ro ~/.gitconfig`. On Linux this
-  uses Landlock audit records (kernel 6.15+ with the audit subsystem enabled);
-  on macOS it queries the unified log, which needs no setup. Hints are
-  best-effort and print nothing when denial records are unavailable. See the
-  new *Denial Diagnostics* documentation page, including one-line setup
-  instructions per Linux distribution.
-- **Profile inference: `bulle -- claude` selects the matching profile.** When
-  no `--profile` is given and the command cannot run under the default
-  profile, `bulle` checks whether exactly one installed profile declares that
-  command as its `default_app`, selects it, and announces the choice on
-  stderr. Inference only rescues runs that would otherwise fail command
-  discovery, never overrides an explicit `--profile`, and refuses to guess
-  when several profiles match. Works out of the box with the built-in
-  `claude`, `codex`, `opencode`, and `pi` profiles.
-
-### Changed
-
+  toolchain that agents routinely shell out to. Codex's state directory
+  follows `${CODEX_HOME:-$HOME/.codex}`.
 - **All runs are now supervised.** Runs without `--timeout` previously
   replaced the `bulle` process with the sandboxed command directly; every run
   now keeps a lightweight parent process, which unifies signal forwarding and
@@ -224,6 +217,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diagnostics possible. Exit codes and signal behavior are unchanged.
 - Upgraded `go-landlock` to v0.9.0 to enable Landlock audit logging of
   sandbox denials on supporting kernels. Enforcement semantics are unchanged.
+
+### Fixed
+
+- **Markers survive resolver expansion.** `?` and `+` on a resolver entry
+  were dropped when it expanded, so an optional resolver whose directory did
+  not yet exist became a hard failure in a `rw` list.
 
 ## [0.0.7] - 2026-08-10
 
