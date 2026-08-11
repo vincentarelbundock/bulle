@@ -233,11 +233,8 @@ func reviewScratch(s *scratchState, skipPrompt bool, stdout, stderr io.Writer) {
 				fmt.Fprintln(stdout, "the scratch has uncommitted changes; use [s] to open a shell there and commit (or clean the tree), then [p] again")
 				continue
 			}
-			if pullScratch(s, stdout, stderr) {
-				return
-			}
-			// Failed pull: the scratch is untouched; re-prompt so the user
-			// can inspect or keep it.
+			pullScratch(s, stdout, stderr)
+			return
 		case "k":
 			printScratchRecipe(s, stdout)
 			return
@@ -276,14 +273,23 @@ func scratchIsDirty(s *scratchState) bool {
 // pullScratch integrates the scratch's commits into the origin with git pull
 // run from the origin side, so the merge updates the origin working tree
 // properly. Only called on a clean scratch. On success the scratch is
-// removed; on failure (conflicts, dirty origin) nothing is retried and the
-// scratch is kept untouched.
+// removed. On failure the scratch is kept and the review ends: the next
+// steps live in the origin, not in bulle. A merge conflict in particular
+// leaves the origin mid-merge, and the user resolves it there with normal
+// git; the scratch stays around until they wipe it themselves.
 func pullScratch(s *scratchState, stdout, stderr io.Writer) bool {
 	cmd := exec.Command("git", "-C", s.Origin, "pull", "--no-rebase", s.Dir)
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
-		fmt.Fprintf(stderr, "bulle: pull failed; the scratch is untouched at %s\n", s.Dir)
+		if _, mergeErr := runGit(s.Origin, "rev-parse", "-q", "--verify", "MERGE_HEAD"); mergeErr == nil {
+			fmt.Fprintf(stderr, "bulle: merge conflict: %s is now mid-merge\n", s.Origin)
+			fmt.Fprintf(stderr, "resolve the conflicts there (git status shows them), then git add and git commit\n")
+			fmt.Fprintf(stderr, "the scratch is kept at %s until you remove it: rm -rf %s\n", s.Dir, s.Dir)
+		} else {
+			fmt.Fprintf(stderr, "bulle: pull failed and nothing was merged; the origin and the scratch are untouched\n")
+			printScratchRecipe(s, stderr)
+		}
 		return false
 	}
 	removeScratch(s)

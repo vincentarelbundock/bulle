@@ -64,10 +64,20 @@ never change its parent shell's directory.
 `p` never commits on your behalf: pull moves commits only, so if the scratch
 has uncommitted changes, bulle points you at `s` to commit them (or clean the
 tree) yourself — when you exit the shell you are back at the prompt, ready to
-`p`. A failed pull (conflicts, uncommitted origin changes in the same files)
-changes nothing and keeps the scratch; and if you leave the shell with the
-scratch back at its starting state, bulle removes it like any other
-changeless run.
+`p`. And if you leave the shell with the scratch back at its starting state,
+bulle removes it like any other changeless run.
+
+A failed `p` ends the review rather than looping — the next steps live in
+your repository, not in bulle. Two cases:
+
+- **Merge conflict.** The pull leaves your repository mid-merge, exactly as a
+  conflicting `git pull` from any remote would. bulle says so and steps
+  aside: resolve the conflicts in your repository (`git status` lists them),
+  then `git add` and `git commit`. The scratch is kept until you remove it.
+- **Refused up front** (for example, uncommitted changes in your repository
+  to the same files the merge would touch). Nothing was merged, both sides
+  are untouched, and the integration recipe is printed for once you have
+  dealt with the obstacle.
 Without a terminal, or with `--scratch-keep`, the scratch is kept and the
 recipe printed. **A scratch is never deleted implicitly** — not on timeout,
 signal, or crash. Losing an agent's work to a cleanup path is worse than

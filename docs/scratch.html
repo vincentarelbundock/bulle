@@ -656,14 +656,24 @@ never change its parent shell's directory.</p>
 <p><code>p</code> never commits on your behalf: pull moves commits only, so if the scratch
 has uncommitted changes, bulle points you at <code>s</code> to commit them (or clean the
 tree) yourself — when you exit the shell you are back at the prompt, ready to
-<code>p</code>. A failed pull (conflicts, uncommitted origin changes in the same files)
-changes nothing and keeps the scratch; and if you leave the shell with the
-scratch back at its starting state, bulle removes it like any other
-changeless run.
+<code>p</code>. And if you leave the shell with the scratch back at its starting state,
+bulle removes it like any other changeless run.</p>
+<p>A failed <code>p</code> ends the review rather than looping — the next steps live in
+your repository, not in bulle. Two cases:</p>
+<ul>
+<li><strong>Merge conflict.</strong> The pull leaves your repository mid-merge, exactly as a
+  conflicting <code>git pull</code> from any remote would. bulle says so and steps
+  aside: resolve the conflicts in your repository (<code>git status</code> lists them),
+  then <code>git add</code> and <code>git commit</code>. The scratch is kept until you remove it.</li>
+<li><strong>Refused up front</strong> (for example, uncommitted changes in your repository
+  to the same files the merge would touch). Nothing was merged, both sides
+  are untouched, and the integration recipe is printed for once you have
+  dealt with the obstacle.
 Without a terminal, or with <code>--scratch-keep</code>, the scratch is kept and the
 recipe printed. <strong>A scratch is never deleted implicitly</strong> — not on timeout,
 signal, or crash. Losing an agent's work to a cleanup path is worse than
-leaving a directory behind.</p>
+leaving a directory behind.</li>
+</ul>
 <h2 id="integrating-the-changes">Integrating the changes<a class="headerlink" href="#integrating-the-changes" title="Permanent link">&para;</a></h2>
 <p>There is no bespoke apply step. The scratch is a real repository, so
 integration is ordinary git, done by you, outside the sandbox. When you are

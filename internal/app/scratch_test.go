@@ -266,6 +266,44 @@ func TestPullScratchKeepsScratchOnFailure(t *testing.T) {
 	}
 }
 
+func TestPullScratchConflictHandsOffToOrigin(t *testing.T) {
+	origin := makeOrigin(t)
+	var stderr, stdout bytes.Buffer
+	s, err := createScratch(origin, t.TempDir(), nil, &stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer removeScratch(s)
+	// Divergent committed edits to the same file on both sides force a real
+	// merge conflict, not an up-front refusal.
+	if err := os.WriteFile(filepath.Join(s.Dir, "tracked.txt"), []byte("scratch version\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitT(t, s.Dir, "add", "-A")
+	gitT(t, s.Dir, "commit", "-q", "-m", "agent work")
+	if err := os.WriteFile(filepath.Join(origin, "tracked.txt"), []byte("origin version\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitT(t, origin, "add", "-A")
+	gitT(t, origin, "commit", "-q", "-m", "origin work")
+
+	stderr.Reset()
+	if pullScratch(s, &stdout, &stderr) {
+		t.Fatal("conflicting pull must not report success")
+	}
+	if _, err := runGit(origin, "rev-parse", "-q", "--verify", "MERGE_HEAD"); err != nil {
+		t.Fatalf("origin should be mid-merge: %v", err)
+	}
+	for _, want := range []string{"mid-merge", "resolve the conflicts there", "rm -rf " + s.Dir} {
+		if !strings.Contains(stderr.String(), want) {
+			t.Errorf("conflict guidance missing %q:\n%s", want, stderr.String())
+		}
+	}
+	if _, err := os.Stat(s.Dir); err != nil {
+		t.Fatalf("scratch must survive a conflicted pull: %v", err)
+	}
+}
+
 func TestRewriteScratchPaths(t *testing.T) {
 	s := &scratchState{Dir: "/home/u/.local/state/bulle/scratch/proj-ab12cd34", Origin: "/home/u/proj"}
 	hints := []string{
