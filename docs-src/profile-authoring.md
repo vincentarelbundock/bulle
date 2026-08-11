@@ -30,7 +30,7 @@ each slot, or note why it does not apply:
    store paths, Homebrew kegs, version managers). Use `which:NAME` for
    binaries and a tool resolver (`r:home`, `uv:cache`, `npm:cache`) for
    directories. Literal paths are fallbacks for when the tool is absent.
-   `bulle --list-resolvers` shows every resolver and what it reports on the
+   `bulle resolvers` shows every resolver and what it reports on the
    current machine.
 2. **Base profiles are offline and read-only for libraries.** A sandboxed
    process that can write the user library or package cache can plant code
@@ -113,7 +113,7 @@ can report an installation prefix, so `/usr` never becomes a grant.
 
 Run the target command under the profile and read the denial report: bulle
 aggregates denials inside one Nix store item or Homebrew keg into a single
-suggested grant and prints a copy-pasteable `bulle --last …` retry line.
-`--policy` shows the fully resolved grants; `--policy=json` is
+suggested grant and prints a copy-pasteable `bulle rerun …` retry line.
+`bulle policy` shows the fully resolved grants; `bulle policy --json` is
 machine-readable. Recurring denials usually mean a missing slot from the
 checklist above rather than a one-off path.

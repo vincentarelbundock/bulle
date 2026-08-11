@@ -31,7 +31,7 @@ func TestRetryHintLine(t *testing.T) {
 		"denied: read /home/u/.gitconfig — add --ro ~/.gitconfig",
 	}
 	got := retryHintLine(hints)
-	want := "bulle: retry with these grants: bulle --last --ro ~/.gitconfig --rox /opt/x"
+	want := "bulle: retry with these grants: bulle rerun --ro ~/.gitconfig --rox /opt/x"
 	if got != want {
 		t.Fatalf("retry = %q, want %q", got, want)
 	}

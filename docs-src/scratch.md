@@ -172,9 +172,9 @@ go to die.
   commit, and the invocation that created it.
 - **Denial hints** report paths in origin-relative form, so a suggested
   `--ro` grant from a scratch run is meaningful on the next one.
-- **`--last`** replays as a *new* scratch carrying your current uncommitted
+- **`bulle rerun`** replays as a *new* scratch carrying your current uncommitted
   state, rather than reusing the previous one.
 - **Submodules** are not carried into the scratch (bulle warns when the
   origin has them).
-- **`--scratch --policy`** prints the scratch-to-origin mapping and the
+- **`bulle policy --scratch`** prints the scratch-to-origin mapping and the
   resolved policy without running anything, then removes the unused clone.

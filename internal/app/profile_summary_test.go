@@ -25,7 +25,7 @@ func TestShouldPrintProfileSummary(t *testing.T) {
 		},
 		{
 			name: "explicit profile policy output",
-			opts: cli.Options{Flags: cli.Flags{Profile: "tool", Policy: true}},
+			opts: cli.Options{Flags: cli.Flags{Profile: "tool"}, Policy: true},
 			want: false,
 		},
 		{

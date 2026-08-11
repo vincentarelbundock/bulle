@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Language and tool profiles
 
+- **`user-bin` profile; personal bin directories are no longer default.**
+  `~/.local/bin`, `~/.bin`, and `~/.cargo/bin` moved out of the platform
+  default executable roots into an opt-in `user-bin` profile: execute
+  requires read under both backends, and personal scripts in those
+  directories can hold secrets a default sandbox should not see. Agent
+  profiles (`claude`, `codex`, `opencode`, `pi`) inherit `user-bin`; other
+  runs add `--profile user-bin` when a user-installed helper is denied.
 - **Built-in `r`, `r-install`, `uv`, and `uv-install` profiles.**
   `bulle --profile r -- Rscript analysis.R` and
   `bulle --profile uv -- uv run script.py` work on conventional installs
@@ -176,6 +183,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Verbs are subcommands now; the verb-flags are gone.** `bulle policy`
+  (with `--json`) replaces `--policy`/`--policy=json`, `bulle rerun` replaces
+  `--last`, `bulle profiles list` replaces `--list-profiles`,
+  `bulle profiles install SOURCE` replaces `--install-profiles`, and
+  `bulle resolvers` replaces `--list-resolvers`. The run itself stays bare —
+  `bulle --profile claude ~/project` is unchanged, and everything that
+  modifies a run (grants, env, `--timeout`, `--scratch`) remains a flag.
+  `policy` accepts every run flag; `rerun` still inserts extra flags before
+  the recorded command, and denial hints now suggest `bulle rerun --ro ...`.
+  Subcommand names are reserved as the first argument; a workspace with such
+  a name is reachable as `./policy` or after `--`.
 - **`deny = ["network"]` no longer blocks `socketpair(2)` or the
   `send*`/`recv*` syscalls on Linux.** A socketpair is a connected
   in-process pipe (Linux only supports `AF_UNIX` pairs) and cannot reach

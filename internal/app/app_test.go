@@ -97,7 +97,7 @@ func TestRunPreparedPolicyDoesNotShadowWorkspacePath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	code := Run([]string{"bulle", preparedPolicyRunnerCommand, "--rox", filepath.Dir(truePath), "--policy=summary", "--", truePath}, &stdout, &stderr)
+	code := Run([]string{"bulle", "policy", preparedPolicyRunnerCommand, "--rox", filepath.Dir(truePath), "--", truePath}, &stdout, &stderr)
 
 	if code != ExitOK {
 		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitOK, stderr.String())
@@ -178,7 +178,7 @@ func TestRunDefaultsWorkspacePathToCurrentDirectory(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"bulle", "--profile", "tool", "--policy=json", "--", "echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "policy", "--json", "--profile", "tool", "--", "echo", "hi"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -205,7 +205,7 @@ func TestRunAddExecWithoutProjectGrantsCurrentDirectory(t *testing.T) {
 		}
 	}()
 
-	code := Run([]string{"bulle", "--add-exec", "--policy=json", "--", "/bin/echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "policy", "--json", "--add-exec", "--", "/bin/echo", "hi"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -253,7 +253,7 @@ func TestRunListProfilesPrintsBuiltInProfiles(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"bulle", "--list-profiles"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "profiles", "list"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -275,7 +275,7 @@ func TestRunListProfilesIncludesConfigProfiles(t *testing.T) {
 	writeConfigProfile(t, tmp, "custom", `inherits = "tool"
 `)
 
-	code := Run([]string{"bulle", "--config", tmp, "--list-profiles"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "profiles", "list", "--config", tmp}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -296,7 +296,7 @@ func TestRunInstallProfilesCopiesSingleProfileFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	code := Run([]string{"bulle", "--config", configRoot, "--install-profiles", source}, &stdout, &stderr)
+	code := Run([]string{"bulle", "profiles", "install", "--config", configRoot, source}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -329,7 +329,7 @@ func TestRunInstallProfilesCopiesDirectoryTomlFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	code := Run([]string{"bulle", "--config", configRoot, "--install-profiles", sourceDir}, &stdout, &stderr)
+	code := Run([]string{"bulle", "profiles", "install", "--config", configRoot, sourceDir}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -360,7 +360,7 @@ func TestRunInstallProfilesUsesProfilesDirectoryInRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	code := Run([]string{"bulle", "--config", configRoot, "--install-profiles", repo}, &stdout, &stderr)
+	code := Run([]string{"bulle", "profiles", "install", "--config", configRoot, repo}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -385,7 +385,7 @@ func TestRunInstallProfilesDoesNotPartiallyCopyInvalidDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	code := Run([]string{"bulle", "--config", configRoot, "--install-profiles", sourceDir}, &stdout, &stderr)
+	code := Run([]string{"bulle", "profiles", "install", "--config", configRoot, sourceDir}, &stdout, &stderr)
 
 	if code == 0 {
 		t.Fatalf("exit code = 0, want install failure")
@@ -504,7 +504,7 @@ func TestRunFindsBareCommandFromExplicitExecutableRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	code := Run([]string{"bulle", "--rox", binDir, "--policy", "--", "bulle-test-tool"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "policy", "--rox", binDir, "--", "bulle-test-tool"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -546,7 +546,7 @@ func TestRunUsesDefaultAppFromConfig(t *testing.T) {
 rox = ["/bin"]
 `)
 
-	code := Run([]string{"bulle", "--config", tmp, tmp, "--policy=json"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "policy", "--json", "--config", tmp, tmp}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -564,7 +564,7 @@ func TestRunUsesDefaultAppFromProfile(t *testing.T) {
 default_app = "echo profile"
 `)
 
-	code := Run([]string{"bulle", "--config", tmp, "--profile", "agent", tmp, "--policy=json"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "policy", "--json", "--config", tmp, "--profile", "agent", tmp}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -582,7 +582,7 @@ func TestRunParsesQuotedDefaultApp(t *testing.T) {
 rox = ["/bin"]
 `)
 
-	code := Run([]string{"bulle", "--config", tmp, tmp, "--policy=json"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "policy", "--json", "--config", tmp, tmp}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -599,7 +599,7 @@ func TestRunRejectsInvalidDefaultApp(t *testing.T) {
 	writeConfigProfile(t, tmp, "default", `default_app = "echo 'unterminated"
 `)
 
-	code := Run([]string{"bulle", "--config", tmp, tmp, "--policy=json"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "policy", "--json", "--config", tmp, tmp}, &stdout, &stderr)
 
 	if code != ExitConfigError {
 		t.Fatalf("exit code = %d, want %d; stdout = %s; stderr = %s", code, ExitConfigError, stdout.String(), stderr.String())
@@ -636,7 +636,7 @@ func TestRunPolicyJSONPrintsResolvedPolicy(t *testing.T) {
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
 
-	code := Run([]string{"bulle", "--profile", "tool", tmp, "--policy=json", "--", "echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "policy", "--json", "--profile", "tool", tmp, "--", "echo", "hi"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -660,7 +660,7 @@ func TestRunPolicyJSONIncludesTimeoutWhenConfigured(t *testing.T) {
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
 
-	code := Run([]string{"bulle", "--timeout", "30s", "--profile", "tool", tmp, "--policy=json", "--", "echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "policy", "--json", "--timeout", "30s", "--profile", "tool", tmp, "--", "echo", "hi"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -675,7 +675,7 @@ func TestRunPolicyJSONOmitsTimeoutWhenUnset(t *testing.T) {
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
 
-	code := Run([]string{"bulle", "--profile", "tool", tmp, "--policy=json", "--", "echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "policy", "--json", "--profile", "tool", tmp, "--", "echo", "hi"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -690,7 +690,7 @@ func TestRunPolicySummaryIncludesTimeoutWhenConfigured(t *testing.T) {
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
 
-	code := Run([]string{"bulle", "--timeout", "250ms", "--profile", "tool", tmp, "--policy", "--", "echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "policy", "--timeout", "250ms", "--profile", "tool", tmp, "--", "echo", "hi"}, &stdout, &stderr)
 
 	if code != ExitOK {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -707,10 +707,10 @@ func TestRunPolicyPrintsHumanReadableSummaryByDefault(t *testing.T) {
 
 	code := Run([]string{
 		"bulle",
+		"policy",
 		"--profile", "tool",
 		"--env", "BULLE_TEST_SECRET=super-secret-value",
 		tmp,
-		"--policy",
 		"--", "/bin/echo", "hi",
 	}, &stdout, &stderr)
 
@@ -834,7 +834,7 @@ func TestRunPolicyIncludesOfflineProfileOverlay(t *testing.T) {
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
 
-	code := Run([]string{"bulle", "--profile", "tool,offline", tmp, "--policy=json", "--", "echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "policy", "--json", "--profile", "tool,offline", tmp, "--", "echo", "hi"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -859,7 +859,7 @@ func TestRunPolicyIncludesLinuxLibraryDepsWhenAddLibsIsSet(t *testing.T) {
 		t.Skip("/usr/bin/true has no discoverable ELF dependencies")
 	}
 
-	code := Run([]string{"bulle", "--add-exec", "--add-libs", tmp, "--policy=json", "--", "/usr/bin/true"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "policy", "--json", "--add-exec", "--add-libs", tmp, "--", "/usr/bin/true"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())

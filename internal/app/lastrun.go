@@ -121,7 +121,7 @@ func retryHintLine(hints []string) string {
 	if len(grants) > maxGrants {
 		grants = grants[:maxGrants]
 	}
-	return "bulle: retry with these grants: bulle --last " + strings.Join(grants, " ")
+	return "bulle: retry with these grants: bulle rerun " + strings.Join(grants, " ")
 }
 
 // applyConfigDefaults fills flag-shaped gaps from the [defaults] block of the

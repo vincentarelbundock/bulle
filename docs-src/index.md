@@ -155,7 +155,7 @@ A profile is a named bundle of path, environment, network, and platform grants. 
 
 !!! warning
 
-    Profiles can grant broad filesystem, environment, network, and platform access. Use `--policy` to inspect the resolved permissions before running an unfamiliar profile or combining profiles.
+    Profiles can grant broad filesystem, environment, network, and platform access. Use `bulle policy` to inspect the resolved permissions before running an unfamiliar profile or combining profiles.
 
 ### Selection and inference
 
@@ -183,7 +183,7 @@ Inference is deliberately conservative, because applying a profile changes what 
 - It only ever rescues a run that would otherwise fail command discovery. A command that already works under the default profile is never re-profiled.
 - It never fires when you pass `--profile` — an explicit selection always wins.
 - If several profiles declare the same command, `bulle` refuses to guess, lists the candidates, and asks you to choose with `--profile`.
-- The selection is always announced on stderr, and `--policy` shows the resulting permissions (`bulle --policy -- claude`).
+- The selection is always announced on stderr, and `bulle policy` shows the resulting permissions (`bulle policy -- claude`).
 
 Without a profile or an explicit grant, `bulle` cannot find or execute anything, so command discovery fails before the sandbox starts:
 
@@ -218,10 +218,10 @@ bulle --profile claude --ro README.qmd --rw ~/Desktop --env GITHUB_TOKEN
 
 ### List
 
-Use `--list-profiles` to print available profiles:
+Use `bulle profiles list` to print available profiles:
 
 ```bash
-bulle --list-profiles
+bulle profiles list
 
 claude
 codex
@@ -257,12 +257,12 @@ They can also be combined on the command line: `bulle --profile tool,git,rust --
 
 ### Install
 
-Install or override profiles with `--install-profiles SOURCE`. The source can be one `.toml` file, a directory containing `.toml` files, a local git repository, or a GitHub source such as `github:vincentarelbundock/bulle/custom_profiles`.
+Install or override profiles with `bulle profiles install SOURCE`. The source can be one `.toml` file, a directory containing `.toml` files, a local git repository, or a GitHub source such as `github:vincentarelbundock/bulle/custom_profiles`.
 
 ```bash
-bulle --install-profiles agent.toml
-bulle --install-profiles ./profiles
-bulle --install-profiles github:vincentarelbundock/bulle/custom_profiles
+bulle profiles install agent.toml
+bulle profiles install ./profiles
+bulle profiles install github:vincentarelbundock/bulle/custom_profiles
 ```
 
 By default, profiles are installed under the operating system user config directory: usually `$XDG_CONFIG_HOME/bulle/profiles/` or `~/.config/bulle/profiles/` on Linux, and `~/Library/Application Support/bulle/profiles/` on macOS. Use `--config PATH` to install into a different config directory; `bulle` creates its `profiles/` subdirectory if needed. The filename becomes the profile name, so `profiles/agent.toml` is selected with `--profile agent`.
@@ -324,7 +324,7 @@ A profile written on one machine should work on another, even when tools are ins
 | `$CACHE`  | `$XDG_CACHE_HOME` or `~/.cache`     | `~/Library/Caches`              |
 | `$STATE`  | `$XDG_STATE_HOME` or `~/.local/state`| `~/Library/Application Support` |
 
-On Linux, the raw `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_CACHE_HOME`, and `XDG_STATE_HOME` names are also available and honor the parent environment when set. On macOS, several of these collapse to the same directory; the `--policy` resolution table flags entries whose grants merge because of that.
+On Linux, the raw `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_CACHE_HOME`, and `XDG_STATE_HOME` names are also available and honor the parent environment when set. On macOS, several of these collapse to the same directory; the `bulle policy` resolution table flags entries whose grants merge because of that.
 
 **Optional and created entries.** Read-only entries (`ro`, `rox`) are always skipped silently when the path does not exist. Writable entries (`rw`, `rwx`) fail hard on a missing path unless marked:
 
@@ -354,7 +354,7 @@ rw  = ["?+npm:cache", "?+go:modcache"]
 
 Unlike `which:`/`pkg:`, these name ordinary directories and are valid in every list. Markers work as usual: `?` skips when the tool is absent, `+` creates a directory the tool reports but has not made yet. Results are re-resolved as literal paths, so the symlink pairing and sensitive-target refusals apply exactly as they do to a hand-written path.
 
-Run `bulle --list-resolvers` to see every resolver and what it points at on the current machine — a resolver that reports nothing is otherwise indistinguishable from one that works. The set is fixed by `bulle`: a profile chooses from it but can never supply a command to run, because profiles are installable from GitHub and one that could run commands would make installing a profile equivalent to running its author's code. An unknown namespace is an error rather than a literal path, and a literal path in that shape must be written `./ruby:gems` or absolute.
+Run `bulle resolvers` to see every resolver and what it points at on the current machine — a resolver that reports nothing is otherwise indistinguishable from one that works. The set is fixed by `bulle`: a profile chooses from it but can never supply a command to run, because profiles are installable from GitHub and one that could run commands would make installing a profile equivalent to running its author's code. An unknown namespace is an error rather than a literal path, and a literal path in that shape must be written `./ruby:gems` or absolute.
 
 Some aspects are guarded. `r:prefix` reports R's installation root, which is narrow where R owns its own directory (a Nix store path, a Homebrew Cellar entry) and far too broad where it is `/usr`; results matching the `pkg:` system-root denylist are dropped rather than granted.
 
@@ -380,10 +380,10 @@ A sandboxed run often fails because one grant is missing. The kernel-level [deni
 ```text
 bulle: the sandbox denied the following accesses during this run:
   denied: read /home/user/.gitconfig — add --ro ~/.gitconfig
-bulle: retry with these grants: bulle --last --ro ~/.gitconfig
+bulle: retry with these grants: bulle rerun --ro ~/.gitconfig
 ```
 
-`bulle --last` repeats the previous invocation — from any shell, restoring the original working directory — and inserts any extra flags before the command, so the retry line works as-is. Each run overwrites the recorded invocation, and repeated `--last` runs accumulate their added grants. The sandbox is restarted rather than widened: Landlock cannot extend a live sandbox, and agents resume from their own session state.
+`bulle rerun` repeats the previous invocation — from any shell, restoring the original working directory — and inserts any extra flags before the command, so the retry line works as-is. Each run overwrites the recorded invocation, and repeated `rerun` invocations accumulate their added grants. The sandbox is restarted rather than widened: Landlock cannot extend a live sandbox, and agents resume from their own session state.
 
 The invocation is recorded in `$XDG_STATE_HOME/bulle/last-run.json` (usually `~/.local/state/bulle/`) on Linux and `~/Library/Application Support/bulle/` on macOS.
 
@@ -412,10 +412,10 @@ bulle --profile codex,offline
 
 ## Policy
 
-Use `--policy` to inspect the resolved sandbox policy without running the command. By default, it prints the same human-readable permissions summary that `bulle` sends to supported LLM agent profiles at startup. This is a useful safety check before launching an agent or script, especially when combining profiles with extra filesystem or environment grants.
+Use `bulle policy` to inspect the resolved sandbox policy without running the command. By default, it prints the same human-readable permissions summary that `bulle` sends to supported LLM agent profiles at startup. This is a useful safety check before launching an agent or script, especially when combining profiles with extra filesystem or environment grants.
 
 ```bash
-bulle --profile codex --policy
+bulle policy --profile codex
 ```
 
 No command is required: without one (and without a configured `default_app`), the policy is resolved and printed as-is, minus command-dependent grants such as `--add-exec` and shebang interpreter discovery.
@@ -429,10 +429,10 @@ The summary ends with a **resolution table**: one line per configured entry show
     rw   ?$HOME/.netrc      → skipped (does not exist)
 ```
 
-Stable machine-readable output is available with `--policy=json`:
+Stable machine-readable output is available with `bulle policy --json`:
 
 ```bash
-bulle --policy=json ~/Desktop --rox /bin -- /bin/ls
+bulle policy --json ~/Desktop --rox /bin -- /bin/ls
 ```
 
 ```json
@@ -452,7 +452,7 @@ bulle --policy=json ~/Desktop --rox /bin -- /bin/ls
 }
 ```
 
-In the `--policy=json` example, `workspace_path` is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to `/home/user/Desktop`, shown in the `rw` array. The `command` field is the command that would be executed, and the `ro`, `rox`, `rw`, and `rwx` arrays show the readable, executable, writable, and writable-executable path grants. The `env_keys` array lists environment variables that would be passed into the sandbox. The `mach_lookup` array lists configured macOS Mach services. The `network` field shows the resolved network state. The `backend` value depends on your operating system.
+In the `bulle policy --json` example, `workspace_path` is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to `/home/user/Desktop`, shown in the `rw` array. The `command` field is the command that would be executed, and the `ro`, `rox`, `rw`, and `rwx` arrays show the readable, executable, writable, and writable-executable path grants. The `env_keys` array lists environment variables that would be passed into the sandbox. The `mach_lookup` array lists configured macOS Mach services. The `network` field shows the resolved network state. The `backend` value depends on your operating system.
 
 ## Executables and Libraries
 
@@ -474,7 +474,7 @@ Profiles can enable these conveniences with `add_exec = true` and `add_libs = tr
 
 ## OS-Level Sandboxing
 
-`bulle` builds a policy before the command starts. The policy is assembled from the workspace, selected profile, command-line flags, selected environment variables, network profile settings, executable discovery, and runtime library defaults. Paths are resolved before sandbox setup, and `--policy` prints the resulting policy without running the command.
+`bulle` builds a policy before the command starts. The policy is assembled from the workspace, selected profile, command-line flags, selected environment variables, network profile settings, executable discovery, and runtime library defaults. Paths are resolved before sandbox setup, and `bulle policy` prints the resulting policy without running the command.
 
 ### Linux
 

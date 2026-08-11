@@ -66,7 +66,7 @@ func TestRunInfersProfileFromCommandWhenDiscoveryFails(t *testing.T) {
 	})
 	var stdout, stderr bytes.Buffer
 	code := Run([]string{
-		"bulle", "--config", configRoot, t.TempDir(), "--policy", "--", script,
+		"bulle", "policy", "--config", configRoot, t.TempDir(), "--", script,
 	}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -85,7 +85,7 @@ func TestRunDoesNotInferProfileWhenExplicitProfileGiven(t *testing.T) {
 	})
 	var stdout, stderr bytes.Buffer
 	code := Run([]string{
-		"bulle", "--config", configRoot, "--profile", "default", t.TempDir(), "--policy", "--", script,
+		"bulle", "policy", "--config", configRoot, "--profile", "default", t.TempDir(), "--", script,
 	}, &stdout, &stderr)
 	if code == 0 {
 		t.Fatalf("expected failure under explicit default profile, stdout = %s", stdout.String())
@@ -102,7 +102,7 @@ func TestRunRefusesToInferAmbiguousProfiles(t *testing.T) {
 	})
 	var stdout, stderr bytes.Buffer
 	code := Run([]string{
-		"bulle", "--config", configRoot, t.TempDir(), "--policy", "--", script,
+		"bulle", "policy", "--config", configRoot, t.TempDir(), "--", script,
 	}, &stdout, &stderr)
 	if code == 0 {
 		t.Fatalf("expected failure on ambiguous profiles, stdout = %s", stdout.String())

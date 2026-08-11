@@ -95,6 +95,7 @@ Profiles:
   rust              cargo, rustup toolchains, and the registry cache
   terminal          environment variables an interactive terminal program expects
   tool              general local command support (PATH, executables, libs)
+  user-bin          personal executable directories (~/.local/bin, ~/.bin, ~/.cargo/bin)
   uv                uv-managed Python interpreters and environments
   uv-install        uv plus a writable cache, project venv, and PyPI access
 

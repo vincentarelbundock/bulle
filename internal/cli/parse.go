@@ -32,12 +32,6 @@ func Parse(args []string) (Options, error) {
 		opts.Notes = append(opts.Notes, note)
 	}
 	cliArgs = normalizeTimeoutValue(cliArgs)
-	var policyFormat string
-	var err error
-	cliArgs, policyFormat, err = normalizePolicyFormat(cliArgs)
-	if err != nil {
-		return opts, err
-	}
 	if err := rejectScratchValue(cliArgs); err != nil {
 		return opts, err
 	}
@@ -51,10 +45,6 @@ func Parse(args []string) (Options, error) {
 		return opts, err
 	}
 	opts.Timeout = timeout
-	opts.PolicyFormat = policyFormat
-	if opts.Policy && opts.PolicyFormat == "" {
-		opts.PolicyFormat = "summary"
-	}
 	opts.ProjectPath = parsed.ProjectPath
 	if opts.ProjectPath == "" {
 		opts.ProjectPath = "."
@@ -70,9 +60,8 @@ type runCLI struct {
 }
 
 type Flags struct {
-	Profile         string `name:"profile" short:"p" placeholder:"NAME" help:"Named profile, or comma-separated profiles merged left to right."`
-	Config          string `name:"config" placeholder:"PATH" help:"Path to a configuration directory."`
-	InstallProfiles string `name:"install-profiles" placeholder:"SOURCE" help:"Install profile TOML files from a file, directory, local git repository, or GitHub source."`
+	Profile string `name:"profile" short:"p" placeholder:"NAME" help:"Named profile, or comma-separated profiles merged left to right."`
+	Config  string `name:"config" placeholder:"PATH" help:"Path to a configuration directory."`
 
 	ReadOnly      []string `name:"ro" placeholder:"PATH" help:"Grant read-only access."`
 	ReadOnlyExec  []string `name:"rox" placeholder:"PATH" help:"Grant read-only access plus execute."`
@@ -90,37 +79,12 @@ type Flags struct {
 	Scratch     bool `name:"scratch" help:"Run against a disposable local clone of the workspace, then review the changes."`
 	ScratchKeep bool `name:"scratch-keep" help:"Skip the review prompt, keep the scratch, and print its path."`
 
-	Last       bool `name:"last" help:"Repeat the previous bulle invocation, with any extra flags appended."`
 	NoDefaults bool `name:"no-defaults" help:"Ignore the [defaults] block of the user configuration."`
 
-	AddExec       bool   `name:"add-exec" help:"Add the resolved command executable to the sandbox."`
-	AddLibs       bool   `name:"add-libs" help:"Add runtime library access for executables."`
-	NoWorkspace   bool   `name:"no-workspace" help:"Do not automatically grant the workspace read-write access."`
-	ListProfiles  bool   `name:"list-profiles" help:"List available profiles and exit."`
-	ListResolvers bool   `name:"list-resolvers" help:"List path resolvers with what they resolve to on this machine, and exit."`
-	Timeout       string `name:"timeout" placeholder:"DURATION" help:"Kill the sandboxed command if it runs longer than DURATION, using Go duration syntax such as 30s, 2m, or 1h30m; 0 disables."`
-	Policy        bool   `name:"policy" help:"Print the resolved policy and exit."`
-}
-
-func normalizePolicyFormat(args []string) ([]string, string, error) {
-	out := make([]string, 0, len(args))
-	format := ""
-	for _, arg := range args {
-		value, ok := strings.CutPrefix(arg, "--policy=")
-		if !ok {
-			out = append(out, arg)
-			continue
-		}
-		if value != "summary" && value != "json" {
-			return nil, "", fmt.Errorf("invalid --policy value %q; use summary or json", value)
-		}
-		if format != "" && format != value {
-			return nil, "", fmt.Errorf("conflicting --policy values %q and %q", format, value)
-		}
-		format = value
-		out = append(out, "--policy")
-	}
-	return out, format, nil
+	AddExec     bool   `name:"add-exec" help:"Add the resolved command executable to the sandbox."`
+	AddLibs     bool   `name:"add-libs" help:"Add runtime library access for executables."`
+	NoWorkspace bool   `name:"no-workspace" help:"Do not automatically grant the workspace read-write access."`
+	Timeout     string `name:"timeout" placeholder:"DURATION" help:"Kill the sandboxed command if it runs longer than DURATION, using Go duration syntax such as 30s, 2m, or 1h30m; 0 disables."`
 }
 
 // rejectScratchValue turns kong's generic bool-parse failure for
@@ -199,7 +163,7 @@ func NormalizeSeparator(args []string) []string {
 // their values for positionals.
 var valueFlags = map[string]bool{
 	"--profile": true, "-p": true,
-	"--config": true, "--install-profiles": true,
+	"--config": true,
 	"--ro": true, "--rox": true, "--rw": true, "--rwx": true,
 	"--env": true, "--env-file": true, "--env-all-except": true,
 	"--var": true, "--timeout": true,

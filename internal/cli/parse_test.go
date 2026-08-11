@@ -41,83 +41,12 @@ func TestParseRunWithProjectCommandAndFlags(t *testing.T) {
 	}
 }
 
-func TestParsePolicyFlagDefaultsToSummary(t *testing.T) {
-	opts, err := Parse([]string{"bulle", "--policy", "--", "codex"})
-	if err != nil {
-		t.Fatalf("Parse returned error: %v", err)
-	}
-	if !opts.Policy {
-		t.Fatalf("Policy = false, want true")
-	}
-	if opts.PolicyFormat != "summary" {
-		t.Fatalf("PolicyFormat = %q, want summary", opts.PolicyFormat)
-	}
-	if len(opts.Command) != 1 || opts.Command[0] != "codex" {
-		t.Fatalf("Command = %#v, want [codex]", opts.Command)
-	}
-}
-
-func TestParsePolicyFormatValues(t *testing.T) {
-	for _, tc := range []struct {
-		arg  string
-		want string
-	}{
-		{arg: "--policy=summary", want: "summary"},
-		{arg: "--policy=json", want: "json"},
-	} {
-		opts, err := Parse([]string{"bulle", tc.arg, "--", "codex", "--model", "gpt-5"})
-		if err != nil {
-			t.Fatalf("Parse(%q) returned error: %v", tc.arg, err)
+func TestParseRejectsRemovedVerbFlags(t *testing.T) {
+	// These verbs are subcommands now; the flags are gone entirely.
+	for _, arg := range []string{"--policy", "--policy=json", "--last", "--list-profiles", "--list-resolvers", "--install-profiles"} {
+		if _, err := Parse([]string{"bulle", arg}); err == nil {
+			t.Fatalf("Parse(%q) succeeded, want unknown-flag error", arg)
 		}
-		if !opts.Policy {
-			t.Fatalf("Parse(%q) Policy = false, want true", tc.arg)
-		}
-		if opts.PolicyFormat != tc.want {
-			t.Fatalf("Parse(%q) PolicyFormat = %q, want %q", tc.arg, opts.PolicyFormat, tc.want)
-		}
-		if len(opts.Command) != 3 || opts.Command[0] != "codex" || opts.Command[1] != "--model" || opts.Command[2] != "gpt-5" {
-			t.Fatalf("Parse(%q) Command = %#v, want [codex --model gpt-5]", tc.arg, opts.Command)
-		}
-	}
-}
-
-func TestParsePolicyRejectsInvalidFormat(t *testing.T) {
-	_, err := Parse([]string{"bulle", "--policy=pretty"})
-	if err == nil {
-		t.Fatal("Parse returned nil error, want invalid --policy value error")
-	}
-	if !strings.Contains(err.Error(), `invalid --policy value "pretty"`) {
-		t.Fatalf("Parse error = %q, want invalid --policy value pretty", err.Error())
-	}
-}
-
-func TestParsePolicyRejectsConflictingFormats(t *testing.T) {
-	_, err := Parse([]string{"bulle", "--policy=json", "--policy=summary"})
-	if err == nil {
-		t.Fatal("Parse returned nil error, want conflicting --policy values error")
-	}
-	if !strings.Contains(err.Error(), "conflicting --policy values") {
-		t.Fatalf("Parse error = %q, want conflicting --policy values", err.Error())
-	}
-}
-
-func TestParseListProfilesFlag(t *testing.T) {
-	opts, err := Parse([]string{"bulle", "--list-profiles"})
-	if err != nil {
-		t.Fatalf("Parse returned error: %v", err)
-	}
-	if !opts.ListProfiles {
-		t.Fatalf("ListProfiles = false, want true")
-	}
-}
-
-func TestParseInstallProfilesFlag(t *testing.T) {
-	opts, err := Parse([]string{"bulle", "--install-profiles", "profiles"})
-	if err != nil {
-		t.Fatalf("Parse returned error: %v", err)
-	}
-	if opts.InstallProfiles != "profiles" {
-		t.Fatalf("InstallProfiles = %q, want profiles", opts.InstallProfiles)
 	}
 }
 

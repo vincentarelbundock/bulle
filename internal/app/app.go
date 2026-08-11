@@ -47,17 +47,80 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return ExitConfigError
 	}
 
-	// `scratch` is a reserved subcommand, intercepted like the help/version
-	// aliases so command inference never tries to run it in a sandbox.
-	if len(args) > 1 && args[1] == "scratch" {
-		return runScratchCommand(args[2:], stdout, stderr)
+	// Subcommands are dispatched by the first argument, before run parsing,
+	// so command inference never tries to execute a verb in a sandbox. Any
+	// other first argument is a run: the wrapper invocation stays bare.
+	if len(args) > 1 {
+		switch args[1] {
+		case "scratch":
+			return runScratchCommand(args[2:], stdout, stderr)
+		case "profiles":
+			return runProfilesCommand(args[2:], stdout, stderr)
+		case "resolvers":
+			if len(args) > 2 {
+				fmt.Fprintln(stderr, "usage: bulle resolvers")
+				return ExitConfigError
+			}
+			writeResolverListing(parentEnv(), stdout)
+			return ExitOK
+		case "policy":
+			runArgs, format, err := extractPolicyFormat(args[2:])
+			if err != nil {
+				fmt.Fprintln(stderr, err)
+				return ExitConfigError
+			}
+			return runMain(append([]string{args[0]}, runArgs...), format, stdout, stderr)
+		case "rerun":
+			stored, err := loadLastRun()
+			if err != nil {
+				fmt.Fprintln(stderr, "bulle: rerun: no previous invocation recorded")
+				return ExitConfigError
+			}
+			merged := mergeLastRunArgs(stored.Args, args[2:])
+			if stored.Dir != "" {
+				if cwd, err := os.Getwd(); err == nil && cwd != stored.Dir {
+					if err := os.Chdir(stored.Dir); err != nil {
+						fmt.Fprintf(stderr, "bulle: rerun: cannot return to %s: %v\n", stored.Dir, err)
+						return ExitConfigError
+					}
+					fmt.Fprintf(stderr, "bulle: rerun: running from %s\n", stored.Dir)
+				}
+			}
+			fmt.Fprintf(stderr, "bulle: repeating: bulle %s\n", strings.Join(merged, " "))
+			return runMain(append([]string{args[0]}, merged...), "", stdout, stderr)
+		}
 	}
+	return runMain(args, "", stdout, stderr)
+}
 
+// extractPolicyFormat pulls --json out of `bulle policy` arguments; the rest
+// are ordinary run arguments.
+func extractPolicyFormat(args []string) ([]string, string, error) {
+	format := "summary"
+	out := make([]string, 0, len(args))
+	for _, arg := range args {
+		switch arg {
+		case "--json":
+			format = "json"
+		case "--summary":
+			format = "summary"
+		default:
+			out = append(out, arg)
+		}
+	}
+	return out, format, nil
+}
+
+// runMain is the sandboxed run itself — and, when policyFormat is non-empty,
+// the `bulle policy` variant that resolves and prints without running.
+func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Writer) int {
 	opts, err := cli.Parse(args)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return ExitConfigError
 	}
+	opts.Policy = policyFormat != ""
+	opts.PolicyFormat = policyFormat
 	if opts.Help {
 		fmt.Fprint(stdout, cli.Usage())
 		return ExitOK
@@ -65,30 +128,6 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if opts.Version {
 		fmt.Fprintf(stdout, "bulle %s\n", Version)
 		return ExitOK
-	}
-	if opts.Last {
-		stored, err := loadLastRun()
-		if err != nil {
-			fmt.Fprintln(stderr, "bulle: --last: no previous invocation recorded")
-			return ExitConfigError
-		}
-		merged := mergeLastRunArgs(stored.Args, args[1:])
-		if stored.Dir != "" {
-			if cwd, err := os.Getwd(); err == nil && cwd != stored.Dir {
-				if err := os.Chdir(stored.Dir); err != nil {
-					fmt.Fprintf(stderr, "bulle: --last: cannot return to %s: %v\n", stored.Dir, err)
-					return ExitConfigError
-				}
-				fmt.Fprintf(stderr, "bulle: --last: running from %s\n", stored.Dir)
-			}
-		}
-		fmt.Fprintf(stderr, "bulle: repeating: bulle %s\n", strings.Join(merged, " "))
-		args = append([]string{args[0]}, merged...)
-		opts, err = cli.Parse(args)
-		if err != nil {
-			fmt.Fprintln(stderr, err)
-			return ExitConfigError
-		}
 	}
 	for _, note := range opts.Notes {
 		fmt.Fprintln(stderr, note)
@@ -103,21 +142,6 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return ExitConfigError
 	}
-	if opts.InstallProfiles != "" {
-		root := opts.Config
-		if root == "" {
-			root = defaultConfigRoot()
-		}
-		if root == "" {
-			fmt.Fprintln(stderr, "could not determine user config directory")
-			return ExitConfigError
-		}
-		if err := installProfiles(opts.InstallProfiles, root, stdout); err != nil {
-			fmt.Fprintln(stderr, err)
-			return ExitConfigError
-		}
-		return ExitOK
-	}
 	global, err := loadConfig(opts)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -128,16 +152,6 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 			fmt.Fprintln(stderr, err)
 			return ExitConfigError
 		}
-	}
-	if opts.ListProfiles {
-		for _, name := range cli.ProfileNames(global) {
-			fmt.Fprintln(stdout, name)
-		}
-		return ExitOK
-	}
-	if opts.ListResolvers {
-		writeResolverListing(parentEnv(), stdout)
-		return ExitOK
 	}
 	explicitCommand := len(opts.Command) > 0
 	if len(opts.Command) == 0 {
