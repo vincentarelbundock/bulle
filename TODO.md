@@ -15,6 +15,14 @@
   - Offer diff, apply, keep, and discard once the command exits.
   - Coordinate with ephemeral state support so filesystem and app state scratch behave consistently.
 
+- [ ] Consider an `r-build` profile for source compilation.
+  - `install.packages()` from source needs a C/Fortran toolchain, `$R_HOME/etc/Makeconf`, and headers.
+  - Much larger grant than the binary installation `r-install` targets; specify only after `r-install` has been exercised in the wild.
+
+- [ ] Decide whether a bare `python` profile (no uv) is worth shipping.
+  - System python layouts vary widely and some machines have no `python3` at all.
+  - Could be a thin alias selecting `uv` plus a bare-interpreter fallback.
+
 - [ ] Add record mode for profile authoring.
   - Run a command once under observation and emit a minimal profile from what it touched.
   - Use Seatbelt `(trace)` with `sandbox-simplify` on macOS, and `fanotify` or `ptrace` on Linux.
