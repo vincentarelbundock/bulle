@@ -217,7 +217,7 @@ func reviewScratch(s *scratchState, skipPrompt bool, stdout, stderr io.Writer) {
 	}
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Fprint(stdout, "[d]iff  [k]eep  [D]iscard? ")
+		fmt.Fprint(stdout, "[d]iff  [k]eep  [s]hell  [D]iscard? ")
 		answer, err := reader.ReadString('\n')
 		if err != nil {
 			printScratchRecipe(s, stdout)
@@ -227,6 +227,10 @@ func reviewScratch(s *scratchState, skipPrompt bool, stdout, stderr io.Writer) {
 		case "d":
 			pageScratchDiff(s, final, stderr)
 		case "k":
+			printScratchRecipe(s, stdout)
+			return
+		case "s":
+			openScratchShell(s, stdout, stderr)
 			printScratchRecipe(s, stdout)
 			return
 		case "D":
@@ -274,6 +278,28 @@ func pageScratchDiff(s *scratchState, final string, stderr io.Writer) {
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		fmt.Fprintf(stderr, "bulle: diff failed: %v\n", err)
+	}
+}
+
+// openScratchShell keeps the scratch and starts the user's shell inside it —
+// unsandboxed, since the run is over and this is the user reviewing. A child
+// process cannot change the parent shell's directory, so a subshell is the
+// closest honest equivalent of "cd into the scratch".
+func openScratchShell(s *scratchState, stdout, stderr io.Writer) {
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "sh"
+	}
+	fmt.Fprintf(stdout, "starting %s in %s (exit to return)\n", filepath.Base(shell), s.Dir)
+	cmd := exec.Command(shell)
+	cmd.Dir = s.Dir
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		if _, isExit := err.(*exec.ExitError); !isExit {
+			fmt.Fprintf(stderr, "bulle: could not start %s: %v\n", shell, err)
+		}
 	}
 }
 

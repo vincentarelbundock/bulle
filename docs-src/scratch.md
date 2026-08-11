@@ -19,7 +19,7 @@ scratch: 4 files changed, 1 added, 0 deleted
   M	internal/policy/resolve.go
   M	internal/policy/policy.go
   A	internal/policy/scratch.go
-[d]iff  [k]eep  [D]iscard?
+[d]iff  [k]eep  [s]hell  [D]iscard?
 ~~~
 
 The whole model in three sentences: `--scratch` clones the repository locally
@@ -53,7 +53,11 @@ exits you are back at your own prompt, which never moved. The review summary
 and the integration recipe print right there.
 
 At the prompt: `d` pages the full diff and asks again, `k` keeps the scratch
-and prints the integration recipe, `D` discards it after a confirmation.
+and prints the integration recipe, `s` keeps it and opens your shell inside
+the scratch (unsandboxed — the run is over; exit to return to where you
+were), and `D` discards it after a confirmation. A subshell is as close as
+any program can get to "cd into the scratch": a child process can never
+change its parent shell's directory.
 Without a terminal, or with `--scratch-keep`, the scratch is kept and the
 recipe printed. **A scratch is never deleted implicitly** — not on timeout,
 signal, or crash. Losing an agent's work to a cleanup path is worse than

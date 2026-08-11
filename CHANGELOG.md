@@ -15,7 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   agent starts from the state you see; git objects are hardlinked, so cloning
   is nearly free. The real checkout is never granted to the sandbox. After
   the run, a review gate shows what changed — including work the agent
-  committed — and offers diff, keep, or discard; a run that changed nothing
+  committed — and offers diff, keep, a subshell inside the scratch, or
+  discard; a run that changed nothing
   cleans up after itself, and a scratch with changes is never deleted
   implicitly. Integration is git-native: keep prints a `git push
   origin HEAD:scratch/<id>` recipe, and the result lands as a ref in the
