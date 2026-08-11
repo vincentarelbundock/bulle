@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -23,6 +24,82 @@ type scratchMeta struct {
 	Invocation   string `toml:"invocation"`
 }
 
+// scratchVerbs are the review verbs of `bulle scratch`; anything else after
+// the word `scratch` starts a run in a fresh scratch instead.
+var scratchVerbs = []string{"list", "diff", "pull", "wipe", "shell"}
+
+func isScratchVerb(arg string) bool {
+	for _, verb := range scratchVerbs {
+		if arg == verb {
+			return true
+		}
+	}
+	return false
+}
+
+// scratchArgsStartRun reports whether `bulle scratch <args>` is a run in a
+// fresh scratch rather than a review verb. Verbs never begin with a dash, so a
+// flag-led invocation (bulle scratch --profile claude) is unambiguous; an
+// unrecognized positional reads exactly as it would at the top level, where
+// an existing directory is the workspace and anything else starts the command.
+//
+// The one thing that decision must not swallow is a mistyped verb: without a
+// guard, `bulle scratch difff` would clone the repository just to fail on a
+// missing executable. A near-miss that is neither a directory nor a command on
+// PATH is reported as a typo instead.
+func scratchArgsStartRun(args []string) (bool, error) {
+	if len(args) == 0 {
+		return false, nil
+	}
+	first := args[0]
+	if isScratchVerb(first) {
+		return false, nil
+	}
+	if strings.HasPrefix(first, "-") {
+		return true, nil
+	}
+	if info, err := os.Stat(first); err == nil && info.IsDir() {
+		return true, nil
+	}
+	if _, err := exec.LookPath(first); err == nil {
+		return true, nil
+	}
+	for _, verb := range scratchVerbs {
+		if editDistanceWithin1(first, verb) {
+			return false, fmt.Errorf("unknown scratch command %q; did you mean %q? (to run %q in a scratch, use: bulle scratch -- %s)", first, verb, first, first)
+		}
+	}
+	return true, nil
+}
+
+// editDistanceWithin1 reports whether a and b are at most one single-character
+// insertion, deletion, or substitution apart.
+func editDistanceWithin1(a, b string) bool {
+	if a == b {
+		return true
+	}
+	switch {
+	case len(a) == len(b):
+		diff := 0
+		for i := range a {
+			if a[i] != b[i] {
+				diff++
+			}
+		}
+		return diff == 1
+	case len(a) == len(b)+1:
+		return editDistanceWithin1(b, a)
+	case len(b) == len(a)+1:
+		for i := range a {
+			if a[i] != b[i] {
+				return a[i:] == b[i+1:]
+			}
+		}
+		return true
+	}
+	return false
+}
+
 // runScratchCommand implements `bulle scratch <verb> [id]`. The verbs mirror
 // the review-prompt letters — list, diff, pull, wipe, shell — and are
 // re-entrant views of the same review: a kept scratch (or one left behind by
@@ -30,6 +107,7 @@ type scratchMeta struct {
 func runScratchCommand(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "usage: bulle scratch list|diff|pull|wipe|shell [id]")
+		fmt.Fprintln(stderr, "       bulle scratch [run flags] [workspace] [-- command [args...]]")
 		return ExitConfigError
 	}
 	verb := args[0]

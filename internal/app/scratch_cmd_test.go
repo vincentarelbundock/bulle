@@ -134,3 +134,55 @@ func TestRunScratchCommandUnknownVerb(t *testing.T) {
 		t.Fatalf("missing verb exit %d", code)
 	}
 }
+
+func TestScratchArgsStartRun(t *testing.T) {
+	dir := t.TempDir()
+	cases := []struct {
+		name    string
+		args    []string
+		wantRun bool
+		wantErr string
+	}{
+		{name: "no arguments stay with the verb usage", args: nil},
+		{name: "review verb", args: []string{"diff", "a1b2"}},
+		{name: "flag-led invocation runs", args: []string{"--profile", "claude"}, wantRun: true},
+		{name: "separator runs", args: []string{"--", "shell"}, wantRun: true},
+		{name: "existing directory is a workspace", args: []string{dir}, wantRun: true},
+		{name: "command on PATH runs", args: []string{"go", "test"}, wantRun: true},
+		{name: "near-miss verb is a typo", args: []string{"difff"}, wantErr: `did you mean "diff"`},
+		{name: "dropped letter is a typo", args: []string{"wip"}, wantErr: `did you mean "wipe"`},
+		{name: "unrelated unknown command runs", args: []string{"zzzsomecommand"}, wantRun: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := scratchArgsStartRun(tc.args)
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("error = %v, want it to contain %q", err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.wantRun {
+				t.Fatalf("startRun = %v, want %v", got, tc.wantRun)
+			}
+		})
+	}
+}
+
+func TestEditDistanceWithin1(t *testing.T) {
+	within := [][2]string{{"diff", "diff"}, {"difff", "diff"}, {"dif", "diff"}, {"daff", "diff"}, {"wip", "wipe"}, {"shel", "shell"}}
+	beyond := [][2]string{{"policy", "pull"}, {"dfif", "diff"}, {"", "diff"}, {"listing", "list"}}
+	for _, pair := range within {
+		if !editDistanceWithin1(pair[0], pair[1]) {
+			t.Errorf("editDistanceWithin1(%q, %q) = false, want true", pair[0], pair[1])
+		}
+	}
+	for _, pair := range beyond {
+		if editDistanceWithin1(pair[0], pair[1]) {
+			t.Errorf("editDistanceWithin1(%q, %q) = true, want false", pair[0], pair[1])
+		}
+	}
+}

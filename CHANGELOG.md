@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Workspaces
 
-- **`--scratch` disposable workspaces.** Run the sandboxed command against a
-  throwaway local clone of the workspace instead of the real checkout. The
+- **`bulle scratch` disposable workspaces.** Run the sandboxed command against
+  a throwaway local clone of the workspace instead of the real checkout. The
   clone carries uncommitted work (tracked changes and untracked files) so the
   agent starts from the state you see; git objects are hardlinked, so cloning
   is nearly free, and the real checkout is never granted to the sandbox.
@@ -28,7 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   merging. A kept scratch is a paused review:
   `bulle scratch list|diff|pull|wipe|shell [id]` resumes it later with the
   same semantics as the prompt letters (id optional when unambiguous, unique
-  prefixes accepted). `--scratch-keep` skips the prompt for non-interactive
+  prefixes accepted). The subcommand covers creation too: anything after
+  `scratch` that is not a review verb is an ordinary run
+  (`bulle scratch --profile claude`), with `--` available for a command named
+  like a verb and a typo guard so a mistyped verb reports itself instead of
+  cloning. The flag form `--scratch` remains, and is what `bulle rerun` and
+  `bulle policy` compose with. `--scratch-keep` skips the prompt for non-interactive
   runs, `[scratch] dir` in `config.toml` relocates scratches (warning when
   the location defeats hardlinking), and denial hints from scratch runs are
   rewritten to origin-relative paths so suggested grants stay meaningful.

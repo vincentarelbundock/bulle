@@ -18,6 +18,7 @@ Usage:
   bulle [flags] [workspace] [-- command [args...]]
   bulle policy [run flags] [--json]
   bulle rerun [extra flags]
+  bulle scratch [run flags] [workspace] [-- command [args...]]
   bulle scratch list|diff|pull|wipe|shell [id]
   bulle profiles list|install SOURCE
   bulle resolvers
@@ -66,7 +67,7 @@ Subcommands:
                     accepts every run flag, plus --json (summary otherwise)
   rerun             repeat the previous invocation, with extra flags inserted
                     before the command (e.g. bulle rerun --ro ~/.gitconfig)
-  scratch           manage kept scratch workspaces (see below)
+  scratch           run in a disposable clone, or manage kept ones (see below)
   profiles list     list available profiles
   profiles install SOURCE
                     install profile TOML files from a file, directory, local
@@ -93,10 +94,15 @@ Executable discovery:
                     These do not add app state files or environment variables.
 
 Disposable workspaces:
-  --scratch         run against a disposable local clone of the workspace
+  bulle scratch [run flags] [workspace] [-- command [args...]]
+                    run against a disposable local clone of the workspace
                     (git repositories only; uncommitted work is carried over).
                     After the run, review the changes: diff, pull into the
                     origin, keep, open a shell in the scratch, or wipe it.
+                    Everything after "scratch" that is not a review verb is an
+                    ordinary run; use -- to run a command named like a verb.
+  --scratch         the same, as a flag on a run — for composing with the other
+                    subcommands, as in bulle rerun --scratch
   --scratch-keep    skip the review prompt, keep the scratch, print its path
   bulle scratch list|diff|pull|wipe|shell [id]
                     resume the review of a kept scratch later; id may be a
@@ -112,6 +118,7 @@ Output and safety:
 
 Examples:
   bulle --profile claude ~/repos/project   # Claude Code in a workspace
+  bulle scratch --profile claude           # the same, in a disposable clone
   bulle --add-exec -- /bin/ls
   bulle --profile codex --ro ~/.cache/uv
   bulle . --profile secrets --env OPENAI_API_KEY -- codex

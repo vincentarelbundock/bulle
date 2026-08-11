@@ -53,6 +53,18 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) > 1 {
 		switch args[1] {
 		case "scratch":
+			// `bulle scratch` covers the whole lifecycle: the review verbs
+			// resume a kept scratch, and anything else creates one, so the
+			// subcommand is not limited to scratches that already exist.
+			isRun, err := scratchArgsStartRun(args[2:])
+			if err != nil {
+				fmt.Fprintf(stderr, "bulle: %v\n", err)
+				return ExitConfigError
+			}
+			if isRun {
+				runArgs := append([]string{args[0], "--scratch"}, args[2:]...)
+				return runMain(runArgs, "", stdout, stderr)
+			}
 			return runScratchCommand(args[2:], stdout, stderr)
 		case "profiles":
 			return runProfilesCommand(args[2:], stdout, stderr)
