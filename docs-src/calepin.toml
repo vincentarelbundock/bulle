@@ -1,0 +1,72 @@
+title = "bulle"
+description = "bulle runs local commands in a sandbox, exposing only the essential parts of your machine."
+base-url = "https://vincentarelbundock.github.io/bulle"
+logo = "assets/bulle.svg"
+logo-alt = "bulle"
+favicon = "assets/favicon.png"
+# HTML only: no PDF rendering, and no .typ source shipped beside each page.
+# With neither alternate view, the theme drops the view-mode picker entirely.
+pdf = false
+typ = false
+search = "pagefind"
+
+# The license notices the website links to are plain text files, not pages.
+[static]
+include = ["assets/**", "LICENSES/**"]
+
+[toc]
+enabled = true
+depth = 3
+
+[menus]
+
+  [[menus.main]]
+  target = "permissions.typ"
+  label = "Permissions"
+
+  [[menus.main]]
+  target = "profiles.typ"
+  label = "Profiles"
+
+  [[menus.main]]
+  target = "cli-reference.typ"
+  label = "CLI reference"
+
+  [[menus.social]]
+  target = "https://github.com/vincentarelbundock/bulle"
+  label = "{icon:github}"
+  aria-label = "GitHub"
+
+[footer]
+
+  [[footer.item]]
+  label = "bulle is distributed under the MIT License."
+
+  [[footer.item]]
+  label = "Made with Calepin."
+  target = "https://vincentarelbundock.github.io/calepin"
+
+[sidebar]
+fold = true
+
+# Six pages is few enough that section headings would add nesting without
+# adding orientation; the per-page table of contents carries the detail.
+[[sidebar.section]]
+
+  [[sidebar.section.item]]
+  target = "index.typ"
+
+  [[sidebar.section.item]]
+  target = "permissions.typ"
+
+  [[sidebar.section.item]]
+  target = "profiles.typ"
+
+  [[sidebar.section.item]]
+  target = "scratch.typ"
+
+  [[sidebar.section.item]]
+  target = "denial-diagnostics.typ"
+
+  [[sidebar.section.item]]
+  target = "cli-reference.typ"
