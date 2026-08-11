@@ -181,11 +181,11 @@ func TestUsageShowsProfileShortFlag(t *testing.T) {
 	if strings.Contains(Usage(), "--no-network") {
 		t.Fatalf("Usage() still shows --no-network:\n%s", Usage())
 	}
-	if !strings.Contains(Usage(), "--list-profiles") {
-		t.Fatalf("Usage() does not show --list-profiles:\n%s", Usage())
+	if !strings.Contains(Usage(), "profiles list") {
+		t.Fatalf("Usage() does not show profiles list subcommand:\n%s", Usage())
 	}
-	if !strings.Contains(Usage(), "--install-profiles SOURCE") {
-		t.Fatalf("Usage() does not show --install-profiles:\n%s", Usage())
+	if !strings.Contains(Usage(), "profiles install SOURCE") {
+		t.Fatalf("Usage() does not show profiles install subcommand:\n%s", Usage())
 	}
 	if !strings.Contains(Usage(), "--timeout DURATION") {
 		t.Fatalf("Usage() does not show --timeout:\n%s", Usage())
@@ -197,19 +197,15 @@ func TestUsageShowsProfileShortFlag(t *testing.T) {
 		t.Fatalf("Usage() does not document timeout exit code:\n%s", Usage())
 	}
 	for _, example := range []string{
-		"bulle --install-profiles agent.toml",
-		"bulle --install-profiles ./profiles",
-		"bulle --install-profiles github:vincentarelbundock/bulle/custom_profiles",
+		"bulle profiles install agent.toml",
+		"bulle profiles install github:vincentarelbundock/bulle/custom_profiles",
 	} {
 		if !strings.Contains(Usage(), example) {
 			t.Fatalf("Usage() does not show install-profile example %q:\n%s", example, Usage())
 		}
 	}
-	if !strings.Contains(Usage(), "--policy[=summary|json]") {
+	if !strings.Contains(Usage(), "--json (summary otherwise)") {
 		t.Fatalf("Usage() does not show policy formats:\n%s", Usage())
-	}
-	if !strings.Contains(Usage(), "summary by default") {
-		t.Fatalf("Usage() does not explain default policy format:\n%s", Usage())
 	}
 	if !strings.Contains(Usage(), "macOS uses configured runtime roots") {
 		t.Fatalf("Usage() does not explain macOS --add-libs behavior:\n%s", Usage())

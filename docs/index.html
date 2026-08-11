@@ -816,7 +816,7 @@ the default profile cannot; pass --profile to choose explicitly
 <p>A profile is a named bundle of path, environment, network, and platform grants. It saves you from spelling out the same permissions every time you run a tool.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>Profiles can grant broad filesystem, environment, network, and platform access. Use <code>--policy</code> to inspect the resolved permissions before running an unfamiliar profile or combining profiles.</p>
+<p>Profiles can grant broad filesystem, environment, network, and platform access. Use <code>bulle policy</code> to inspect the resolved permissions before running an unfamiliar profile or combining profiles.</p>
 </div>
 <h3 id="selection-and-inference">Selection and inference<a class="headerlink" href="#selection-and-inference" title="Permanent link">&para;</a></h3>
 <p>There are two ways a profile gets applied to a run.</p>
@@ -834,7 +834,7 @@ the default profile cannot; pass --profile to choose explicitly
 <li>It only ever rescues a run that would otherwise fail command discovery. A command that already works under the default profile is never re-profiled.</li>
 <li>It never fires when you pass <code>--profile</code> — an explicit selection always wins.</li>
 <li>If several profiles declare the same command, <code>bulle</code> refuses to guess, lists the candidates, and asks you to choose with <code>--profile</code>.</li>
-<li>The selection is always announced on stderr, and <code>--policy</code> shows the resulting permissions (<code>bulle --policy -- claude</code>).</li>
+<li>The selection is always announced on stderr, and <code>bulle policy</code> shows the resulting permissions (<code>bulle policy -- claude</code>).</li>
 </ul>
 <p>Without a profile or an explicit grant, <code>bulle</code> cannot find or execute anything, so command discovery fails before the sandbox starts:</p>
 <div class="language-text highlight"><pre><span></span><code>bulle -- ping google.com
@@ -856,8 +856,8 @@ ping: cannot resolve google.com: Unknown host
 <div class="language-text highlight"><pre><span></span><code>bulle --profile claude --ro README.qmd --rw ~/Desktop --env GITHUB_TOKEN
 </code></pre></div>
 <h3 id="list">List<a class="headerlink" href="#list" title="Permanent link">&para;</a></h3>
-<p>Use <code>--list-profiles</code> to print available profiles:</p>
-<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--list-profiles
+<p>Use <code>bulle profiles list</code> to print available profiles:</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>profiles<span class="w"> </span>list
 
 claude
 codex
@@ -885,10 +885,10 @@ tool
 </code></pre></div>
 <p>They can also be combined on the command line: <code>bulle --profile tool,git,rust -- cargo build</code>.</p>
 <h3 id="install_1">Install<a class="headerlink" href="#install_1" title="Permanent link">&para;</a></h3>
-<p>Install or override profiles with <code>--install-profiles SOURCE</code>. The source can be one <code>.toml</code> file, a directory containing <code>.toml</code> files, a local git repository, or a GitHub source such as <code>github:vincentarelbundock/bulle/custom_profiles</code>.</p>
-<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--install-profiles<span class="w"> </span>agent.toml
-bulle<span class="w"> </span>--install-profiles<span class="w"> </span>./profiles
-bulle<span class="w"> </span>--install-profiles<span class="w"> </span>github:vincentarelbundock/bulle/custom_profiles
+<p>Install or override profiles with <code>bulle profiles install SOURCE</code>. The source can be one <code>.toml</code> file, a directory containing <code>.toml</code> files, a local git repository, or a GitHub source such as <code>github:vincentarelbundock/bulle/custom_profiles</code>.</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>profiles<span class="w"> </span>install<span class="w"> </span>agent.toml
+bulle<span class="w"> </span>profiles<span class="w"> </span>install<span class="w"> </span>./profiles
+bulle<span class="w"> </span>profiles<span class="w"> </span>install<span class="w"> </span>github:vincentarelbundock/bulle/custom_profiles
 </code></pre></div>
 <p>By default, profiles are installed under the operating system user config directory: usually <code>$XDG_CONFIG_HOME/bulle/profiles/</code> or <code>~/.config/bulle/profiles/</code> on Linux, and <code>~/Library/Application Support/bulle/profiles/</code> on macOS. Use <code>--config PATH</code> to install into a different config directory; <code>bulle</code> creates its <code>profiles/</code> subdirectory if needed. The filename becomes the profile name, so <code>profiles/agent.toml</code> is selected with <code>--profile agent</code>.</p>
 <p>When installing from a local git repository root or <code>github:owner/repo</code>, <code>bulle</code> uses <code>profiles/*.toml</code> if that directory exists. When a GitHub source includes a subdirectory, such as <code>github:owner/repo/custom_profiles</code>, that subdirectory is used as the profile source.</p>
@@ -959,7 +959,7 @@ bulle<span class="w"> </span>--install-profiles<span class="w"> </span>github:vi
 </tr>
 </tbody>
 </table>
-<p>On Linux, the raw <code>XDG_CONFIG_HOME</code>, <code>XDG_DATA_HOME</code>, <code>XDG_CACHE_HOME</code>, and <code>XDG_STATE_HOME</code> names are also available and honor the parent environment when set. On macOS, several of these collapse to the same directory; the <code>--policy</code> resolution table flags entries whose grants merge because of that.</p>
+<p>On Linux, the raw <code>XDG_CONFIG_HOME</code>, <code>XDG_DATA_HOME</code>, <code>XDG_CACHE_HOME</code>, and <code>XDG_STATE_HOME</code> names are also available and honor the parent environment when set. On macOS, several of these collapse to the same directory; the <code>bulle policy</code> resolution table flags entries whose grants merge because of that.</p>
 <p><strong>Optional and created entries.</strong> Read-only entries (<code>ro</code>, <code>rox</code>) are always skipped silently when the path does not exist. Writable entries (<code>rw</code>, <code>rwx</code>) fail hard on a missing path unless marked:</p>
 <div class="language-toml highlight"><pre><span></span><code><span class="n">rw</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;?$HOME/.netrc&quot;</span><span class="p">]</span><span class="w">        </span><span class="c1"># ? optional: skip when missing</span>
 <span class="n">rwx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;+$HOME/.codex/&quot;</span><span class="p">]</span><span class="w">       </span><span class="c1"># + trailing slash: create the directory when missing</span>
@@ -976,7 +976,7 @@ bulle<span class="w"> </span>--install-profiles<span class="w"> </span>github:vi
 <span class="n">rw</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;?+npm:cache&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;?+go:modcache&quot;</span><span class="p">]</span>
 </code></pre></div>
 <p>Unlike <code>which:</code>/<code>pkg:</code>, these name ordinary directories and are valid in every list. Markers work as usual: <code>?</code> skips when the tool is absent, <code>+</code> creates a directory the tool reports but has not made yet. Results are re-resolved as literal paths, so the symlink pairing and sensitive-target refusals apply exactly as they do to a hand-written path.</p>
-<p>Run <code>bulle --list-resolvers</code> to see every resolver and what it points at on the current machine — a resolver that reports nothing is otherwise indistinguishable from one that works. The set is fixed by <code>bulle</code>: a profile chooses from it but can never supply a command to run, because profiles are installable from GitHub and one that could run commands would make installing a profile equivalent to running its author's code. An unknown namespace is an error rather than a literal path, and a literal path in that shape must be written <code>./ruby:gems</code> or absolute.</p>
+<p>Run <code>bulle resolvers</code> to see every resolver and what it points at on the current machine — a resolver that reports nothing is otherwise indistinguishable from one that works. The set is fixed by <code>bulle</code>: a profile chooses from it but can never supply a command to run, because profiles are installable from GitHub and one that could run commands would make installing a profile equivalent to running its author's code. An unknown namespace is an error rather than a literal path, and a literal path in that shape must be written <code>./ruby:gems</code> or absolute.</p>
 <p>Some aspects are guarded. <code>r:prefix</code> reports R's installation root, which is narrow where R owns its own directory (a Nix store path, a Homebrew Cellar entry) and far too broad where it is <code>/usr</code>; results matching the <code>pkg:</code> system-root denylist are dropped rather than granted.</p>
 <p><strong>Globs.</strong> A <code>*</code> matches within one path segment (no <code>**</code>). No matches means the entry is skipped, so version-stamped directories stop breaking on upgrade:</p>
 <div class="language-toml highlight"><pre><span></span><code><span class="n">rox</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;$HOME/.nvm/versions/node/*/bin&quot;</span><span class="p">]</span>
@@ -990,9 +990,9 @@ bulle<span class="w"> </span>--install-profiles<span class="w"> </span>github:vi
 <p>A sandboxed run often fails because one grant is missing. The kernel-level <a href="denial-diagnostics">denial diagnostics</a> already print the missing grants after a failed run; <code>bulle</code> now also prints a copy-pasteable retry line:</p>
 <div class="language-text highlight"><pre><span></span><code>bulle: the sandbox denied the following accesses during this run:
   denied: read /home/user/.gitconfig — add --ro ~/.gitconfig
-bulle: retry with these grants: bulle --last --ro ~/.gitconfig
+bulle: retry with these grants: bulle rerun --ro ~/.gitconfig
 </code></pre></div>
-<p><code>bulle --last</code> repeats the previous invocation — from any shell, restoring the original working directory — and inserts any extra flags before the command, so the retry line works as-is. Each run overwrites the recorded invocation, and repeated <code>--last</code> runs accumulate their added grants. The sandbox is restarted rather than widened: Landlock cannot extend a live sandbox, and agents resume from their own session state.</p>
+<p><code>bulle rerun</code> repeats the previous invocation — from any shell, restoring the original working directory — and inserts any extra flags before the command, so the retry line works as-is. Each run overwrites the recorded invocation, and repeated <code>rerun</code> invocations accumulate their added grants. The sandbox is restarted rather than widened: Landlock cannot extend a live sandbox, and agents resume from their own session state.</p>
 <p>The invocation is recorded in <code>$XDG_STATE_HOME/bulle/last-run.json</code> (usually <code>~/.local/state/bulle/</code>) on Linux and <code>~/Library/Application Support/bulle/</code> on macOS.</p>
 <h2 id="configuration-defaults">Configuration Defaults<a class="headerlink" href="#configuration-defaults" title="Permanent link">&para;</a></h2>
 <p>A <code>[defaults]</code> block in <code>&lt;config&gt;/config.toml</code> (usually <code>~/.config/bulle/config.toml</code>) supplies values used when the corresponding flag is absent, so bare <code>bulle</code> does the usual thing in a repository:</p>
@@ -1009,8 +1009,8 @@ bulle: retry with these grants: bulle --last --ro ~/.gitconfig
 bulle<span class="w"> </span>--profile<span class="w"> </span>codex,offline
 </code></pre></div>
 <h2 id="policy">Policy<a class="headerlink" href="#policy" title="Permanent link">&para;</a></h2>
-<p>Use <code>--policy</code> to inspect the resolved sandbox policy without running the command. By default, it prints the same human-readable permissions summary that <code>bulle</code> sends to supported LLM agent profiles at startup. This is a useful safety check before launching an agent or script, especially when combining profiles with extra filesystem or environment grants.</p>
-<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--profile<span class="w"> </span>codex<span class="w"> </span>--policy
+<p>Use <code>bulle policy</code> to inspect the resolved sandbox policy without running the command. By default, it prints the same human-readable permissions summary that <code>bulle</code> sends to supported LLM agent profiles at startup. This is a useful safety check before launching an agent or script, especially when combining profiles with extra filesystem or environment grants.</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>policy<span class="w"> </span>--profile<span class="w"> </span>codex
 </code></pre></div>
 <p>No command is required: without one (and without a configured <code>default_app</code>), the policy is resolved and printed as-is, minus command-dependent grants such as <code>--add-exec</code> and shebang interpreter discovery.</p>
 <p>The summary ends with a <strong>resolution table</strong>: one line per configured entry showing what it resolved to — granted, skipped, created, or expanded from a <code>which:</code>/<code>pkg:</code> resolver or glob — so "why can't the agent see X" is answerable from one command. Entries whose resolved path is also granted through another list (for example when <code>$CONFIG</code> and <code>$DATA</code> collapse to the same directory on macOS) are flagged with their effective permission.</p>
@@ -1019,8 +1019,8 @@ bulle<span class="w"> </span>--profile<span class="w"> </span>codex,offline
     rwx  +$HOME/.codex/     → created (dir) /home/user/.codex
     rw   ?$HOME/.netrc      → skipped (does not exist)
 </code></pre></div>
-<p>Stable machine-readable output is available with <code>--policy=json</code>:</p>
-<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--policy<span class="o">=</span>json<span class="w"> </span>~/Desktop<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--<span class="w"> </span>/bin/ls
+<p>Stable machine-readable output is available with <code>bulle policy --json</code>:</p>
+<div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>policy<span class="w"> </span>--json<span class="w"> </span>~/Desktop<span class="w"> </span>--rox<span class="w"> </span>/bin<span class="w"> </span>--<span class="w"> </span>/bin/ls
 </code></pre></div>
 <div class="language-json highlight"><pre><span></span><code><span class="p">{</span>
 <span class="w">  </span><span class="nt">&quot;backend&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;macos-seatbelt&quot;</span><span class="p">,</span>
@@ -1037,7 +1037,7 @@ bulle<span class="w"> </span>--profile<span class="w"> </span>codex,offline
 <span class="w">  </span><span class="nt">&quot;network&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;full&quot;</span>
 <span class="p">}</span>
 </code></pre></div>
-<p>In the <code>--policy=json</code> example, <code>workspace_path</code> is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to <code>/home/user/Desktop</code>, shown in the <code>rw</code> array. The <code>command</code> field is the command that would be executed, and the <code>ro</code>, <code>rox</code>, <code>rw</code>, and <code>rwx</code> arrays show the readable, executable, writable, and writable-executable path grants. The <code>env_keys</code> array lists environment variables that would be passed into the sandbox. The <code>mach_lookup</code> array lists configured macOS Mach services. The <code>network</code> field shows the resolved network state. The <code>backend</code> value depends on your operating system.</p>
+<p>In the <code>bulle policy --json</code> example, <code>workspace_path</code> is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to <code>/home/user/Desktop</code>, shown in the <code>rw</code> array. The <code>command</code> field is the command that would be executed, and the <code>ro</code>, <code>rox</code>, <code>rw</code>, and <code>rwx</code> arrays show the readable, executable, writable, and writable-executable path grants. The <code>env_keys</code> array lists environment variables that would be passed into the sandbox. The <code>mach_lookup</code> array lists configured macOS Mach services. The <code>network</code> field shows the resolved network state. The <code>backend</code> value depends on your operating system.</p>
 <h2 id="executables-and-libraries">Executables and Libraries<a class="headerlink" href="#executables-and-libraries" title="Permanent link">&para;</a></h2>
 <p>For quick local commands, <code>--add-exec</code> can save you from spelling out executable grants by hand. It resolves the command before the sandbox starts and adds the executable to the policy:</p>
 <div class="language-bash highlight"><pre><span></span><code>bulle<span class="w"> </span>--add-exec<span class="w"> </span>--<span class="w"> </span>/bin/ls
@@ -1048,7 +1048,7 @@ bulle<span class="w"> </span>--profile<span class="w"> </span>codex,offline
 <p>These flags are conveniences for executables and runtime libraries. They do not add app state files, config directories, caches, secrets, or shell environment variables. Use profiles for agents and other tools that need a larger, repeatable policy.</p>
 <p>Profiles can enable these conveniences with <code>add_exec = true</code> and <code>add_libs = true</code>. Boolean settings inherit like other scalar profile settings: an explicit value in a later inherited profile or child profile overrides the earlier value.</p>
 <h2 id="os-level-sandboxing">OS-Level Sandboxing<a class="headerlink" href="#os-level-sandboxing" title="Permanent link">&para;</a></h2>
-<p><code>bulle</code> builds a policy before the command starts. The policy is assembled from the workspace, selected profile, command-line flags, selected environment variables, network profile settings, executable discovery, and runtime library defaults. Paths are resolved before sandbox setup, and <code>--policy</code> prints the resulting policy without running the command.</p>
+<p><code>bulle</code> builds a policy before the command starts. The policy is assembled from the workspace, selected profile, command-line flags, selected environment variables, network profile settings, executable discovery, and runtime library defaults. Paths are resolved before sandbox setup, and <code>bulle policy</code> prints the resulting policy without running the command.</p>
 <h3 id="linux">Linux<a class="headerlink" href="#linux" title="Permanent link">&para;</a></h3>
 <p>On Linux, <code>bulle</code> applies the policy with <a href="https://docs.kernel.org/userspace-api/landlock.html">Landlock</a>. Landlock is a kernel feature, not a package to install; basic filesystem sandboxing requires Linux 5.13 or later with Landlock enabled. The Linux backend restricts filesystem access for the process and its children according to the resolved read, write, and execute grants. When the resolved network setting is denied, it also installs a seccomp filter before <code>exec</code> to deny socket-related system calls.</p>
 <h3 id="macos">macOS<a class="headerlink" href="#macos" title="Permanent link">&para;</a></h3>

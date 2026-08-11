@@ -767,11 +767,11 @@ go to die.</p>
   commit, and the invocation that created it.</li>
 <li><strong>Denial hints</strong> report paths in origin-relative form, so a suggested
   <code>--ro</code> grant from a scratch run is meaningful on the next one.</li>
-<li><strong><code>--last</code></strong> replays as a <em>new</em> scratch carrying your current uncommitted
+<li><strong><code>bulle rerun</code></strong> replays as a <em>new</em> scratch carrying your current uncommitted
   state, rather than reusing the previous one.</li>
 <li><strong>Submodules</strong> are not carried into the scratch (bulle warns when the
   origin has them).</li>
-<li><strong><code>--scratch --policy</code></strong> prints the scratch-to-origin mapping and the
+<li><strong><code>bulle policy --scratch</code></strong> prints the scratch-to-origin mapping and the
   resolved policy without running anything, then removes the unused clone.</li>
 </ul>
 

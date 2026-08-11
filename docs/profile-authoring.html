@@ -696,7 +696,7 @@ each slot, or note why it does not apply:</p>
    store paths, Homebrew kegs, version managers). Use <code>which:NAME</code> for
    binaries and a tool resolver (<code>r:home</code>, <code>uv:cache</code>, <code>npm:cache</code>) for
    directories. Literal paths are fallbacks for when the tool is absent.
-   <code>bulle --list-resolvers</code> shows every resolver and what it reports on the
+   <code>bulle resolvers</code> shows every resolver and what it reports on the
    current machine.</li>
 <li><strong>Base profiles are offline and read-only for libraries.</strong> A sandboxed
    process that can write the user library or package cache can plant code
@@ -768,8 +768,8 @@ can report an installation prefix, so <code>/usr</code> never becomes a grant.</
 <h2 id="debugging-a-new-profile">Debugging a new profile<a class="headerlink" href="#debugging-a-new-profile" title="Permanent link">&para;</a></h2>
 <p>Run the target command under the profile and read the denial report: bulle
 aggregates denials inside one Nix store item or Homebrew keg into a single
-suggested grant and prints a copy-pasteable <code>bulle --last …</code> retry line.
-<code>--policy</code> shows the fully resolved grants; <code>--policy=json</code> is
+suggested grant and prints a copy-pasteable <code>bulle rerun …</code> retry line.
+<code>bulle policy</code> shows the fully resolved grants; <code>bulle policy --json</code> is
 machine-readable. Recurring denials usually mean a missing slot from the
 checklist above rather than a one-off path.</p>
 

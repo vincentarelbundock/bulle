@@ -18,6 +18,11 @@ restricts filesystem and environment access, and can optionally deny network acc
 
 Usage:
   bulle [flags] [workspace] [-- command [args...]]
+  bulle policy [run flags] [--json]
+  bulle rerun [extra flags]
+  bulle scratch list|diff|pull|wipe|shell [id]
+  bulle profiles list|install SOURCE
+  bulle resolvers
   bulle help | version
 
 The workspace is the command's working directory and writable area. If omitted,
@@ -44,7 +49,7 @@ Path entries (flags and profiles):
                    findable by name inside the sandbox (rox/rwx entries)
   pkg:NAME         like which:, plus the tool's package tree (rox/rwx entries)
   TOOL:ASPECT      ask a tool where its own directories are, such as r:libs or
-                   uv:cache; valid in every list (see --list-resolvers)
+                   uv:cache; valid in every list (see bulle resolvers)
   dir/*/bin        single-star glob; no matches means the entry is skipped
   Variables: $WORKSPACE, $HOME, $TMP, $TMPDIR, and the per-platform
   $CONFIG, $DATA, $CACHE, $STATE (XDG dirs on Linux, ~/Library on macOS).
@@ -58,9 +63,17 @@ Environment flags (no variables are passed unless requested):
   --env-all-except NAME,...
                     pass the whole parent environment except the named variables
 
-State and reruns:
-  --last            repeat the previous invocation, with extra flags inserted
-                    before the command (e.g. bulle --last --ro ~/.gitconfig)
+Subcommands:
+  policy            resolve and print the policy without running anything;
+                    accepts every run flag, plus --json (summary otherwise)
+  rerun             repeat the previous invocation, with extra flags inserted
+                    before the command (e.g. bulle rerun --ro ~/.gitconfig)
+  scratch           manage kept scratch workspaces (see below)
+  profiles list     list available profiles
+  profiles install SOURCE
+                    install profile TOML files from a file, directory, local
+                    git repository, or GitHub source
+  resolvers         list path resolvers and what they resolve to here
 
 Configuration:
   --config PATH     path to a configuration directory
@@ -70,10 +83,6 @@ Configuration:
 Profiles:
   -p, --profile NAME
                     named profile, or comma-separated profiles merged left to right
-  --list-profiles  list available profiles and exit
-  --list-resolvers list path resolvers and what they resolve to here, and exit
-  --install-profiles SOURCE
-                    install profile TOML files from a file, directory, local git repository, or GitHub source
   claude            Claude Code app state, config, and login support
   codex             Codex app state, config, network, MCP, and login support
   default           default sandbox profile
@@ -122,9 +131,6 @@ Output and safety:
                     kill the sandboxed command if it runs longer than DURATION.
                     Uses Go duration syntax such as 30s, 2m, or 1h30m.
                     Use 0 to disable. Timed-out commands exit 124.
-  --policy[=summary|json]
-                    print the resolved policy and exit; summary by default.
-                    Works without a command
   -h, --help        show this help and exit
   -V, --version     show version information and exit
 
@@ -133,10 +139,9 @@ Examples:
   bulle --add-exec -- /bin/ls
   bulle --profile codex --ro ~/.cache/uv
   bulle . --profile secrets --env OPENAI_API_KEY -- codex
-  bulle . --rox /bin --policy=json -- /bin/bash
-  bulle --profile codex --policy
+  bulle policy --json . --rox /bin -- /bin/bash
+  bulle policy --profile codex
   bulle --profile codex,offline
-  bulle --install-profiles agent.toml
-  bulle --install-profiles ./profiles
-  bulle --install-profiles github:vincentarelbundock/bulle/custom_profiles
+  bulle profiles install agent.toml
+  bulle profiles install github:vincentarelbundock/bulle/custom_profiles
 ~~~
