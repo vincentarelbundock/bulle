@@ -1,6 +1,6 @@
 title = "Codex"
 description = "Codex app state, config, network, MCP, and login support"
-inherits = ["tool", "terminal", "keychain", "git", "node"]
+inherits = ["tool", "terminal", "user-bin", "keychain", "git", "node"]
 default_app = "codex"
 env = [
   "CODEX_HOME",

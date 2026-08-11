@@ -1,6 +1,6 @@
 title = "OpenCode"
 description = "OpenCode app state and config support"
-inherits = ["tool", "terminal", "git", "node"]
+inherits = ["tool", "terminal", "user-bin", "git", "node"]
 default_app = "opencode"
 rwx = [
   # OpenCode follows XDG on Linux. Its macOS behavior is not verified, so both

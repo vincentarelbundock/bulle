@@ -379,12 +379,12 @@ func TestResolveToolProfileIncludesToolAndPlatformDefaults(t *testing.T) {
 			}
 		}
 	}
-	for _, want := range []string{localBin, dotBin} {
-		if !containsString(got.ReadOnlyExec, want) {
-			t.Fatalf("ReadOnlyExec = %#v, want %q", got.ReadOnlyExec, want)
-		}
-		if !pathListContains(got.Env["PATH"], want) {
-			t.Fatalf("PATH = %q, want %q", got.Env["PATH"], want)
+	// Personal bin directories are no longer platform defaults: they moved to
+	// the opt-in user-bin profile because execute requires read and personal
+	// scripts can hold secrets.
+	for _, absent := range []string{localBin, dotBin} {
+		if containsString(got.ReadOnlyExec, absent) {
+			t.Fatalf("ReadOnlyExec = %#v, must not include %q without the user-bin profile", got.ReadOnlyExec, absent)
 		}
 	}
 }

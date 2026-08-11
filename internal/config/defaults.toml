@@ -4,9 +4,6 @@ rox = [
   "/usr/bin",
   "/sbin",
   "/usr/local/bin",
-  "~/.local/bin",
-  "~/.bin",
-  "~/.cargo/bin",
   "/opt/homebrew/bin",
 ]
 
@@ -39,9 +36,6 @@ rox = [
   "/usr/bin",
   "/sbin",
   "/usr/local/bin",
-  "~/.local/bin",
-  "~/.bin",
-  "~/.cargo/bin",
 ]
 
 [platform.linux.libs]

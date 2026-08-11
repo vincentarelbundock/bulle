@@ -1,0 +1,9 @@
+title = "User bin"
+description = "personal executable directories (~/.local/bin, ~/.bin, ~/.cargo/bin)"
+# These were platform defaults, moved behind an opt-in: execute requires read
+# under both backends, and personal scripts in these directories can hold
+# secrets a default sandbox should not see. Agent profiles inherit this
+# because agents routinely invoke user-installed helpers (pipx, cargo
+# install) by name; for other runs, add --profile user-bin when a helper is
+# denied.
+rox = ["?~/.local/bin", "?~/.bin", "?~/.cargo/bin"]
