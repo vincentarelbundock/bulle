@@ -70,6 +70,42 @@ except OSError:
     print("smoke-ok")`},
 			want: "smoke-ok",
 		},
+		{
+			name:     "git-init-and-commit",
+			profile:  "git",
+			requires: "git",
+			args: []string{"sh", "-c",
+				`git init -q && git -c user.name=smoke -c user.email=smoke@test commit -q --allow-empty -m smoke && echo smoke-ok`},
+			want: "smoke-ok",
+		},
+		{
+			name:     "node-runs",
+			profile:  "node",
+			requires: "node",
+			args:     []string{"node", "-e", `console.log("smoke-ok")`},
+			want:     "smoke-ok",
+		},
+		{
+			name:     "go-builds-and-runs",
+			profile:  "go",
+			requires: "go",
+			setup: func(t *testing.T, workspace string) {
+				writeFile(t, workspace, "go.mod", "module smoke\n\ngo 1.22\n")
+				writeFile(t, workspace, "main.go", "package main\n\nimport \"fmt\"\n\nfunc main() { fmt.Println(\"smoke-ok\") }\n")
+			},
+			args: []string{"go", "run", "."},
+			want: "smoke-ok",
+		},
+		{
+			name:     "rust-builds-and-runs",
+			profile:  "rust",
+			requires: "cargo",
+			setup: func(t *testing.T, workspace string) {
+				run(t, workspace, "cargo", "init", "--vcs", "none", "--name", "smoke", ".")
+			},
+			args: []string{"cargo", "run", "-q", "--offline"},
+			want: "Hello, world!",
+		},
 	}
 }
 
@@ -97,6 +133,13 @@ func TestProfileSmoke(t *testing.T) {
 				t.Fatalf("profile %s output %q, want it to contain %q", tc.profile, string(out), tc.want)
 			}
 		})
+	}
+}
+
+func writeFile(t *testing.T, dir string, name string, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 

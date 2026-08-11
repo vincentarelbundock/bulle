@@ -115,9 +115,18 @@ func scanTreesForELFSeeds(execRoots []string, readRoots []string) libScanResult 
 			return
 		}
 		if !info.IsDir() {
-			if !seen[clean] && isELFFile(clean) {
-				seen[clean] = true
+			if seen[clean] {
+				return
+			}
+			seen[clean] = true
+			if isELFFile(clean) {
 				result.seeds = append(result.seeds, clean)
+			} else if interp, ok := shebangInterpreter(clean); ok {
+				if !seen["interp:"+interp] {
+					seen["interp:"+interp] = true
+					result.interpreters = append(result.interpreters, interp)
+				}
+				result.addStoreRefs(scriptStoreRefs(clean), seen)
 			}
 			return
 		}
@@ -136,10 +145,32 @@ func scanTreesForELFSeeds(execRoots []string, readRoots []string) libScanResult 
 				}
 				return nil
 			}
+			if entry.Type()&fs.ModeSymlink != 0 {
+				// A store item can point into another item by symlink (gcc's
+				// lib/libgcc_s.so.1 links to a separate libgcc output). The
+				// target item needs granting like a textual reference.
+				if target, err := filepath.EvalSymlinks(path); err == nil {
+					if root, ok := storeItemRootFor(target); ok && root != clean {
+						result.addStoreRefs([]string{root}, seen)
+					}
+				}
+				return nil
+			}
 			if !entry.Type().IsRegular() {
 				return nil
 			}
 			if libsOnly && !underLibsDir(clean, path) {
+				return nil
+			}
+			// nix-support files are the Nix convention for propagated build
+			// inputs: plain-text flag files naming the store paths a wrapper
+			// injects at link time (libgcc, crt objects). They are neither
+			// executable nor ELF, so they need their own carve-out.
+			if !libsOnly && filepath.Base(filepath.Dir(path)) == "nix-support" {
+				if !seen[path] {
+					seen[path] = true
+					result.addStoreRefs(scriptStoreRefs(path), seen)
+				}
 				return nil
 			}
 			if !libScanCandidateName(entry) {
@@ -157,12 +188,7 @@ func scanTreesForELFSeeds(execRoots []string, readRoots []string) libScanResult 
 						seen["interp:"+interp] = true
 						result.interpreters = append(result.interpreters, interp)
 					}
-					for _, ref := range scriptStoreRefs(path) {
-						if !seen["ref:"+ref] {
-							seen["ref:"+ref] = true
-							result.storeRefs = append(result.storeRefs, ref)
-						}
-					}
+					result.addStoreRefs(scriptStoreRefs(path), seen)
 				}
 			}
 			return nil
@@ -181,9 +207,36 @@ func scanTreesForELFSeeds(execRoots []string, readRoots []string) libScanResult 
 	return result
 }
 
-// scriptStoreRefsMaxSize bounds how much of a wrapper script is read when
-// looking for package-store references. Real wrappers are a few KB.
-const scriptStoreRefsMaxSize = 256 * 1024
+func (r *libScanResult) addStoreRefs(refs []string, seen map[string]bool) {
+	for _, ref := range refs {
+		if seen["ref:"+ref] {
+			continue
+		}
+		seen["ref:"+ref] = true
+		// Prose can contain things that look like store paths ("/nix/store/..."
+		// in a comment); only real items become grants.
+		if info, err := os.Stat(ref); err == nil && info.IsDir() {
+			r.storeRefs = append(r.storeRefs, ref)
+		}
+	}
+}
+
+// scriptStoreRefsMaxSize bounds how much of a file is read when looking for
+// package-store references. Wrapper scripts are a few KB; the dynamic loader,
+// also scanned for its baked-in default directories, is a few hundred KB.
+const scriptStoreRefsMaxSize = 4 * 1024 * 1024
+
+// storeRefsFromFile returns the existing package-store items a file references,
+// for callers outside the tree walk (which filters through addStoreRefs).
+func storeRefsFromFile(path string) []string {
+	out := []string{}
+	for _, ref := range scriptStoreRefs(path) {
+		if info, err := os.Stat(ref); err == nil && info.IsDir() {
+			out = append(out, ref)
+		}
+	}
+	return out
+}
 
 // scriptStoreRefs returns the package-store item roots a script references by
 // absolute path. Only roots under packageStoreRoots are reported: those trees
@@ -211,10 +264,10 @@ func scriptStoreRefs(path string) []string {
 			}
 			i += start
 			end := i
-			for end < len(text) && !isStoreRefBoundary(text[end]) {
+			for end < len(text) && isStorePathChar(text[end]) {
 				end++
 			}
-			start = end
+			start = i + len(storeRoot) + 1
 			parts := strings.Split(strings.TrimPrefix(text[i:end], "/"), "/")
 			if len(parts) <= components {
 				continue
@@ -229,12 +282,12 @@ func scriptStoreRefs(path string) []string {
 	return refs
 }
 
-func isStoreRefBoundary(c byte) bool {
-	switch c {
-	case ' ', '\t', '\n', '\r', '"', '\'', '`', ':', ';', ')', '(', '$', '\\':
-		return true
-	}
-	return false
+// isStorePathChar reports bytes that can appear in a store path. Anything
+// else ends the match, which keeps the scan correct inside binaries where
+// paths are separated by arbitrary non-path bytes rather than whitespace.
+func isStorePathChar(c byte) bool {
+	return c == '/' || c == '.' || c == '-' || c == '_' || c == '+' ||
+		'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9'
 }
 
 // libScanCandidateName filters walk entries to files that can plausibly be

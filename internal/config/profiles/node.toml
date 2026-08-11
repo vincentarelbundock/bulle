@@ -1,5 +1,6 @@
 title = "Node"
 description = "Node.js runtime, npm, and package caches"
+inherits = ["tool", "terminal"]
 rox = [
   "?pkg:node",
   "?which:npm",

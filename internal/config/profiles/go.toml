@@ -1,12 +1,15 @@
 title = "Go"
 description = "Go toolchain, module cache, and build cache"
+inherits = ["tool", "terminal"]
 rox = [
   "?pkg:go",
   "?go:root",
   "${GOPATH:-~/go}/bin",
 ]
 # go env reports the effective values, which follow GOFLAGS, the environment,
-# and go env -w settings that a literal path cannot see.
-rwx = ["?+go:path", "+${GOPATH:-~/go}/"]
-rw = ["?+go:modcache", "+$CACHE/go-build/"]
+# and go env -w settings that a literal path cannot see. The sandbox tmp is
+# executable here because `go run` and `go test` build into it and exec the
+# result.
+rwx = ["?+go:path", "+${GOPATH:-~/go}/", "$TMP/bulle/tmp"]
+rw = ["?+go:modcache", "+$CACHE/go-build/", "?+$CONFIG/go/"]
 env = ["GOPATH", "GOBIN", "GOFLAGS", "GOCACHE", "GOMODCACHE", "GOPROXY"]

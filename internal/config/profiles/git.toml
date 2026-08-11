@@ -1,9 +1,20 @@
 title = "Git"
 description = "git binary, user configuration, and global ignores"
-rox = ["?which:git"]
+inherits = ["tool", "terminal"]
+# pkg: additionally grants the package tree so git's libexec/git-core
+# subcommand binaries (git-maintenance, git-remote-https) are executable; on
+# system installs it skips and the platform defaults cover libexec instead.
+rox = ["?which:git", "?pkg:git"]
+# The individual config files are granted by name as well as via their
+# directory: a granted path carries its symlink target with it, which matters
+# when the files are symlinks into a store (home-manager, chezmoi), while a
+# directory grant does not cover symlink targets inside it.
 ro = [
   "?$HOME/.gitconfig",
   "?$CONFIG/git",
+  "?$CONFIG/git/config",
+  "?$CONFIG/git/ignore",
+  "?$CONFIG/git/attributes",
   "?$HOME/.gitignore",
   "?$HOME/.gitignore_global",
 ]

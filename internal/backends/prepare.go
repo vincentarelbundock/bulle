@@ -35,10 +35,26 @@ func PreparePolicy(p policy.Policy) (policy.Policy, error) {
 		// resolution so those libraries resolve even before they are granted.
 		scan := scanTreesForELFSeeds(executableRoots(prepared), prepared.ReadOnly)
 		seeds := append(linuxELFDependencyRoots(prepared.Command[0]), scan.seeds...)
-		if len(scan.storeRefs) > 0 {
-			prepared.ReadOnlyExec = appendAbsolutePaths(prepared.ReadOnlyExec, scan.storeRefs...)
-			refScan := scanTreesForELFSeeds(scan.storeRefs, nil)
+		// Store references chain: a wrapper script references a store item
+		// whose nix-support files reference further items (a cc wrapper
+		// naming libgcc). Follow a few hops, never revisiting an item.
+		granted := map[string]bool{}
+		refs := scan.storeRefs
+		for hop := 0; hop < 3 && len(refs) > 0; hop++ {
+			fresh := []string{}
+			for _, ref := range refs {
+				if !granted[ref] {
+					granted[ref] = true
+					fresh = append(fresh, ref)
+				}
+			}
+			if len(fresh) == 0 {
+				break
+			}
+			prepared.ReadOnlyExec = appendAbsolutePaths(prepared.ReadOnlyExec, fresh...)
+			refScan := scanTreesForELFSeeds(fresh, nil)
 			seeds = append(seeds, refScan.seeds...)
+			refs = refScan.storeRefs
 		}
 		for _, interpreter := range scan.interpreters {
 			// A scanned script's shebang can name a path that does not exist
@@ -57,6 +73,17 @@ func PreparePolicy(p policy.Policy) (policy.Policy, error) {
 			return prepared, err
 		}
 		prepared.ReadOnlyExec = appendAbsolutePaths(prepared.ReadOnlyExec, deps...)
+		// The dynamic loader can carry baked-in default search directories
+		// (Nix patches ld.so with a libgcc path for lazy unwinder loads that
+		// appear in no ELF header). Treat store paths embedded in the loader
+		// like a wrapper script's references.
+		for _, dep := range deps {
+			if strings.HasPrefix(filepath.Base(dep), "ld-") {
+				for _, ref := range storeRefsFromFile(dep) {
+					prepared.ReadOnlyExec = appendAbsolutePaths(prepared.ReadOnlyExec, ref)
+				}
+			}
+		}
 		// A library's package often carries data its code reads at runtime
 		// (glibc's gconv tables and locale archive, ICU data). Inside a
 		// package store, grant the whole store item read-only alongside the
