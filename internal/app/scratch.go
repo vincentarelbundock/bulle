@@ -203,6 +203,7 @@ func reviewScratch(s *scratchState, skipPrompt bool, stdout, stderr io.Writer) {
 	}
 	if final == s.BaselineTree {
 		removeScratch(s)
+		fmt.Fprintln(stderr, "bulle: scratch removed: the run changed nothing")
 		return
 	}
 	lines, added, deleted, changed := scratchChangeSummary(s, final)

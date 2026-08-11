@@ -637,10 +637,14 @@ deliberate <code>git push</code> from outside the sandbox.</p>
    the run, nothing in the sandbox can reach it.</li>
 <li><strong>Review.</strong> After the command exits — on success, failure, and timeout
    alike — bulle shows what changed and prompts. A run that changed nothing
-   removes the scratch silently. Changes are detected against the recorded
-   starting state, so work the agent <em>committed</em> inside the scratch is
-   counted too, not just dirty files.</li>
+   removes the scratch and says so in one line. Changes are detected against
+   the recorded starting state, so work the agent <em>committed</em> inside the
+   scratch is counted too, not just dirty files.</li>
 </ol>
+<p>Your shell never leaves your repository: the <em>command</em> runs inside the
+scratch (its working directory and <code>$WORKSPACE</code> point there), and when it
+exits you are back at your own prompt, which never moved. The review summary
+and the integration recipe print right there.</p>
 <p>At the prompt: <code>d</code> pages the full diff and asks again, <code>k</code> keeps the scratch
 and prints the integration recipe, <code>D</code> discards it after a confirmation.
 Without a terminal, or with <code>--scratch-keep</code>, the scratch is kept and the
