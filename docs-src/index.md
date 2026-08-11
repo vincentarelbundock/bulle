@@ -418,6 +418,8 @@ Use `--policy` to inspect the resolved sandbox policy without running the comman
 bulle --profile codex --policy
 ```
 
+No command is required: without one (and without a configured `default_app`), the policy is resolved and printed as-is, minus command-dependent grants such as `--add-exec` and shebang interpreter discovery.
+
 The summary ends with a **resolution table**: one line per configured entry showing what it resolved to — granted, skipped, created, or expanded from a `which:`/`pkg:` resolver or glob — so "why can't the agent see X" is answerable from one command. Entries whose resolved path is also granted through another list (for example when `$CONFIG` and `$DATA` collapse to the same directory on macOS) are flagged with their effective permission.
 
 ```text

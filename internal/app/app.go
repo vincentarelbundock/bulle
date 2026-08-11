@@ -149,10 +149,30 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 			opts.Command = command
 		}
 	}
-	if len(opts.Command) == 0 {
+	// --policy resolves and prints without running anything, so it works
+	// without a command; command-dependent grants (add_exec, shebang
+	// discovery) are simply absent from the printed policy.
+	if len(opts.Command) == 0 && !opts.Policy {
 		fmt.Fprintln(stderr, "bulle: no command supplied and no default_app configured")
 		fmt.Fprintln(stderr, "pass a command after -- (e.g. bulle . -- claude) or set default_app in your config")
 		return ExitConfigError
+	}
+	// The scratch is created before policy.Resolve so $WORKSPACE and the
+	// automatic read-write grant follow it; the origin path is never granted.
+	// Scratches are deliberately absent from the deferred cleanup below: only
+	// an empty change set or an explicit discard removes one.
+	var scratch *scratchState
+	if opts.Scratch {
+		if opts.NoWorkspace {
+			fmt.Fprintln(stderr, "bulle: --scratch with --no-workspace is contradictory: a scratch exists to be the workspace")
+			return ExitConfigError
+		}
+		scratch, err = createScratch(opts.ProjectPath, global.Scratch.Dir, cli.NormalizeSeparator(args[1:]), stderr)
+		if err != nil {
+			fmt.Fprintf(stderr, "bulle: %v\n", err)
+			return ExitConfigError
+		}
+		opts.ProjectPath = scratch.Dir
 	}
 	// Shim directories created for which:/pkg: entries are per-run; remove
 	// them on the way out (normal exit, command failure, and timeout all
@@ -205,6 +225,11 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		if len(ambiguousProfiles) > 0 {
 			fmt.Fprintf(stderr, "profiles %s all declare a default_app running %q; choose one with --profile\n", strings.Join(ambiguousProfiles, ", "), opts.Command[0])
 		}
+		if scratch != nil {
+			// Nothing ran, so the scratch is unchanged; remove it rather than
+			// leaving an empty clone behind on every failed policy resolution.
+			removeScratch(scratch)
+		}
 		if errors.Is(err, policy.ErrCommandNotFound) {
 			return ExitNotFound
 		}
@@ -212,6 +237,12 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 	p = prepared
 	if opts.Policy {
+		if scratch != nil {
+			// Nothing ran, so the scratch is empty by construction; remove it
+			// after explaining the redirection.
+			defer removeScratch(scratch)
+			fmt.Fprintf(stdout, "scratch workspace: %s (origin: %s)\n", scratch.Dir, scratch.Origin)
+		}
 		switch opts.PolicyFormat {
 		case "", "summary":
 			writeProfilePermissionSummary(policySummaryProfileName(opts), p, stdout)
@@ -235,24 +266,29 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	// All runs go through the supervisor (even without a timeout) so a parent
 	// process survives the sandboxed command and can report on its failure.
 	probe := startDenialProbe(p)
+	code := ExitOK
 	if err := supervisor.Run(p, supervisor.Options{
 		Timeout: p.Timeout,
 		Stdin:   os.Stdin,
 		Stdout:  os.Stdout,
 		Stderr:  os.Stderr,
 	}); err != nil {
-		code := exitCodeForSupervisorError(err, stderr)
-		printDenialHints(probe, stderr)
-		return code
+		code = exitCodeForSupervisorError(err, stderr)
+		printDenialHints(probe, scratch, home, stderr)
 	}
-	return ExitOK
+	// The review gate runs on every exit path — success, command failure,
+	// and timeout alike — and never changes the exit code.
+	if scratch != nil {
+		reviewScratch(scratch, opts.ScratchKeep, stdout, stderr)
+	}
+	return code
 }
 
 // printDenialHints reports sandbox denials logged by the kernel during a
 // failed run, with copy-pasteable policy fixes. Best-effort: it prints
 // nothing when denial logging is unsupported or kernel logs are unreadable.
-func printDenialHints(probe denialProbe, stderr io.Writer) {
-	hints := probe.hints()
+func printDenialHints(probe denialProbe, scratch *scratchState, home string, stderr io.Writer) {
+	hints := rewriteScratchPaths(probe.hints(), scratch, home)
 	if len(hints) == 0 {
 		return
 	}

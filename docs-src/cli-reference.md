@@ -105,7 +105,8 @@ Output and safety:
                     Uses Go duration syntax such as 30s, 2m, or 1h30m.
                     Use 0 to disable. Timed-out commands exit 124.
   --policy[=summary|json]
-                    print the resolved policy and exit; summary by default
+                    print the resolved policy and exit; summary by default.
+                    Works without a command
   -h, --help        show this help and exit
   -V, --version     show version information and exit
 

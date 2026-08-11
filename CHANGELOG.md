@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`--policy` works without a command.** `bulle -p uv --policy` prints the
+  resolved policy even when no command is supplied and no `default_app` is
+  configured; command-dependent grants (`add_exec`, shebang discovery) are
+  simply absent from the output.
 - **Built-in `r`, `r-install`, `uv`, and `uv-install` profiles.**
   `bulle --profile r -- Rscript analysis.R` and
   `bulle --profile uv -- uv run script.py` work on conventional installs

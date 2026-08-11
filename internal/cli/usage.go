@@ -83,13 +83,21 @@ Executable discovery:
                     unusual locations may need explicit --ro/--rox grants.
                     These do not add app state files or environment variables.
 
+Disposable workspaces:
+  --scratch         run against a disposable local clone of the workspace
+                    (git repositories only; uncommitted work is carried over).
+                    After the run, review the changes and keep or discard the
+                    scratch; integrate kept work with git push from the scratch.
+  --scratch-keep    skip the review prompt, keep the scratch, print its path
+
 Output and safety:
   --timeout DURATION
                     kill the sandboxed command if it runs longer than DURATION.
                     Uses Go duration syntax such as 30s, 2m, or 1h30m.
                     Use 0 to disable. Timed-out commands exit 124.
   --policy[=summary|json]
-                    print the resolved policy and exit; summary by default
+                    print the resolved policy and exit; summary by default.
+                    Works without a command
   -h, --help        show this help and exit
   -V, --version     show version information and exit
 
