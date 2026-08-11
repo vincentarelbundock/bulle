@@ -13,11 +13,6 @@
     origin's `.git` (including hooks) and need write access to it, which
     defeats scratch isolation. Scratch uses `git clone --local` instead.
 
-- [ ] Consider `bulle scratch list` / `gc` if forgotten scratches accumulate.
-  - v1 ships without subcommands; kept scratches live under
-    `$XDG_STATE_HOME/bulle/scratch/` with a `meta.toml` beside each, so
-    future tooling needs no format migration.
-
 - [ ] Consider an `r-build` profile for source compilation.
   - `install.packages()` from source needs a C/Fortran toolchain, `$R_HOME/etc/Makeconf`, and headers.
   - Much larger grant than the binary installation `r-install` targets; specify only after `r-install` has been exercised in the wild.

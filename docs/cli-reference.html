@@ -539,13 +539,16 @@ Profiles:
   git               git binary, user configuration, and global ignores
   go                Go toolchain, module cache, and build cache
   keychain          macOS Keychain file and service access
+  latex             TeX Live engines, the distribution tree, and font caches
   macos-certs       macOS certificate trust service lookup
   macos-dns         macOS DNS and directory service lookups
   network           network socket access capability
   node              Node.js runtime, npm, and package caches
   offline           deny network socket access
   opencode          OpenCode app state and config support
+  pandoc            pandoc document converter and its data directory
   pi                Pi app state and config support
+  quarto            quarto rendering with pandoc, LaTeX, R, and Python support
   r                 R interpreter, library search path, and startup files
   r-install         R plus a writable user library and CRAN access
   rust              cargo, rustup toolchains, and the registry cache
@@ -565,9 +568,12 @@ Executable discovery:
 Disposable workspaces:
   --scratch         run against a disposable local clone of the workspace
                     (git repositories only; uncommitted work is carried over).
-                    After the run, review the changes and keep or discard the
-                    scratch; integrate kept work with git push from the scratch.
+                    After the run, review the changes: diff, pull into the
+                    origin, keep, open a shell in the scratch, or wipe it.
   --scratch-keep    skip the review prompt, keep the scratch, print its path
+  bulle scratch list|diff|pull|wipe|shell [id]
+                    resume the review of a kept scratch later; id may be a
+                    unique prefix, and is optional when unambiguous
 
 Output and safety:
   --timeout DURATION

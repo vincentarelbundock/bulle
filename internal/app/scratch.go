@@ -13,6 +13,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 // scratchState describes a disposable clone of the workspace created for a
@@ -488,12 +490,11 @@ func sameFilesystem(a, b string) bool {
 	return sysA.Dev == sysB.Dev
 }
 
+// stdinIsTerminal is a real isatty check: /dev/null is a character device
+// too, and a mode-bits test would leave cron jobs hanging on the prompt.
 func stdinIsTerminal() bool {
-	info, err := os.Stdin.Stat()
-	if err != nil {
-		return false
-	}
-	return info.Mode()&os.ModeCharDevice != 0
+	_, err := unix.IoctlGetTermios(int(os.Stdin.Fd()), termiosRequest)
+	return err == nil
 }
 
 func randomID() (string, error) {

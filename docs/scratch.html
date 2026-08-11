@@ -460,6 +460,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#coming-back-later" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Coming back later
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#details-and-edge-cases" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -569,6 +580,17 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         Why not a worktree?
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#coming-back-later" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Coming back later
       </span>
     </span>
   </a>
@@ -714,6 +736,21 @@ genuinely severed <code>.git</code>: hooks are not carried over, and no write ac
 your repository is needed.</p>
 <p>The rule of thumb: for parallel <em>trusted</em> sessions, use a worktree manager
 around bulle; for reviewable <em>untrusted</em> runs, use <code>--scratch</code>.</p>
+<h2 id="coming-back-later">Coming back later<a class="headerlink" href="#coming-back-later" title="Permanent link">&para;</a></h2>
+<p>A kept scratch — or one left behind by a failed pull — is a paused review,
+and <code>bulle scratch</code> resumes it:</p>
+<div class="language-text highlight"><pre><span></span><code>bulle scratch list           # id, age, change summary, origin
+bulle scratch diff [id]      # the review diff against the recorded baseline
+bulle scratch pull [id]      # same semantics as [p] at the prompt
+bulle scratch wipe [id]      # same as [w], with a confirmation
+bulle scratch shell [id]     # same as [s]
+</code></pre></div>
+<p>The verbs mean exactly what the prompt letters mean — one mental model, two
+entry points. The id may be any unique prefix, and may be omitted when there
+is only one scratch (or only one whose origin is the current directory).
+Deliberately absent: <code>gc</code> — bulk cleanup is <code>list</code> plus <code>wipe</code>, and an
+auto-deletion policy is where "a scratch is never deleted implicitly" would
+go to die.</p>
 <h2 id="details-and-edge-cases">Details and edge cases<a class="headerlink" href="#details-and-edge-cases" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Git only.</strong> <code>--scratch</code> requires a git repository with at least one

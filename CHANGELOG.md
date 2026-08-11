@@ -9,31 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Workspaces
+
 - **`--scratch` disposable workspaces.** Run the sandboxed command against a
   throwaway local clone of the workspace instead of the real checkout. The
   clone carries uncommitted work (tracked changes and untracked files) so the
   agent starts from the state you see; git objects are hardlinked, so cloning
-  is nearly free. The real checkout is never granted to the sandbox. After
-  the run, a review gate shows what changed — including work the agent
+  is nearly free, and the real checkout is never granted to the sandbox.
+  After the run, a review gate shows what changed — including work the agent
   committed — and offers diff, pull-into-origin, keep, a subshell inside the
-  scratch, or wipe; pull never commits on your behalf (a dirty scratch routes
+  scratch, or wipe. Pull never commits on your behalf (a dirty scratch routes
   through the subshell to commit first), and a failed pull changes nothing
-  and keeps the scratch. A run that changed nothing
-  cleans up after itself, and a scratch with changes is never deleted
-  implicitly. Integration is git-native: keep prints a one-command
-  `git pull` recipe run from the origin side (warning first when the scratch
-  has uncommitted changes, since pull only moves commits), with a
-  fetch-to-ref variant for inspecting before merging. `--scratch-keep` skips
-  the prompt
-  for non-interactive runs, `[scratch] dir` in `config.toml` relocates
-  scratches (with a warning when the location defeats hardlinking), and
-  denial hints from scratch runs are rewritten to origin-relative paths so
-  suggested grants stay meaningful. Worktree-based isolation is deliberately
-  not offered: worktrees share the origin's `.git`, including hooks.
-- **`--policy` works without a command.** `bulle -p uv --policy` prints the
-  resolved policy even when no command is supplied and no `default_app` is
-  configured; command-dependent grants (`add_exec`, shebang discovery) are
-  simply absent from the output.
+  and keeps the scratch. A run that changed nothing cleans up after itself; a
+  scratch with changes is never deleted implicitly. Integration is
+  git-native: keep prints a one-command `git pull` recipe run from the origin
+  side (with a warning when the scratch has uncommitted changes, since pull
+  only moves commits) and a fetch-to-ref variant for inspecting before
+  merging. A kept scratch is a paused review:
+  `bulle scratch list|diff|pull|wipe|shell [id]` resumes it later with the
+  same semantics as the prompt letters (id optional when unambiguous, unique
+  prefixes accepted). `--scratch-keep` skips the prompt for non-interactive
+  runs, `[scratch] dir` in `config.toml` relocates scratches (warning when
+  the location defeats hardlinking), and denial hints from scratch runs are
+  rewritten to origin-relative paths so suggested grants stay meaningful.
+  Worktree-based isolation is deliberately not offered: worktrees share the
+  origin's `.git`, including hooks.
+
+#### Language and tool profiles
+
 - **Built-in `r`, `r-install`, `uv`, and `uv-install` profiles.**
   `bulle --profile r -- Rscript analysis.R` and
   `bulle --profile uv -- uv run script.py` work on conventional installs

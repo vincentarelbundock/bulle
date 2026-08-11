@@ -86,9 +86,12 @@ Executable discovery:
 Disposable workspaces:
   --scratch         run against a disposable local clone of the workspace
                     (git repositories only; uncommitted work is carried over).
-                    After the run, review the changes and keep or discard the
-                    scratch; integrate kept work with git push from the scratch.
+                    After the run, review the changes: diff, pull into the
+                    origin, keep, open a shell in the scratch, or wipe it.
   --scratch-keep    skip the review prompt, keep the scratch, print its path
+  bulle scratch list|diff|pull|wipe|shell [id]
+                    resume the review of a kept scratch later; id may be a
+                    unique prefix, and is optional when unambiguous
 
 Output and safety:
   --timeout DURATION

@@ -47,6 +47,12 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return ExitConfigError
 	}
 
+	// `scratch` is a reserved subcommand, intercepted like the help/version
+	// aliases so command inference never tries to run it in a sandbox.
+	if len(args) > 1 && args[1] == "scratch" {
+		return runScratchCommand(args[2:], stdout, stderr)
+	}
+
 	opts, err := cli.Parse(args)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -245,7 +251,7 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 		switch opts.PolicyFormat {
 		case "", "summary":
-			writeProfilePermissionSummary(policySummaryProfileName(opts), p, stdout)
+			writeProfilePermissionSummary(policySummaryProfileName(opts), p, stdout, true)
 			writeResolutionTable(p, stdout)
 		case "json":
 			if err := json.NewEncoder(stdout).Encode(policy.NewView(p)); err != nil {

@@ -136,6 +136,26 @@ your repository is needed.
 The rule of thumb: for parallel *trusted* sessions, use a worktree manager
 around bulle; for reviewable *untrusted* runs, use `--scratch`.
 
+## Coming back later
+
+A kept scratch — or one left behind by a failed pull — is a paused review,
+and `bulle scratch` resumes it:
+
+~~~text
+bulle scratch list           # id, age, change summary, origin
+bulle scratch diff [id]      # the review diff against the recorded baseline
+bulle scratch pull [id]      # same semantics as [p] at the prompt
+bulle scratch wipe [id]      # same as [w], with a confirmation
+bulle scratch shell [id]     # same as [s]
+~~~
+
+The verbs mean exactly what the prompt letters mean — one mental model, two
+entry points. The id may be any unique prefix, and may be omitted when there
+is only one scratch (or only one whose origin is the current directory).
+Deliberately absent: `gc` — bulk cleanup is `list` plus `wipe`, and an
+auto-deletion policy is where "a scratch is never deleted implicitly" would
+go to die.
+
 ## Details and edge cases
 
 - **Git only.** `--scratch` requires a git repository with at least one
