@@ -11,10 +11,14 @@ coverage.*
 .cache
 .claude
 
-# Calepin/Quarto render caches
+# Calepin/Quarto render caches. Calepin materializes .calepin/ in the website
+# source directory and writes a build manifest beside the rendered site; both
+# are generated, and the rendered site itself (docs/) is committed for Pages.
 /.quarto/
 /_freeze/
 /_site/
+docs-src/.calepin/
+docs/.calepin/
 
 # Editor and OS files
 .DS_Store

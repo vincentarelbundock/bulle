@@ -4,6 +4,11 @@
 
 BIN     := bulle
 PREFIX  ?= $(HOME)/.local
+CALEPIN ?= calepin
+# DOCS_SRC is the hand-authored website (pages, calepin.toml, assets); SITE_DIR
+# is what Calepin writes from it. Nothing in SITE_DIR is edited directly.
+DOCS_SRC := docs-src
+SITE_DIR := docs
 VERSION ?= dev
 LDFLAGS = -X github.com/vincentarelbundock/bulle/internal/app.Version=$(VERSION)
 
@@ -25,13 +30,18 @@ vet: ## Run go vet
 
 check: vet test ## Run vet and tests
 
-website: ## Render docs-src/ into docs/
+website: ## Render docs-src/ into docs/ with Calepin
 	go run ./cmd/bulle-docs
-	@if [ -d .cache ]; then chmod -R u+w .cache 2>/dev/null || true; fi
-	uv run zensical build --clean
+# Every byte under docs/ is generated, and Calepin refuses to overwrite an
+# output directory it does not recognise, so start from nothing.
+	rm -rf $(SITE_DIR)
+	$(CALEPIN) compile $(DOCS_SRC) $(SITE_DIR)
+# GitHub Pages runs Jekyll unless this file is present, and Jekyll drops every
+# path beginning with an underscore, including the assets Calepin emits.
+	@touch $(SITE_DIR)/.nojekyll
 
-serve: ## Build and serve the website at http://localhost:8000
-	uv run zensical serve
+serve: website ## Build and serve the website at http://localhost:8000
+	$(CALEPIN) serve $(SITE_DIR)
 
 bump: ## Release VERSION=x.y.z: update VERSION file, commit, and tag
 	@if [ "$(origin VERSION)" != "command line" ]; then \

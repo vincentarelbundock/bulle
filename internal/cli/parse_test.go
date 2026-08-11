@@ -217,13 +217,16 @@ func TestUsageShowsProfileShortFlag(t *testing.T) {
 	}
 }
 
-func TestReferenceMarkdownIncludesFullHelp(t *testing.T) {
-	md := ReferenceMarkdown()
-	if !strings.Contains(md, "bulle runs local coding agents inside a controlled workspace.") {
-		t.Fatalf("ReferenceMarkdown does not include full Usage() text:\n%s", md)
+func TestReferenceTypstIncludesFullHelp(t *testing.T) {
+	page := ReferenceTypst()
+	if !strings.Contains(page, "bulle runs local coding agents inside a controlled workspace.") {
+		t.Fatalf("ReferenceTypst does not include full Usage() text:\n%s", page)
 	}
-	if !strings.Contains(md, "Examples:") {
-		t.Fatalf("ReferenceMarkdown does not include examples from Usage():\n%s", md)
+	if !strings.Contains(page, "Examples:") {
+		t.Fatalf("ReferenceTypst does not include examples from Usage():\n%s", page)
+	}
+	if !strings.Contains(page, "<website-metadata>") {
+		t.Fatalf("ReferenceTypst does not carry Calepin page metadata:\n%s", page)
 	}
 }
 
