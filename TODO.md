@@ -5,15 +5,18 @@
   - Expect backend changes because the Linux backend currently `exec`s into the target process.
   - Document platform differences clearly.
 
-- [ ] Add git worktree integration.
-  - Support `--worktree NAME` to create or reuse a worktree and make it the workspace.
-  - Replace the manual create-then-sandbox dance for branch-shaped agent work.
-  - Decide how worktree cleanup interacts with the sandboxed run.
+- [ ] Document `--scratch` in the user docs.
+  - Name the composition explicitly: for parallel trusted sessions, use a
+    worktree manager (`wt`-style tools) around bulle; for reviewable untrusted
+    runs, use `--scratch`.
+  - Worktree integration is deliberately not offered: worktrees share the
+    origin's `.git` (including hooks) and need write access to it, which
+    defeats scratch isolation. Scratch uses `git clone --local` instead.
 
-- [ ] Add a scratch workspace mode.
-  - Run against a throwaway copy or worktree of the repository instead of the real checkout.
-  - Offer diff, apply, keep, and discard once the command exits.
-  - Coordinate with ephemeral state support so filesystem and app state scratch behave consistently.
+- [ ] Consider `bulle scratch list` / `gc` if forgotten scratches accumulate.
+  - v1 ships without subcommands; kept scratches live under
+    `$XDG_STATE_HOME/bulle/scratch/` with a `meta.toml` beside each, so
+    future tooling needs no format migration.
 
 - [ ] Consider an `r-build` profile for source compilation.
   - `install.packages()` from source needs a C/Fortran toolchain, `$R_HOME/etc/Makeconf`, and headers.
