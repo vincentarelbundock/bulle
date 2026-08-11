@@ -1,7 +1,22 @@
 title = "Tool"
 description = "general local command support (PATH, executables, libs)"
 inherits = "network"
-rw = ["$TMP/bulle/tmp"]
+# Runtime probes that numeric and threaded runtimes (OpenMP, BLAS, malloc
+# tuning) read on startup. Read-only and information-only.
+ro = [
+  "?/proc/stat",
+  "?/proc/cpuinfo",
+  "?/proc/sys/vm/overcommit_memory",
+  "?/sys/devices/system/cpu",
+  "?/sys/kernel/mm/transparent_hugepage",
+  "?/sys/fs/cgroup",
+  "?/usr/lib/locale/locale-archive",
+  "?/run/current-system/sw/lib/locale/locale-archive",
+]
+# system(3) and popen(3) hardcode /bin/sh; nearly every tool shells out
+# through it at some point.
+rox = ["?/bin/sh"]
+rw = ["$TMP/bulle/tmp", "?/dev/null"]
 env = ["PATH"]
 add_exec = true
 add_libs = true

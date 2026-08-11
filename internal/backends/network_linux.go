@@ -59,9 +59,12 @@ func installDenySocketSeccompFilter() error {
 }
 
 func deniedNetworkSyscalls() []uintptr {
+	// SYS_SOCKETPAIR is deliberately absent: a socketpair is a connected
+	// in-process pipe (Linux only supports AF_UNIX pairs) and cannot reach
+	// anything outside the sandbox, while async runtimes (tokio, libuv) need
+	// one for signal handling before doing any real work.
 	return []uintptr{
 		unix.SYS_SOCKET,
-		unix.SYS_SOCKETPAIR,
 		unix.SYS_CONNECT,
 		unix.SYS_BIND,
 		unix.SYS_LISTEN,

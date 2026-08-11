@@ -228,6 +228,9 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return ExitOK
 	}
 	saveLastRun(cli.NormalizeSeparator(args[1:]))
+	for _, note := range p.Notes {
+		fmt.Fprintf(stderr, "bulle: %s\n", note)
+	}
 	p.Command = commandWithSessionPermissions(opts.Profile, p.Command, preRunSessionPaste(opts, p))
 	// All runs go through the supervisor (even without a timeout) so a parent
 	// process survives the sandboxed command and can report on its failure.

@@ -1,0 +1,27 @@
+title = "R"
+description = "R interpreter, library search path, and startup files"
+inherits = ["tool", "terminal"]
+
+# r:home and r:prefix are rox, not ro: R's startup path runs executables from
+# both (bin/exec/R lives beside R_HOME, not under it). r:libs is granted
+# read-only; compiled package code loads via mmap, which needs only read under
+# both backends, and add_libs discovers the external libraries those packages
+# dlopen.
+# uname, sed, and rm are called by name from R's own launch scripts and
+# session-temp cleanup, which run before and after the real binary.
+rox = ["?which:R", "?which:Rscript", "?which:uname", "?which:sed", "?which:rm", "?r:home", "?r:prefix"]
+ro = [
+  "?r:libs",
+  "?~/.Rprofile",
+  "?~/.Renviron",
+  "?$CONFIG/R",
+  "?$DATA/R",
+  "?/etc/passwd",
+]
+rw = ["?$CACHE/R", "?/dev/tty"]
+env = [
+  "R_LIBS", "R_LIBS_USER", "R_LIBS_SITE",
+  "R_ENVIRON", "R_ENVIRON_USER", "R_PROFILE", "R_PROFILE_USER", "R_USER",
+]
+deny = ["network"]
+add_libs = true

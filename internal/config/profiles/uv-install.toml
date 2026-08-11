@@ -1,0 +1,7 @@
+title = "uv (with package installation)"
+description = "uv plus a writable cache, project venv, and PyPI access"
+inherits = "uv"
+
+rwx = ["?+uv:cache", "?+$WORKSPACE/.venv/"]
+env = ["UV_NO_CACHE=0", "UV_CACHE_DIR"]
+allow = ["network"]

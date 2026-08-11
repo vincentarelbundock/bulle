@@ -177,7 +177,18 @@ func GetSystemLibraryDependencies(binary string) ([]string, error) {
 }
 
 func GetLibraryDependencies(binary string, opts DependencyOptions) ([]string, error) {
-	queue := []string{binary}
+	return GetLibraryDependenciesForAll([]string{binary}, opts)
+}
+
+// GetLibraryDependenciesForAll walks the ELF dependency closure of every seed
+// binary through one shared work queue, so a library needed by many seeds is
+// parsed once. Seeds that are not readable ELF files contribute nothing.
+func GetLibraryDependenciesForAll(binaries []string, opts DependencyOptions) ([]string, error) {
+	queue := append([]string{}, binaries...)
+	seeds := map[string]struct{}{}
+	for _, binary := range binaries {
+		seeds[binary] = struct{}{}
+	}
 	processed := map[string]struct{}{}
 	finalMap := map[string]struct{}{}
 
@@ -193,12 +204,13 @@ func GetLibraryDependencies(binary string, opts DependencyOptions) ([]string, er
 		}
 		processed[curr] = struct{}{}
 
-		info, ok := readDependencyInfo(curr, curr == binary)
+		_, isSeed := seeds[curr]
+		info, ok := readDependencyInfo(curr, isSeed)
 		if !ok {
 			continue
 		}
 
-		if curr == binary {
+		if isSeed {
 			if info.interp != "" {
 				if path, ok := cleanELFDependencyPath(info.interp); ok && runtimePathAllowed(path, opts.TrustedRpathRoots) {
 					finalMap[path] = struct{}{}

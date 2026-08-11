@@ -1,0 +1,19 @@
+title = "uv"
+description = "uv-managed Python interpreters and environments"
+inherits = ["tool", "terminal"]
+
+# uv follows XDG on macOS as well as Linux, so the same entries work on both
+# platforms. UV_NO_CACHE points uv at an ephemeral cache under the sandbox
+# tmp: uv opens its cache for writing even for offline runs, and a writable
+# real cache would let sandboxed code poison packages that later
+# non-sandboxed runs import. uv-install overrides this.
+rox = ["?which:uv", "?uv:python", "?uv:tools", "?$WORKSPACE/.venv"]
+ro = ["?$CONFIG/uv"]
+env = [
+  "UV_TOOL_DIR", "UV_PYTHON_INSTALL_DIR",
+  "UV_PYTHON_BIN_DIR", "UV_TOOL_BIN_DIR", "UV_PROJECT_ENVIRONMENT",
+  "VIRTUAL_ENV", "PYTHONPATH",
+  "UV_NO_CACHE=1",
+]
+deny = ["network"]
+add_libs = true

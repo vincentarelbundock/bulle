@@ -33,3 +33,56 @@ jobs:
 
       - name: Test
         run: go test ./...
+
+  profile-smoke:
+    name: Profile smoke tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Profile smoke tests
+        run: go test ./internal/integration -run TestProfileSmoke -v
+
+  # Nix is the adversarial layout: wrappers, per-package store paths, no
+  # /usr fallbacks. A profile that survives it survives Debian and Homebrew.
+  profile-smoke-nix:
+    name: Profile smoke tests (nix)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: Install R and uv from nixpkgs
+        run: nix profile install nixpkgs#R nixpkgs#uv
+
+      - name: Profile smoke tests
+        run: go test ./internal/integration -run TestProfileSmoke -v

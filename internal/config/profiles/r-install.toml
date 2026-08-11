@@ -1,0 +1,9 @@
+title = "R (with package installation)"
+description = "R plus a writable user library and CRAN access"
+inherits = "r"
+
+# The writable grant is R_LIBS_USER only, created if missing. The rest of the
+# library search path stays read-only: a sandboxed install must not be able to
+# overwrite packages that non-sandboxed sessions will later load.
+rw = ["?+r:libs-user"]
+allow = ["network"]

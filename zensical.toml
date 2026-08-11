@@ -15,6 +15,7 @@ nav = [
   { "Quick Start" = "index.html#quick-start" },
   { "CLI Reference" = "cli-reference.md" },
   { "Denial Diagnostics" = "denial-diagnostics.md" },
+  { "Writing Profiles" = "profile-authoring.md" },
 ]
 [project.theme]
 custom_dir = "docs-src/overrides"

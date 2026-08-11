@@ -26,12 +26,49 @@ func PreparePolicy(p policy.Policy) (policy.Policy, error) {
 		}
 	}
 	if prepared.Backend == policy.BackendLinuxLandlock && prepared.AddLibs {
-		for _, executable := range linuxELFDependencyRoots(prepared.Command[0]) {
-			deps, err := elfdeps.GetLibraryDependencies(executable, elfdeps.DependencyOptions{TrustedRpathRoots: executableRoots(prepared)})
+		// Seeds are the command, its shebang interpreter, and every ELF object
+		// found inside the granted trees. The tree scan is what handles
+		// interpreters reached through wrapper scripts: the wrapper has no ELF
+		// dependencies, but the real binary lives in a granted tree (an R
+		// prefix, a Nix store path) and its runtime libraries are discovered
+		// from there. Package store roots are trusted for RPATH/RUNPATH
+		// resolution so those libraries resolve even before they are granted.
+		scan := scanTreesForELFSeeds(executableRoots(prepared), prepared.ReadOnly)
+		seeds := append(linuxELFDependencyRoots(prepared.Command[0]), scan.seeds...)
+		if len(scan.storeRefs) > 0 {
+			prepared.ReadOnlyExec = appendAbsolutePaths(prepared.ReadOnlyExec, scan.storeRefs...)
+			refScan := scanTreesForELFSeeds(scan.storeRefs, nil)
+			seeds = append(seeds, refScan.seeds...)
+		}
+		for _, interpreter := range scan.interpreters {
+			// A scanned script's shebang can name a path that does not exist
+			// on this machine (a portable script's #!/bin/bash on NixOS);
+			// granting it would fail ruleset population.
+			real, err := filepath.EvalSymlinks(interpreter)
 			if err != nil {
-				return prepared, err
+				continue
 			}
-			prepared.ReadOnlyExec = appendAbsolutePaths(prepared.ReadOnlyExec, deps...)
+			prepared.ReadOnlyExec = appendAbsolutePaths(prepared.ReadOnlyExec, interpreter, real)
+			seeds = append(seeds, real)
+		}
+		trusted := append(executableRoots(prepared), packageStoreRoots...)
+		deps, err := elfdeps.GetLibraryDependenciesForAll(seeds, elfdeps.DependencyOptions{TrustedRpathRoots: trusted})
+		if err != nil {
+			return prepared, err
+		}
+		prepared.ReadOnlyExec = appendAbsolutePaths(prepared.ReadOnlyExec, deps...)
+		// A library's package often carries data its code reads at runtime
+		// (glibc's gconv tables and locale archive, ICU data). Inside a
+		// package store, grant the whole store item read-only alongside the
+		// library file itself.
+		for _, dep := range deps {
+			if root, ok := storeItemRootFor(dep); ok {
+				prepared.ReadOnly = appendAbsolutePaths(prepared.ReadOnly, root)
+			}
+		}
+		if scan.truncated {
+			prepared.Notes = append(prepared.Notes,
+				"add_libs: the library scan hit its size budget, so some runtime libraries may be missing; a failed run will hint the rest")
 		}
 	}
 	return prepared, nil

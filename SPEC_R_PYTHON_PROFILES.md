@@ -1,7 +1,12 @@
 # SPEC: R and Python (uv) profiles
 
-Status: draft. Scope: built-in profiles that let a sandboxed command run R and
-Python code, and optionally install packages.
+Status: implemented. The `r`, `r-install`, `uv`, and `uv-install` profiles
+ship as built-ins; §9's runtime-library discovery is solved in the engine
+(exec-chain-aware `add_libs`, see `internal/backends/libscan.go`); the §10
+verification matrix runs in CI (`internal/integration/profile_smoke_test.go`).
+Authoring guidance distilled from this work lives in
+`docs-src/profile-authoring.md`. Scope: built-in profiles that let a sandboxed
+command run R and Python code, and optionally install packages.
 
 ## 1. Goals
 
@@ -263,7 +268,19 @@ measured time budget, and a denial-diagnostics-driven fallback for the rest —
 this is exactly the case the run-time hints were built for. Resolve before
 implementation.
 
-**This is now the blocker, confirmed by trying it.** With the resolvers in
+**Resolved.** `add_libs` now scans the granted trees for ELF objects (exec
+trees fully; read-only trees under `libs/` directories, the R package
+convention), collects shebang interpreters and package-store paths referenced
+by wrapper scripts, and resolves the combined `DT_NEEDED`/`RPATH` closure with
+package stores (`/nix/store`, Homebrew Cellar) trusted as RPATH roots. Each
+discovered library's store item is granted read-only in full, so runtime data
+beside the library (gconv tables, locale archives) resolves too. The scan is
+budgeted (entries, seeds, wall clock) and a truncated scan is reported as a
+policy note. Verified on this machine: `library(Amelia)` loads under
+`--profile r`, pulling LAPACK, BLAS, gfortran, and friends from separate store
+paths. The original statement of the problem follows.
+
+**This was the blocker, confirmed by trying it.** With the resolvers in
 place, an `r` profile resolves every R-owned path correctly and R still does not
 start on this machine: the interpreter chain reaches `<prefix>/bin/exec/R`,
 which needs `libgomp`, `libblas`, `liblapack`, `libreadline`, `libgcc_s`, and

@@ -41,6 +41,10 @@ type Policy struct {
 	ShimDir string
 	// Trace records the per-entry resolution outcomes for --policy output.
 	Trace []bpaths.Trace
+	// Notes are non-fatal warnings produced while preparing the policy (for
+	// example, a truncated add_libs scan). They are printed to stderr before
+	// the sandboxed command runs.
+	Notes []string
 }
 
 type View struct {

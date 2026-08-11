@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Built-in `r`, `r-install`, `uv`, and `uv-install` profiles.**
+  `bulle --profile r -- Rscript analysis.R` and
+  `bulle --profile uv -- uv run script.py` work on conventional installs
+  (verified on Nix, the adversarial layout) without hand-written grants. Base
+  profiles are offline with read-only libraries; the `-install` variants add a
+  writable user library or cache and network access. The `uv` base profile
+  sets `UV_NO_CACHE=1` so offline runs use an ephemeral cache inside the
+  sandbox tmp instead of needing write access to the real one.
+- **Exec-chain-aware library discovery.** With `add_libs`, bulle now scans the
+  granted trees for ELF objects (exec trees fully, read-only trees under
+  `libs/` directories), follows wrapper scripts' shebang interpreters and
+  package-store references, and grants the combined `DT_NEEDED`/`RPATH`
+  closure with package stores trusted as RPATH roots. This makes interpreters
+  reached through several exec hops (Nix wrappers, version managers) work
+  without manual grants. The scan is budgeted, and a truncated scan is
+  reported as a policy note.
+- **Denial hints collapse package-store paths.** Denials inside one Nix store
+  item or Homebrew keg now produce a single suggested grant for the package
+  root, so the `bulle --last` retry line converges in one step instead of one
+  file at a time.
+- **Profile smoke-test harness.** A table-driven verification suite
+  (`internal/integration/profile_smoke_test.go`) runs each shipped profile
+  against its tool; CI runs it on Ubuntu, macOS, and Nix. A profile authoring
+  guide with the slot checklist and house rules ships in the website docs.
+
+### Changed
+
+- **`deny = ["network"]` no longer blocks `socketpair(2)` on Linux.** A
+  socketpair is a connected in-process pipe (Linux only supports `AF_UNIX`
+  pairs) and cannot reach outside the sandbox, while async runtimes (tokio,
+  libuv) need one for signal handling before doing any real work. `socket`,
+  `connect`, `bind`, `listen`, and `accept` remain denied.
+- **The `tool` profile grants common runtime probes.** `/bin/sh` (rox),
+  `/dev/null` (rw), and read-only `/proc/stat`, `/proc/cpuinfo`, cgroup
+  limits, CPU topology, transparent-hugepage flags, and glibc locale
+  archives — files that shells, OpenMP, BLAS, and allocators touch on
+  startup.
+
 - **Tool resolvers: `TOOL:ASPECT` path entries.** A grant can ask a tool where
   its own directories are instead of hard-coding them: `r:home`, `r:prefix`,
   `r:libs`, `r:libs-user`, `uv:cache`, `uv:tools`, `uv:python`, `go:root`,

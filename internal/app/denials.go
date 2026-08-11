@@ -92,7 +92,48 @@ func hintForDenial(d landlockDenial, home string) string {
 	if d.Path == "" {
 		return ""
 	}
+	suggest := grantSuggestionPath(d.Path)
+	if suggest != d.Path {
+		// Naming the package root in both halves lets hint deduplication
+		// collapse every denial inside the same store item into one line, so
+		// the 10-hint display cap is spent on distinct grants.
+		return fmt.Sprintf("denied: %s files in %s — add %s %s", verb, suggest, flag, abbreviateHome(suggest, home))
+	}
 	return fmt.Sprintf("denied: %s %s — add %s %s", verb, d.Path, flag, abbreviateHome(d.Path, home))
+}
+
+// storeGrantRoots are per-package installer trees where the natural grant is
+// the package's own root, not the individual denied file. Collapsing to the
+// root turns dozens of denials inside one Nix store item or Homebrew keg into
+// a single suggestion, so following the hints converges in one retry instead
+// of one file at a time.
+var storeGrantRoots = []struct {
+	prefix string
+	// components is the path depth of the package root, counting from "/":
+	// /nix/store/<item> is 3, /opt/homebrew/Cellar/<name>/<version> is 5.
+	components int
+}{
+	{"/nix/store/", 3},
+	{"/gnu/store/", 3},
+	{"/opt/homebrew/Cellar/", 5},
+	{"/usr/local/Cellar/", 5},
+}
+
+// grantSuggestionPath maps a denied path to the path a hint should suggest
+// granting: the enclosing package root inside a package store, the denied
+// path itself everywhere else.
+func grantSuggestionPath(path string) string {
+	for _, root := range storeGrantRoots {
+		if !strings.HasPrefix(path, root.prefix) {
+			continue
+		}
+		parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
+		if len(parts) <= root.components {
+			return path
+		}
+		return "/" + strings.Join(parts[:root.components], "/")
+	}
+	return path
 }
 
 // classifyBlockers maps a record's blockers to a human verb and the grant flag
@@ -203,6 +244,9 @@ func hintForSeatbeltDenial(d seatbeltDenial, home string) string {
 		verb, flag = "read", "--ro"
 	default:
 		return ""
+	}
+	if suggest := grantSuggestionPath(d.Path); suggest != d.Path {
+		return fmt.Sprintf("denied: %s files in %s (%s) — add %s %s", verb, suggest, d.Process, flag, abbreviateHome(suggest, home))
 	}
 	return fmt.Sprintf("denied: %s %s (%s) — add %s %s", verb, d.Path, d.Process, flag, abbreviateHome(d.Path, home))
 }
