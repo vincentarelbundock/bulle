@@ -303,18 +303,24 @@ func openScratchShell(s *scratchState, stdout, stderr io.Writer) {
 	}
 }
 
-// printScratchRecipe prints the push-based integration steps (§8.1 of the
-// scratch spec): review, commit, push to a scratch/<id> ref in the origin,
-// merge from the origin side, dispose.
+// printScratchRecipe prints git-native integration steps, led by the pull
+// form (one command from the origin side). Pull and push only move commits,
+// so when the scratch working tree is dirty the recipe warns and leads with
+// the commit step instead of silently integrating a partial result.
 func printScratchRecipe(s *scratchState, w io.Writer) {
 	fmt.Fprintf(w, "scratch kept: %s\n", s.Dir)
-	fmt.Fprintln(w, "to integrate:")
-	fmt.Fprintf(w, "  cd %s\n", s.Dir)
-	fmt.Fprintln(w, "  git add -A && git commit")
-	fmt.Fprintf(w, "  git push origin HEAD:scratch/%s\n", s.ID)
-	fmt.Fprintf(w, "  cd %s\n", s.Origin)
-	fmt.Fprintf(w, "  git merge scratch/%s   # or rebase, cherry-pick, diff first\n", s.ID)
+	status, err := runGit(s.Dir, "status", "--porcelain")
+	dirty := err != nil || status != ""
+	if dirty {
+		fmt.Fprintln(w, "the scratch has uncommitted changes; integration only sees commits, so commit first:")
+		fmt.Fprintf(w, "  git -C %s add -A && git -C %s commit\n", s.Dir, s.Dir)
+		fmt.Fprintln(w, "then integrate from your repository:")
+	} else {
+		fmt.Fprintln(w, "all changes are committed; to integrate, from your repository:")
+	}
+	fmt.Fprintf(w, "  git -C %s pull %s\n", s.Origin, s.Dir)
 	fmt.Fprintf(w, "  rm -rf %s\n", s.Dir)
+	fmt.Fprintf(w, "to inspect before merging: git -C %s fetch %s HEAD:scratch/%s\n", s.Origin, s.Dir, s.ID)
 }
 
 func removeScratch(s *scratchState) {

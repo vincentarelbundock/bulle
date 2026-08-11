@@ -656,23 +656,29 @@ recipe printed. <strong>A scratch is never deleted implicitly</strong> — not o
 signal, or crash. Losing an agent's work to a cleanup path is worse than
 leaving a directory behind.</p>
 <h2 id="integrating-the-changes">Integrating the changes<a class="headerlink" href="#integrating-the-changes" title="Permanent link">&para;</a></h2>
-<p>There is no bespoke apply step. The scratch is a real repository whose
-<code>origin</code> remote points at your checkout, so integration is ordinary git, done
-by you, outside the sandbox:</p>
-<div class="language-text highlight"><pre><span></span><code>cd ~/.local/state/bulle/scratch/project-a1b2c3d4
-git diff                          # review again if desired
-git add -A &amp;&amp; git commit
-git push origin HEAD:scratch/a1b2c3d4
-cd ~/project
-git merge scratch/a1b2c3d4        # or rebase, cherry-pick, diff first
+<p>There is no bespoke apply step. The scratch is a real repository, so
+integration is ordinary git, done by you, outside the sandbox. When you are
+confident in the changes, one command from your repository pulls them in:</p>
+<div class="language-text highlight"><pre><span></span><code>git add -A &amp;&amp; git commit          # in the scratch, if anything is uncommitted
+git -C ~/project pull ~/.local/state/bulle/scratch/project-a1b2c3d4
 rm -rf ~/.local/state/bulle/scratch/project-a1b2c3d4
 </code></pre></div>
-<p><code>k</code> prints exactly this recipe with your paths filled in.</p>
+<p><code>k</code> prints this recipe with your paths filled in, and checks the scratch
+first: pull only moves <em>commits</em>, so if the scratch has uncommitted changes
+the recipe warns and leads with the commit step rather than letting you
+silently integrate a partial result.</p>
+<p>To inspect before merging, fetch the scratch into a ref instead and take it
+from there with your usual tools:</p>
+<div class="language-text highlight"><pre><span></span><code>git -C ~/project fetch ~/.local/state/bulle/scratch/project-a1b2c3d4 HEAD:scratch/a1b2c3d4
+git diff main...scratch/a1b2c3d4
+git merge scratch/a1b2c3d4        # or rebase, cherry-pick
+</code></pre></div>
 <p>This is safe by construction. During the run, the sandbox denies your
-checkout's path, so a push from inside fails on filesystem permissions; after
-the run, a push is a deliberate act in your trusted shell. And git refuses
-pushes to the checked-out branch, so the result always lands as a ref —
-never as files silently appearing in your working tree.</p>
+checkout's path, so nothing inside the sandbox can reach your repository at
+all; after the run, a pull is a deliberate act in your trusted shell, and the
+merge runs in your checkout so the working tree updates properly. (Pushing
+from the scratch to your checked-out branch would be refused by git for
+exactly that reason — a push updates refs, never your working tree.)</p>
 <h2 id="why-not-a-worktree">Why not a worktree?<a class="headerlink" href="#why-not-a-worktree" title="Permanent link">&para;</a></h2>
 <p>Tools like Worktrunk's <code>wt</code> already automate "run an agent in a separate
 directory" with <code>git worktree add</code>. They are good at what they do — templated

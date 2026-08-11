@@ -18,9 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   committed — and offers diff, keep, a subshell inside the scratch, or
   discard; a run that changed nothing
   cleans up after itself, and a scratch with changes is never deleted
-  implicitly. Integration is git-native: keep prints a `git push
-  origin HEAD:scratch/<id>` recipe, and the result lands as a ref in the
-  origin, never as working-tree changes. `--scratch-keep` skips the prompt
+  implicitly. Integration is git-native: keep prints a one-command
+  `git pull` recipe run from the origin side (warning first when the scratch
+  has uncommitted changes, since pull only moves commits), with a
+  fetch-to-ref variant for inspecting before merging. `--scratch-keep` skips
+  the prompt
   for non-interactive runs, `[scratch] dir` in `config.toml` relocates
   scratches (with a warning when the location defeats hardlinking), and
   denial hints from scratch runs are rewritten to origin-relative paths so

@@ -164,10 +164,24 @@ func TestReviewScratchRemovesEmptyAndKeepsChanged(t *testing.T) {
 		t.Fatalf("changed scratch was removed: %v", err)
 	}
 	out := stdout.String()
-	for _, want := range []string{"1 added", "git push origin HEAD:scratch/" + s.ID, "rm -rf " + s.Dir} {
+	// The scratch working tree is dirty here, so the recipe must warn and
+	// lead with the commit step before the pull form.
+	for _, want := range []string{"1 added", "uncommitted changes", "pull " + s.Dir, "rm -rf " + s.Dir} {
 		if !strings.Contains(out, want) {
 			t.Errorf("review output missing %q:\n%s", want, out)
 		}
+	}
+
+	// Once everything is committed, the recipe goes straight to the pull form.
+	gitT(t, s.Dir, "add", "-A")
+	gitT(t, s.Dir, "commit", "-q", "-m", "agent work")
+	var recipe bytes.Buffer
+	printScratchRecipe(s, &recipe)
+	if strings.Contains(recipe.String(), "uncommitted") {
+		t.Errorf("clean scratch should not warn:\n%s", recipe.String())
+	}
+	if !strings.Contains(recipe.String(), "all changes are committed") {
+		t.Errorf("clean recipe missing pull lead:\n%s", recipe.String())
 	}
 }
 

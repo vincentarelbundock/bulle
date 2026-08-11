@@ -65,27 +65,36 @@ leaving a directory behind.
 
 ## Integrating the changes
 
-There is no bespoke apply step. The scratch is a real repository whose
-`origin` remote points at your checkout, so integration is ordinary git, done
-by you, outside the sandbox:
+There is no bespoke apply step. The scratch is a real repository, so
+integration is ordinary git, done by you, outside the sandbox. When you are
+confident in the changes, one command from your repository pulls them in:
 
 ~~~text
-cd ~/.local/state/bulle/scratch/project-a1b2c3d4
-git diff                          # review again if desired
-git add -A && git commit
-git push origin HEAD:scratch/a1b2c3d4
-cd ~/project
-git merge scratch/a1b2c3d4        # or rebase, cherry-pick, diff first
+git add -A && git commit          # in the scratch, if anything is uncommitted
+git -C ~/project pull ~/.local/state/bulle/scratch/project-a1b2c3d4
 rm -rf ~/.local/state/bulle/scratch/project-a1b2c3d4
 ~~~
 
-`k` prints exactly this recipe with your paths filled in.
+`k` prints this recipe with your paths filled in, and checks the scratch
+first: pull only moves *commits*, so if the scratch has uncommitted changes
+the recipe warns and leads with the commit step rather than letting you
+silently integrate a partial result.
+
+To inspect before merging, fetch the scratch into a ref instead and take it
+from there with your usual tools:
+
+~~~text
+git -C ~/project fetch ~/.local/state/bulle/scratch/project-a1b2c3d4 HEAD:scratch/a1b2c3d4
+git diff main...scratch/a1b2c3d4
+git merge scratch/a1b2c3d4        # or rebase, cherry-pick
+~~~
 
 This is safe by construction. During the run, the sandbox denies your
-checkout's path, so a push from inside fails on filesystem permissions; after
-the run, a push is a deliberate act in your trusted shell. And git refuses
-pushes to the checked-out branch, so the result always lands as a ref —
-never as files silently appearing in your working tree.
+checkout's path, so nothing inside the sandbox can reach your repository at
+all; after the run, a pull is a deliberate act in your trusted shell, and the
+merge runs in your checkout so the working tree updates properly. (Pushing
+from the scratch to your checked-out branch would be refused by git for
+exactly that reason — a push updates refs, never your working tree.)
 
 ## Why not a worktree?
 
