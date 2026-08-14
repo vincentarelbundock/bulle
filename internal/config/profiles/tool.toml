@@ -34,7 +34,6 @@ ro = [
   # keeps the grant to that one domain instead of the whole ByHost directory.
   "~/Library/Preferences/ByHost/.GlobalPreferences.*.plist",
   "?/dev/autofs_nowait",
-  "?/dev/dtracehelper",
 ]
 # system(3) and popen(3) hardcode /bin/sh; nearly every tool shells out
 # through it at some point. The nix-ld directory is NixOS's loader shim for
@@ -55,7 +54,9 @@ rox = [
   "?which:rm",
   "?/run/current-system/sw/share/nix-ld/lib",
 ]
-rw = ["$TMP/bulle/tmp", "?/dev/null", "?/dev/tty"]
+# libc opens /dev/dtracehelper read-write during process startup on macOS, so a
+# read-only grant is not enough to keep the probe quiet.
+rw = ["$TMP/bulle/tmp", "?/dev/null", "?/dev/tty", "?/dev/dtracehelper"]
 env = ["PATH", "NIX_LD", "NIX_LD_LIBRARY_PATH", "LD_LIBRARY_PATH"]
 add_exec = true
 add_libs = true

@@ -40,6 +40,14 @@ type toolResolver struct {
 	argv        []string
 	format      resolverFormat
 	description string
+	// appBundleRoot rewrites a result that lives inside a macOS .app to the
+	// bundle directory itself, and drops results that do not. The developer
+	// directory is the only thing a tool will report, but the toolchain
+	// validates its own installation by reading the bundle's Info.plist and
+	// shared frameworks, which sit above it. Dropping the non-bundle case is
+	// what makes a Command Line Tools install (no enclosing .app) resolve to
+	// nothing rather than to /Library/Developer.
+	appBundleRoot bool
 	// denySystemRoots drops results that are whole system trees. An aspect
 	// reporting an installation prefix is narrow where a tool lives in its own
 	// directory (a Nix store path, a Homebrew Cellar entry) and far too broad
@@ -155,6 +163,13 @@ var toolResolvers = []toolResolver{
 		description: "active macOS developer directory (xcode-select -p), holding the toolchain and SDKs",
 	},
 	{
+		tool: "xcode", aspect: "app",
+		argv:          []string{"xcode-select", "-p"},
+		format:        formatSingle,
+		appBundleRoot: true,
+		description:   "Xcode application bundle enclosing the developer directory; empty for a Command Line Tools install",
+	},
+	{
 		tool: "npm", aspect: "cache",
 		argv:        []string{"npm", "config", "get", "cache"},
 		format:      formatSingle,
@@ -251,10 +266,34 @@ func (r toolResolver) run(parentPATH string, parentEnv map[string]string) ([]str
 		return nil, fmt.Errorf("%s exited with an error", r.argv[0])
 	}
 	paths := parseResolverOutput(stdout.String(), r.format)
+	if r.appBundleRoot {
+		paths = keepAppBundleRoots(paths)
+	}
 	if r.denySystemRoots {
 		paths = dropSystemRoots(paths, parentEnv["HOME"])
 	}
 	return paths, nil
+}
+
+// keepAppBundleRoots maps each path to the nearest enclosing .app directory,
+// dropping paths that are not inside one. Results are deduplicated because
+// several aspects of one bundle collapse to the same root.
+func keepAppBundleRoots(paths []string) []string {
+	out := []string{}
+	seen := map[string]bool{}
+	for _, path := range paths {
+		for dir := path; dir != "/" && dir != "."; dir = filepath.Dir(dir) {
+			if !strings.HasSuffix(dir, ".app") {
+				continue
+			}
+			if !seen[dir] {
+				seen[dir] = true
+				out = append(out, dir)
+			}
+			break
+		}
+	}
+	return out
 }
 
 // dropSystemRoots removes results that would hand over a whole system tree.

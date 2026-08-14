@@ -186,3 +186,52 @@ func TestExpandToolResolversPreservesMarkers(t *testing.T) {
 		}
 	}
 }
+
+// The Xcode toolchain reads its bundle's Info.plist and frameworks, which sit
+// above the directory xcode-select reports, so xcode:app walks up to the
+// bundle. A Command Line Tools install has no enclosing bundle and must
+// resolve to nothing rather than to the /Library/Developer tree above it.
+func TestKeepAppBundleRoots(t *testing.T) {
+	cases := []struct {
+		name string
+		in   []string
+		want []string
+	}{
+		{
+			name: "xcode developer directory maps to the bundle",
+			in:   []string{"/Applications/Xcode_26.6.app/Contents/Developer"},
+			want: []string{"/Applications/Xcode_26.6.app"},
+		},
+		{
+			name: "command line tools have no bundle",
+			in:   []string{"/Library/Developer/CommandLineTools"},
+			want: []string{},
+		},
+		{
+			name: "aspects of one bundle collapse to a single root",
+			in: []string{
+				"/Applications/Xcode.app/Contents/Developer",
+				"/Applications/Xcode.app/Contents/SharedFrameworks",
+			},
+			want: []string{"/Applications/Xcode.app"},
+		},
+		{
+			name: "the bundle itself is already a root",
+			in:   []string{"/Applications/Xcode.app"},
+			want: []string{"/Applications/Xcode.app"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := keepAppBundleRoots(tc.in)
+			if len(got) != len(tc.want) {
+				t.Fatalf("keepAppBundleRoots(%v) = %v, want %v", tc.in, got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Errorf("keepAppBundleRoots(%v) = %v, want %v", tc.in, got, tc.want)
+				}
+			}
+		})
+	}
+}

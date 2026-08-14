@@ -20,5 +20,11 @@ rw = [
   "+${CARGO_HOME:-~/.cargo}/registry/",
   "+${CARGO_HOME:-~/.cargo}/git/",
   "?+${CARGO_HOME:-~/.cargo}/.global-cache",
+  # cargo takes these lock files before it touches the registry or the shared
+  # cache, and creates them on a cold home, so they are granted rather than
+  # merely allowed to exist.
+  "?+${CARGO_HOME:-~/.cargo}/.package-cache",
+  "?+${CARGO_HOME:-~/.cargo}/.package-cache-mutate",
+  "?+${CARGO_HOME:-~/.cargo}/.global-cache-journal",
 ]
 env = ["CARGO_HOME", "RUSTUP_HOME", "RUSTFLAGS"]
