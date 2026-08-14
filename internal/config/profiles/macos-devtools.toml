@@ -13,3 +13,13 @@ description = "the active Xcode or Command Line Tools developer directory"
 # well as the developer directory inside it. On a Command Line Tools install
 # xcode:app reports nothing and only the developer directory is granted.
 rox = ["?xcode:developer", "?xcode:app", "?which:xcode-select", "?which:xcrun"]
+# Xcode records license acceptance in these preference domains, and xcodebuild
+# checks them before it will hand the SDK to the linker. Denied, the check does
+# not fail open: it reports the licence as unaccepted and the link dies with
+# advice to run sudo xcodebuild -license. Read-only; nothing here is accepting
+# anything on the user's behalf.
+ro = [
+  "?/Library/Preferences/com.apple.dt.Xcode.plist",
+  "?~/Library/Preferences/com.apple.dt.Xcode.plist",
+  "?~/Library/Preferences/com.apple.dt.xcodebuild.plist",
+]
