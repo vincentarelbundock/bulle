@@ -91,6 +91,7 @@ Profiles:
   keychain          macOS Keychain file and service access
   latex             TeX Live engines, the distribution tree, and font caches
   macos-certs       macOS certificate trust service lookup
+  macos-devtools    the active Xcode or Command Line Tools developer directory
   macos-dns         macOS DNS and directory service lookups
   network           network socket access capability
   node              Node.js runtime, npm, and package caches

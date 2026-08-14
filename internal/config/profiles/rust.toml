@@ -2,7 +2,7 @@ title = "Rust"
 description = "cargo, rustup toolchains, and the registry cache"
 # git: cargo reads git configuration and shells out to git for git
 # dependencies and vcs metadata.
-inherits = ["tool", "terminal", "git"]
+inherits = ["tool", "terminal", "git", "macos-devtools"]
 # cc and ld are rustc's link step; on wrapper-based systems (Nix, Homebrew
 # gcc) they are scripts whose referenced store paths the add_libs scan grants.
 rox = [

@@ -149,6 +149,12 @@ var toolResolvers = []toolResolver{
 		description: "Go module cache",
 	},
 	{
+		tool: "xcode", aspect: "developer",
+		argv:        []string{"xcode-select", "-p"},
+		format:      formatSingle,
+		description: "active macOS developer directory (xcode-select -p), holding the toolchain and SDKs",
+	},
+	{
 		tool: "npm", aspect: "cache",
 		argv:        []string{"npm", "config", "get", "cache"},
 		format:      formatSingle,

@@ -19,6 +19,22 @@ ro = [
   "?/etc/os-release",
   "?/usr/lib/locale/locale-archive",
   "?/run/current-system/sw/lib/locale/locale-archive",
+  # The macOS equivalents of the probes above: dyld resolves the shared cache
+  # through the cryptex mounts, CoreFoundation reads the text encoding and the
+  # global preference domains on every process start, and libc opens the dtrace
+  # and autofs helpers. All are information-only, and a denial on them is a
+  # silent behaviour change rather than a clean error.
+  "?/System/Cryptexes/App",
+  "?/System/Cryptexes/OS",
+  "?~/.CFUserTextEncoding",
+  "?/Library/Preferences/.GlobalPreferences.plist",
+  "?~/Library/Preferences/.GlobalPreferences.plist",
+  "?~/Library/Preferences/.GlobalPreferences_m.plist",
+  # Host-scoped preferences carry the machine UUID in the filename; the glob
+  # keeps the grant to that one domain instead of the whole ByHost directory.
+  "~/Library/Preferences/ByHost/.GlobalPreferences.*.plist",
+  "?/dev/autofs_nowait",
+  "?/dev/dtracehelper",
 ]
 # system(3) and popen(3) hardcode /bin/sh; nearly every tool shells out
 # through it at some point. The nix-ld directory is NixOS's loader shim for

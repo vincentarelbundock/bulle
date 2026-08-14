@@ -86,19 +86,28 @@ default
 git
 go
 keychain
+latex
 macos-certs
+macos-devtools
 macos-dns
 network
 node
 offline
 opencode
+pandoc
 pi
+quarto
+r
+r-install
 rust
 terminal
 tool
+user-bin
+uv
+uv-install
 ```
 
-Built-in helper profiles such as `default`, `network`, `offline`, `macos-dns`, `macos-certs`, and `keychain` are ordinary profiles that can be inherited directly or selected explicitly when you pass a command.
+Built-in helper profiles such as `default`, `network`, `offline`, `macos-dns`, `macos-certs`, `macos-devtools`, and `keychain` are ordinary profiles that can be inherited directly or selected explicitly when you pass a command.
 
 == Capability micro-profiles
 

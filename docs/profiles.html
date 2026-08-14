@@ -2719,17 +2719,26 @@ ping: cannot resolve google.com: Unknown host</code></pre></div><p>You can still
 <span class="calepin-syntax-scope-1">git</span>
 <span class="calepin-syntax-scope-1">go</span>
 <span class="calepin-syntax-scope-1">keychain</span>
+<span class="calepin-syntax-scope-1">latex</span>
 <span class="calepin-syntax-scope-1">macos-certs</span>
+<span class="calepin-syntax-scope-1">macos-devtools</span>
 <span class="calepin-syntax-scope-1">macos-dns</span>
 <span class="calepin-syntax-scope-1">network</span>
 <span class="calepin-syntax-scope-1">node</span>
 <span class="calepin-syntax-scope-1">offline</span>
 <span class="calepin-syntax-scope-1">opencode</span>
+<span class="calepin-syntax-scope-1">pandoc</span>
 <span class="calepin-syntax-scope-1">pi</span>
+<span class="calepin-syntax-scope-1">quarto</span>
+<span class="calepin-syntax-scope-1">r</span>
+<span class="calepin-syntax-scope-1">r-install</span>
 <span class="calepin-syntax-scope-1">rust</span>
 <span class="calepin-syntax-scope-1">terminal</span>
 <span class="calepin-syntax-scope-1">tool</span>
-</code></pre></div><p>Built-in helper profiles such as <code>default</code>, <code>network</code>, <code>offline</code>, <code>macos-dns</code>, <code>macos-certs</code>, and <code>keychain</code> are ordinary profiles that can be inherited directly or selected explicitly when you pass a command.</p><h3 id="capability-micro-profiles">Capability micro-profiles</h3><p>The built-in <code>git</code>, <code>node</code>, <code>rust</code>, <code>go</code>, and <code>terminal</code> profiles are small capability bundles, each answering one concern once and portably. The tool profiles use <code>which:</code>/<code>pkg:</code> resolvers, tool resolvers such as <code>npm:cache</code> and <code>go:modcache</code>, platform variables, and optional/create markers to settle a tool’s location questions (binary, configuration, caches); <code>terminal</code> carries the environment variables an interactive program expects. They are meant to be assembled through <code>inherits</code> rather than restating tool layouts in every agent profile:</p><div class="sourceCode" data-lang="toml"><pre><code data-lang="toml">title <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">"</span>My agent<span class="calepin-syntax-scope-3">"</span>
+<span class="calepin-syntax-scope-1">user-bin</span>
+<span class="calepin-syntax-scope-1">uv</span>
+<span class="calepin-syntax-scope-1">uv-install</span>
+</code></pre></div><p>Built-in helper profiles such as <code>default</code>, <code>network</code>, <code>offline</code>, <code>macos-dns</code>, <code>macos-certs</code>, <code>macos-devtools</code>, and <code>keychain</code> are ordinary profiles that can be inherited directly or selected explicitly when you pass a command.</p><h3 id="capability-micro-profiles">Capability micro-profiles</h3><p>The built-in <code>git</code>, <code>node</code>, <code>rust</code>, <code>go</code>, and <code>terminal</code> profiles are small capability bundles, each answering one concern once and portably. The tool profiles use <code>which:</code>/<code>pkg:</code> resolvers, tool resolvers such as <code>npm:cache</code> and <code>go:modcache</code>, platform variables, and optional/create markers to settle a tool’s location questions (binary, configuration, caches); <code>terminal</code> carries the environment variables an interactive program expects. They are meant to be assembled through <code>inherits</code> rather than restating tool layouts in every agent profile:</p><div class="sourceCode" data-lang="toml"><pre><code data-lang="toml">title <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">"</span>My agent<span class="calepin-syntax-scope-3">"</span>
 inherits <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">[</span><span class="calepin-syntax-scope-3">"</span>tool<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">"</span>git<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">,</span> <span class="calepin-syntax-scope-3">"</span>node<span class="calepin-syntax-scope-3">"</span><span class="calepin-syntax-scope-3">]</span>
 default_app <span class="calepin-syntax-scope-3">=</span> <span class="calepin-syntax-scope-3">"</span>my-agent<span class="calepin-syntax-scope-3">"</span></code></pre></div><p>They can also be combined on the command line: <code>bulle --profile tool,git,rust -- cargo build</code>.</p><h3 id="installing-profiles">Installing profiles</h3><p>Install or override profiles with <code>bulle profiles install SOURCE</code>. The source can be one <code>.toml</code> file, a directory containing <code>.toml</code> files, a local git repository, or a GitHub source such as <code>github:vincentarelbundock/bulle/custom_profiles</code>.</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-1">bulle</span> profiles install agent.toml
 <span class="calepin-syntax-scope-1">bulle</span> profiles install ./profiles

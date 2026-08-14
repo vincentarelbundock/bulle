@@ -1,0 +1,11 @@
+title = "macOS developer tools"
+description = "the active Xcode or Command Line Tools developer directory"
+# Anything that compiles or links on macOS goes through /usr/bin/cc, which is a
+# stub that asks xcode-select and xcrun where the real toolchain lives and then
+# execs it out of the developer directory. The directory is version-stamped
+# (/Applications/Xcode_26.6.app/... on CI runners, /Library/Developer/
+# CommandLineTools on a bare install), so it is resolved rather than written
+# down: a hardcoded path breaks on the next Xcode bump.
+# Optional throughout: on Linux there is no xcode-select and every entry drops
+# out, which is what lets tool profiles inherit this unconditionally.
+rox = ["?xcode:developer", "?which:xcode-select", "?which:xcrun"]

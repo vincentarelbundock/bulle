@@ -61,11 +61,18 @@ func profileSmokeTable() []profileSmokeCase {
 				run(t, workspace, "uv", "init", "--no-workspace", "--name", "smoke")
 				run(t, workspace, "uv", "sync")
 			},
+			// The two backends deny the network at different syscalls: the
+			// Linux seccomp filter rejects socket(2) outright, while seatbelt
+			// lets the descriptor exist and denies the operations that put it
+			// on the network. Binding it exercises the property both share and
+			// needs no reachable peer, so the check stays hermetic.
 			args: []string{"uv", "run", "--offline", "python", "-c",
 				`import socket
 try:
-    socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    print("socket-created")
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("127.0.0.1", 0))
+    s.listen(1)
+    print("network-reachable")
 except OSError:
     print("smoke-ok")`},
 			want: "smoke-ok",
