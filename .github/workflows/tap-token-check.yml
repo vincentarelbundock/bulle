@@ -1,0 +1,36 @@
+name: tap-token-check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe the tap token
+        env:
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${HOMEBREW_TAP_GITHUB_TOKEN:?secret is empty or not exposed}"
+
+          echo "== token identity =="
+          curl -fsS -H "Authorization: Bearer ${HOMEBREW_TAP_GITHUB_TOKEN}" \
+            https://api.github.com/user | grep -E '"login"' || echo "(fine-grained token: /user may 403)"
+
+          echo "== repo access =="
+          curl -fsS -H "Authorization: Bearer ${HOMEBREW_TAP_GITHUB_TOKEN}" \
+            https://api.github.com/repos/vincentarelbundock/homebrew-tap \
+            | grep -E '"full_name"|"push"|"admin"'
+
+          echo "== clone =="
+          tmp="$(mktemp -d)"
+          git clone "https://x-access-token:${HOMEBREW_TAP_GITHUB_TOKEN}@github.com/vincentarelbundock/homebrew-tap.git" "$tmp/tap"
+
+          echo "== push (dry run) =="
+          cd "$tmp/tap"
+          git push --dry-run origin HEAD:main
+          echo "OK: token can clone and push to the tap"
