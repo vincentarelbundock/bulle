@@ -1,4 +1,4 @@
-package app
+package record
 
 import (
 	"os"
@@ -17,20 +17,20 @@ func TestCoveredByPolicyChecksEachAccessAgainstItsLists(t *testing.T) {
 	}
 	cases := []struct {
 		name string
-		gr   grant
+		gr   Grant
 		want bool
 	}{
-		{"read inside a read-only root", grant{Flag: "--ro", Path: "/etc/ssl/certs/ca.crt"}, true},
-		{"read of the root itself", grant{Flag: "--ro", Path: "/etc/ssl"}, true},
-		{"read inside an exec root", grant{Flag: "--ro", Path: "/usr/bin/pandoc"}, true},
-		{"exec inside a read-only root", grant{Flag: "--rox", Path: "/etc/ssl/x"}, false},
-		{"exec inside an exec root", grant{Flag: "--rox", Path: "/usr/bin/pandoc"}, true},
-		{"write inside a read-only root", grant{Flag: "--rw", Path: "/etc/ssl/x"}, false},
-		{"write inside a writable root", grant{Flag: "--rw", Path: "/home/user/.cache/tool/db"}, true},
-		{"exec inside a writable root", grant{Flag: "--rox", Path: "/home/user/.cache/tool/x"}, false},
-		{"exec+write inside a rwx root", grant{Flag: "--rwx", Path: "/tmp/build/a.out"}, true},
-		{"unrelated path", grant{Flag: "--ro", Path: "/opt/thing"}, false},
-		{"sibling of a granted root", grant{Flag: "--ro", Path: "/etc/ssl-backup/x"}, false},
+		{"read inside a read-only root", Grant{Flag: "--ro", Path: "/etc/ssl/certs/ca.crt"}, true},
+		{"read of the root itself", Grant{Flag: "--ro", Path: "/etc/ssl"}, true},
+		{"read inside an exec root", Grant{Flag: "--ro", Path: "/usr/bin/pandoc"}, true},
+		{"exec inside a read-only root", Grant{Flag: "--rox", Path: "/etc/ssl/x"}, false},
+		{"exec inside an exec root", Grant{Flag: "--rox", Path: "/usr/bin/pandoc"}, true},
+		{"write inside a read-only root", Grant{Flag: "--rw", Path: "/etc/ssl/x"}, false},
+		{"write inside a writable root", Grant{Flag: "--rw", Path: "/home/user/.cache/tool/db"}, true},
+		{"exec inside a writable root", Grant{Flag: "--rox", Path: "/home/user/.cache/tool/x"}, false},
+		{"exec+write inside a rwx root", Grant{Flag: "--rwx", Path: "/tmp/build/a.out"}, true},
+		{"unrelated path", Grant{Flag: "--ro", Path: "/opt/thing"}, false},
+		{"sibling of a granted root", Grant{Flag: "--ro", Path: "/etc/ssl-backup/x"}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -44,7 +44,7 @@ func TestCoveredByPolicyChecksEachAccessAgainstItsLists(t *testing.T) {
 func TestCoveredByPolicyFollowsSymlinksToTheGrantedPath(t *testing.T) {
 	// The kernel reports the path it resolved, while a profile commonly grants
 	// the link. Both spellings must count as covered, or every run through a
-	// symlinked directory records a duplicate of a grant that already exists.
+	// symlinked directory records a duplicate of a Grant that already exists.
 	dir := t.TempDir()
 	real := filepath.Join(dir, "real")
 	if err := os.MkdirAll(filepath.Join(real, "sub"), 0o755); err != nil {
@@ -56,22 +56,22 @@ func TestCoveredByPolicyFollowsSymlinksToTheGrantedPath(t *testing.T) {
 	}
 
 	p := policy.Policy{ReadOnly: []string{link}}
-	if !coveredByPolicy(grant{Flag: "--ro", Path: filepath.Join(link, "sub")}, p) {
-		t.Error("grant through the link is not covered by a grant on the link")
+	if !coveredByPolicy(Grant{Flag: "--ro", Path: filepath.Join(link, "sub")}, p) {
+		t.Error("Grant through the link is not covered by a Grant on the link")
 	}
 
 	p = policy.Policy{ReadOnly: []string{real}}
-	if !coveredByPolicy(grant{Flag: "--ro", Path: filepath.Join(link, "sub")}, p) {
-		t.Error("grant through the link is not covered by a grant on the target")
+	if !coveredByPolicy(Grant{Flag: "--ro", Path: filepath.Join(link, "sub")}, p) {
+		t.Error("Grant through the link is not covered by a Grant on the target")
 	}
 }
 
 func TestFilterCoveredGrantsKeepsOnlyWhatIsMissing(t *testing.T) {
 	p := policy.Policy{ReadOnly: []string{"/etc/ssl"}}
-	grants := []observedGrant{
-		{Grant: grant{Flag: "--ro", Path: "/etc/ssl/certs/ca.crt"}},
-		{Grant: grant{Flag: "--ro", Path: "/home/user/.gitconfig"}},
-		{Grant: grant{Flag: "--rox", Path: "/etc/ssl/weird"}, Origin: "curl"},
+	grants := []ObservedGrant{
+		{Grant: Grant{Flag: "--ro", Path: "/etc/ssl/certs/ca.crt"}},
+		{Grant: Grant{Flag: "--ro", Path: "/home/user/.gitconfig"}},
+		{Grant: Grant{Flag: "--rox", Path: "/etc/ssl/weird"}, Origin: "curl"},
 	}
 	kept := filterCoveredGrants(grants, p)
 	if len(kept) != 2 {
@@ -94,7 +94,7 @@ func TestGrantsForDenialsDeduplicatesAndSkipsUngrantable(t *testing.T) {
 		{Blockers: []string{"fs.read_file"}, Path: "/etc/b"},
 	}
 	grants := grantsForDenials(denials)
-	want := []grant{
+	want := []Grant{
 		{Flag: "--ro", Path: "/etc/a"},
 		{Flag: "--rox", Path: "/etc/a"},
 		{Flag: "--ro", Path: "/etc/b"},

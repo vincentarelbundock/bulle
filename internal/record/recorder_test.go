@@ -1,4 +1,4 @@
-package app
+package record
 
 import (
 	"os"
@@ -25,10 +25,10 @@ func TestIsProbeArtifact(t *testing.T) {
 }
 
 func TestRecorderDeduplicatesGrantsButAccumulatesOrigins(t *testing.T) {
-	// The same path denied to several processes is one grant, but every
+	// The same path denied to several processes is one Grant, but every
 	// process that hit it is worth showing.
-	rec := newRecorder()
-	gr := grant{Flag: "--ro", Path: "/etc/a"}
+	rec := NewRecorder()
+	gr := Grant{Flag: "--ro", Path: "/etc/a"}
 	rec.noteOrigin(gr, "mytool")
 	rec.noteOrigin(gr, "helper")
 	rec.noteOrigin(gr, "mytool")
@@ -39,17 +39,17 @@ func TestRecorderDeduplicatesGrantsButAccumulatesOrigins(t *testing.T) {
 }
 
 func TestRecorderTracksSavedGrants(t *testing.T) {
-	rec := newRecorder()
-	a := grant{Flag: "--ro", Path: "/etc/a"}
-	b := grant{Flag: "--rw", Path: "/etc/b"}
+	rec := NewRecorder()
+	a := Grant{Flag: "--ro", Path: "/etc/a"}
+	b := Grant{Flag: "--rw", Path: "/etc/b"}
 	rec.grants = append(rec.grants, a)
-	rec.markSaved()
+	rec.MarkSaved()
 	rec.grants = append(rec.grants, b)
-	if got := rec.unsaved(); len(got) != 1 || got[0] != b {
-		t.Errorf("unsaved = %v, want just %v", got, b)
+	if got := rec.Unsaved(); len(got) != 1 || got[0] != b {
+		t.Errorf("Unsaved = %v, want just %v", got, b)
 	}
-	rec.markSaved()
-	if got := rec.unsaved(); len(got) != 0 {
-		t.Errorf("unsaved after save = %v, want none", got)
+	rec.MarkSaved()
+	if got := rec.Unsaved(); len(got) != 0 {
+		t.Errorf("Unsaved after save = %v, want none", got)
 	}
 }

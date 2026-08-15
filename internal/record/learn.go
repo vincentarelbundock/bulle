@@ -1,4 +1,4 @@
-package app
+package record
 
 import (
 	"bufio"
@@ -23,12 +23,12 @@ import (
 // is never rewritten.
 const learnedMarker = "# Saved by bulle. bulle rewrites this file when you save new grants;"
 
-// promptLearnedGrants runs the end-of-run save gate: it shows the grants that
+// PromptLearnedGrants runs the end-of-run save gate: it shows the grants that
 // would allow what this run was denied, and offers to save them to the
 // profile. It reports whether the run should be repeated. Only called on a
 // terminal, and it never changes the exit code of the run.
-func promptLearnedGrants(opts cli.Options, global config.Config, rec *recorder, inScratch bool, stdout, stderr io.Writer) bool {
-	fresh := rec.unsaved()
+func PromptLearnedGrants(opts cli.Options, global config.Config, rec *Recorder, inScratch bool, stdout, stderr io.Writer) bool {
+	fresh := rec.Unsaved()
 	if len(fresh) == 0 {
 		return false
 	}
@@ -71,7 +71,7 @@ func promptLearnedGrants(opts cli.Options, global config.Config, rec *recorder, 
 				fmt.Fprintln(stderr, "bulle: add the grants above to the profile yourself")
 				return false
 			}
-			rec.markSaved()
+			rec.MarkSaved()
 			fmt.Fprintf(stderr, "bulle: saved to %s\n", path)
 			return choice == "s"
 		case "n", "":
@@ -100,7 +100,7 @@ func learnTargetProfile(opts cli.Options, global config.Config) (string, bool) {
 }
 
 // learnedFile is the shape of a profile file bulle manages. It holds nothing
-// but the grant lists and the identity fields the creation case writes, so a
+// but the Grant lists and the identity fields the creation case writes, so a
 // rewrite loses nothing.
 type learnedFile struct {
 	Title       string   `toml:"title,omitempty"`
@@ -118,7 +118,7 @@ type learnedFile struct {
 // (variables substituted, store roots collapsed, every entry optional). The
 // file merges into any same-named profile at load time, so an overlay on a
 // built-in profile and a newly created profile are the same mechanism.
-func saveLearnedGrants(opts cli.Options, global config.Config, name string, create bool, grants []grant) (string, error) {
+func saveLearnedGrants(opts cli.Options, global config.Config, name string, create bool, grants []Grant) (string, error) {
 	root := opts.Config
 	if root == "" {
 		root = config.DefaultRoot()
@@ -205,7 +205,7 @@ func stripComments(data []byte) []byte {
 func renderLearnedFile(file learnedFile) string {
 	var b strings.Builder
 	b.WriteString(learnedMarker + "\n")
-	b.WriteString("# a saved grant is evidence that one run needed it, not that it is safe.\n")
+	b.WriteString("# a saved Grant is evidence that one run needed it, not that it is safe.\n")
 	b.WriteString("# Review, edit, or delete entries freely — bulle only ever adds to the lists.\n\n")
 	if file.Title != "" {
 		fmt.Fprintf(&b, "title = %q\n", file.Title)

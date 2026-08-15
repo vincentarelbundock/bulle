@@ -1,4 +1,4 @@
-package app
+package record
 
 import (
 	"strings"
@@ -27,10 +27,10 @@ func TestDenialHintsCollapseIntoOneStoreGrant(t *testing.T) {
 	}
 	hints := denialHints(parseLandlockDenials(lines, 0), "/home/user")
 	if len(hints) != 1 {
-		t.Fatalf("hints = %v, want the two denials collapsed into one store-root grant", hints)
+		t.Fatalf("hints = %v, want the two denials collapsed into one store-root Grant", hints)
 	}
 	if !strings.Contains(hints[0], "--ro /nix/store/abc-lapack-3") {
-		t.Fatalf("hint = %q, want a /nix/store/abc-lapack-3 grant", hints[0])
+		t.Fatalf("hint = %q, want a /nix/store/abc-lapack-3 Grant", hints[0])
 	}
 }
 
@@ -82,7 +82,7 @@ func TestGrantForDenialReportsFlagAndCollapsedPath(t *testing.T) {
 				return
 			}
 			if got.Flag != tc.wantFlag || got.Path != tc.wantPath {
-				t.Errorf("grant = %+v, want {Flag:%s Path:%s}", got, tc.wantFlag, tc.wantPath)
+				t.Errorf("Grant = %+v, want {Flag:%s Path:%s}", got, tc.wantFlag, tc.wantPath)
 			}
 		})
 	}
@@ -133,7 +133,7 @@ func TestGrantForSeatbeltDenialReportsFlagAndCollapsedPath(t *testing.T) {
 				return
 			}
 			if got.Flag != tc.wantFlag || got.Path != tc.wantPath {
-				t.Errorf("grant = %+v, want {Flag:%s Path:%s}", got, tc.wantFlag, tc.wantPath)
+				t.Errorf("Grant = %+v, want {Flag:%s Path:%s}", got, tc.wantFlag, tc.wantPath)
 			}
 		})
 	}
@@ -142,7 +142,7 @@ func TestGrantForSeatbeltDenialReportsFlagAndCollapsedPath(t *testing.T) {
 func TestGrantSuggestionPathCollapsesPerProcessProcEntries(t *testing.T) {
 	cases := map[string]string{
 		// The pid differs for every process, so the denied path is never the
-		// path to grant.
+		// path to Grant.
 		"/proc/1234/cgroup":       "/proc",
 		"/proc/1/status":          "/proc",
 		"/proc/1234":              "/proc",
@@ -168,9 +168,9 @@ func TestDenialHintsCollapsePerProcessProcEntries(t *testing.T) {
 	}
 	hints := denialHints(parseLandlockDenials(lines, 0), "/home/user")
 	if len(hints) != 1 {
-		t.Fatalf("hints = %v, want one collapsed /proc grant", hints)
+		t.Fatalf("hints = %v, want one collapsed /proc Grant", hints)
 	}
 	if !strings.Contains(hints[0], "--ro /proc") {
-		t.Fatalf("hint = %q, want a /proc grant", hints[0])
+		t.Fatalf("hint = %q, want a /proc Grant", hints[0])
 	}
 }

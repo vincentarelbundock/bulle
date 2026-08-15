@@ -1,4 +1,4 @@
-package app
+package record
 
 import (
 	"os"
@@ -31,7 +31,7 @@ func TestSaveLearnedGrantsCreatesAndMerges(t *testing.T) {
 	opts := cli.Options{Flags: cli.Flags{Config: root}, Command: []string{"mytool"}}
 	global := config.DefaultConfig()
 
-	path, err := saveLearnedGrants(opts, global, "mytool", true, []grant{
+	path, err := saveLearnedGrants(opts, global, "mytool", true, []Grant{
 		{Flag: "--ro", Path: "/etc/mytool.conf"},
 	})
 	if err != nil {
@@ -49,7 +49,7 @@ func TestSaveLearnedGrantsCreatesAndMerges(t *testing.T) {
 	}
 
 	// A second save unions into the same file without losing anything.
-	if _, err := saveLearnedGrants(opts, global, "mytool", true, []grant{
+	if _, err := saveLearnedGrants(opts, global, "mytool", true, []Grant{
 		{Flag: "--ro", Path: "/etc/mytool.conf"},
 		{Flag: "--rw", Path: "/var/lib/mytool"},
 	}); err != nil {
@@ -86,7 +86,7 @@ func TestSaveLearnedGrantsRefusesForeignFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	opts := cli.Options{Flags: cli.Flags{Config: root}, Profile: "claude"}
-	_, err := saveLearnedGrants(opts, config.DefaultConfig(), "claude", false, []grant{{Flag: "--ro", Path: "/etc/x"}})
+	_, err := saveLearnedGrants(opts, config.DefaultConfig(), "claude", false, []Grant{{Flag: "--ro", Path: "/etc/x"}})
 	if err == nil || !strings.Contains(err.Error(), "not written by bulle") {
 		t.Fatalf("err = %v, want refusal to rewrite a hand-written file", err)
 	}

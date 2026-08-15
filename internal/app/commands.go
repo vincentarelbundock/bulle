@@ -9,6 +9,7 @@ import (
 	"github.com/vincentarelbundock/bulle/internal/config"
 	benv "github.com/vincentarelbundock/bulle/internal/env"
 	"github.com/vincentarelbundock/bulle/internal/exitcode"
+	"github.com/vincentarelbundock/bulle/internal/record"
 )
 
 // A subcommand ties a CommandSpec to its handler. Run dispatches from this
@@ -94,7 +95,7 @@ func runScratchDispatch(argv0 string, rest []string, stdout, stderr io.Writer) i
 	}
 	if isRun {
 		runArgs := append([]string{argv0, "--scratch"}, rest...)
-		return runMain(runArgs, "", stdout, stderr, newRecorder())
+		return runMain(runArgs, "", stdout, stderr, record.NewRecorder())
 	}
 	return runScratchCommand(rest, stdout, stderr)
 }

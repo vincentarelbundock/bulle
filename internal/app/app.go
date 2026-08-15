@@ -19,6 +19,7 @@ import (
 	"github.com/vincentarelbundock/bulle/internal/exitcode"
 	bpaths "github.com/vincentarelbundock/bulle/internal/paths"
 	"github.com/vincentarelbundock/bulle/internal/policy"
+	"github.com/vincentarelbundock/bulle/internal/record"
 	"github.com/vincentarelbundock/bulle/internal/supervisor"
 )
 
@@ -30,8 +31,8 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if isPreparedPolicyRunner(args) {
 		return runPreparedPolicy(args, stderr)
 	}
-	if isDenialLoggingProbe(args) {
-		return runDenialLoggingProbe(args, stderr)
+	if record.IsDenialLoggingProbe(args) {
+		return record.RunDenialLoggingProbe(args, stderr)
 	}
 	// An incomplete internal-runner invocation must not fall through to the
 	// public CLI, where command inference would try to execute the reserved
@@ -60,7 +61,7 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 			}
 		}
 	}
-	return runMain(args, "", stdout, stderr, newRecorder())
+	return runMain(args, "", stdout, stderr, record.NewRecorder())
 }
 
 // extractPolicyFormat pulls --json out of `bulle policy` arguments; the rest
@@ -83,7 +84,7 @@ func extractPolicyFormat(args []string) ([]string, string, error) {
 
 // runMain is the sandboxed run itself — and, when policyFormat is non-empty,
 // the `bulle policy` variant that resolves and prints without running.
-func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Writer, rec *recorder) int {
+func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Writer, rec *record.Recorder) int {
 	opts, err := cli.Parse(args)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -270,7 +271,7 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 	p.Command = commandWithSessionPermissions(opts.Profile, p.Command, preRunSessionPaste(opts, p))
 	// All runs go through the supervisor (even without a timeout) so a parent
 	// process survives the sandboxed command and can report on its failure.
-	probe := startDenialProbe(p)
+	probe := record.StartProbe(p)
 	code := exitcode.OK
 	failed := false
 	if err := supervisor.Run(p, supervisor.Options{
@@ -289,10 +290,10 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 	// zero, and that grant belongs in the profile.
 	learnAgain := false
 	if rec != nil {
-		rec.beginRound()
-		rec.observe(p, probe)
-		if rec.lastAdded > 0 && stdinIsTerminal() {
-			learnAgain = promptLearnedGrants(opts, global, rec, scratch != nil, stdout, stderr)
+		rec.BeginRound()
+		rec.Observe(p, probe)
+		if rec.LastAdded > 0 && stdinIsTerminal() {
+			learnAgain = record.PromptLearnedGrants(opts, global, rec, scratch != nil, stdout, stderr)
 		} else if failed {
 			printDenialHints(probe, scratch, home, stderr)
 		}
@@ -352,8 +353,8 @@ func profileNameList(global config.Config) []string {
 // printDenialHints reports sandbox denials logged by the kernel during a
 // failed run, with copy-pasteable policy fixes. Best-effort: it prints
 // nothing when denial logging is unsupported or kernel logs are unreadable.
-func printDenialHints(probe denialProbe, scratch *scratchState, home string, stderr io.Writer) {
-	hints := rewriteScratchPaths(probe.hints(), scratch, home)
+func printDenialHints(probe record.Probe, scratch *scratchState, home string, stderr io.Writer) {
+	hints := rewriteScratchPaths(probe.Hints(), scratch, home)
 	if len(hints) == 0 {
 		return
 	}

@@ -1,6 +1,6 @@
 //go:build linux
 
-package app
+package record
 
 import (
 	"context"
@@ -30,12 +30,12 @@ const (
 	probeSettleDelay    = 400 * time.Millisecond
 )
 
-// isDenialLoggingProbe reports whether these arguments are the internal probe.
-func isDenialLoggingProbe(args []string) bool {
+// IsDenialLoggingProbe reports whether these arguments are the internal probe.
+func IsDenialLoggingProbe(args []string) bool {
 	return len(args) == 4 && args[1] == probeDenialLoggingCommand
 }
 
-// runDenialLoggingProbe is the child side of the check. The "restrict" stage
+// RunDenialLoggingProbe is the child side of the check. The "restrict" stage
 // applies a sandbox and execs the "write" stage, which attempts the access
 // that must be denied.
 //
@@ -53,7 +53,7 @@ func isDenialLoggingProbe(args []string) bool {
 // everywhere and write nowhere keeps the probe measuring only what it was
 // asked to measure. The child writes one file in a temporary directory and
 // exits, so the breadth buys nothing that could be misused.
-func runDenialLoggingProbe(args []string, stderr io.Writer) int {
+func RunDenialLoggingProbe(args []string, stderr io.Writer) int {
 	stage, target := args[2], args[3]
 	switch stage {
 	case "restrict":

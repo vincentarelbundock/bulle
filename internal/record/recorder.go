@@ -1,4 +1,14 @@
-package app
+// Package record turns sandbox denials into profile entries.
+//
+// A run hands it the policy that was in effect and a Probe over the platform's
+// denial log; it parses what was refused (Landlock records on Linux, Seatbelt
+// on macOS), drops what the policy already granted, generalizes the rest into
+// portable entries — variables substituted, package-store roots collapsed,
+// crowded directories promoted — and offers to save them to a profile.
+//
+// It lives outside internal/app so the command layer only wires it up, and so
+// this logic can be tested without the CLI around it.
+package record
 
 import (
 	"os"
@@ -10,35 +20,35 @@ import (
 	"github.com/vincentarelbundock/bulle/internal/policy"
 )
 
-// A recorder accumulates the grants a command was denied across rounds. It is
+// A Recorder accumulates the grants a command was denied across rounds. It is
 // threaded into the ordinary run path so recording observes exactly what a
 // real run does, rather than a re-implementation of it.
-type recorder struct {
-	grants []grant
-	seen   map[grant]bool
-	// origins records which processes were denied each grant, where the
+type Recorder struct {
+	grants []Grant
+	seen   map[Grant]bool
+	// origins records which processes were denied each Grant, where the
 	// platform reports one. It annotates the output rather than filtering it.
-	origins map[grant][]string
+	origins map[Grant][]string
 	// saved marks grants already written to a profile by the save prompt.
-	saved map[grant]bool
-	// lastAdded is how many grants the most recent round contributed. Zero
+	saved map[Grant]bool
+	// LastAdded is how many grants the most recent round contributed. Zero
 	// after a round that ran is the loop's stop condition.
-	lastAdded int
-	// lastObserved is how many denials the most recent round saw at all,
+	LastAdded int
+	// LastObserved is how many denials the most recent round saw at all,
 	// before deduplication and coverage filtering. It separates the two very
 	// different ways a round can add nothing: the sandbox refused nothing, or
 	// it refused only things already granted.
-	lastObserved int
+	LastObserved int
 }
 
-func newRecorder() *recorder {
-	return &recorder{seen: map[grant]bool{}, origins: map[grant][]string{}, saved: map[grant]bool{}}
+func NewRecorder() *Recorder {
+	return &Recorder{seen: map[Grant]bool{}, origins: map[Grant][]string{}, saved: map[Grant]bool{}}
 }
 
-// unsaved returns the accumulated grants not yet written to a profile, in
+// Unsaved returns the accumulated grants not yet written to a profile, in
 // observation order.
-func (r *recorder) unsaved() []grant {
-	var out []grant
+func (r *Recorder) Unsaved() []Grant {
+	var out []Grant
 	for _, gr := range r.grants {
 		if !r.saved[gr] {
 			out = append(out, gr)
@@ -47,28 +57,28 @@ func (r *recorder) unsaved() []grant {
 	return out
 }
 
-// markSaved records that every accumulated grant has been written, so a later
+// MarkSaved records that every accumulated Grant has been written, so a later
 // prompt in the same session only shows what is new.
-func (r *recorder) markSaved() {
+func (r *Recorder) MarkSaved() {
 	for _, gr := range r.grants {
 		r.saved[gr] = true
 	}
 }
 
-// beginRound clears the per-round counter, so a round that returns before the
+// BeginRound clears the per-round counter, so a round that returns before the
 // command ever runs — an invalid policy, a missing backend — reads as having
 // learned nothing rather than inheriting the previous round's progress and
 // spinning to the cap.
-func (r *recorder) beginRound() { r.lastAdded, r.lastObserved = 0, 0 }
+func (r *Recorder) BeginRound() { r.LastAdded, r.LastObserved = 0, 0 }
 
 // observe collects the denials of one round, dropping those the round's own
 // policy already granted, and reports how many were new. Zero means the round
 // learned nothing: either the command succeeded, or it is failing for a reason
-// no grant will fix.
-func (r *recorder) observe(p policy.Policy, probe denialProbe) int {
+// no Grant will fix.
+func (r *Recorder) Observe(p policy.Policy, probe Probe) int {
 	added := 0
-	all := probe.grants()
-	r.lastObserved = len(all)
+	all := probe.Grants()
+	r.LastObserved = len(all)
 	for _, observed := range filterCoveredGrants(all, p) {
 		gr := observed.Grant
 		if isProbeArtifact(gr.Path) {
@@ -82,14 +92,14 @@ func (r *recorder) observe(p policy.Policy, probe denialProbe) int {
 		r.grants = append(r.grants, gr)
 		added++
 	}
-	r.lastAdded = added
+	r.LastAdded = added
 	return added
 }
 
-// noteOrigin records a process that was denied a grant, keeping the list
-// deduplicated and ordered by first sighting. A grant can be hit by several
+// noteOrigin records a process that was denied a Grant, keeping the list
+// deduplicated and ordered by first sighting. A Grant can be hit by several
 // processes across rounds, and all of them are worth showing.
-func (r *recorder) noteOrigin(gr grant, origin string) {
+func (r *Recorder) noteOrigin(gr Grant, origin string) {
 	if origin == "" {
 		return
 	}
@@ -111,7 +121,7 @@ const probeDirPrefix = "bulle-probe-"
 // The probe deliberately triggers a denial moments before the first round, and
 // journalctl filters by whole seconds, so its record routinely lands inside
 // round one's window. Without this the first recorded profile of every session
-// would grant write access to a temporary file that no longer exists.
+// would Grant write access to a temporary file that no longer exists.
 func isProbeArtifact(path string) bool {
 	dir := filepath.Dir(path)
 	if !strings.HasPrefix(filepath.Base(dir), probeDirPrefix) {

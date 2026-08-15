@@ -1,6 +1,6 @@
 //go:build darwin
 
-package app
+package record
 
 import (
 	"context"
@@ -17,33 +17,33 @@ import (
 // command, so the wait buys actionable hints.
 const denialLogTimeout = 8 * time.Second
 
-type denialProbe struct {
+type Probe struct {
 	start   time.Time
 	enabled bool
 }
 
-// startDenialProbe records when the sandboxed command starts so only this
+// StartProbe records when the sandboxed command starts so only this
 // run's Seatbelt violations are reported afterwards. macOS logs sandbox
 // denials to the unified log unconditionally, so no capability probing is
 // needed.
-func startDenialProbe(p policy.Policy) denialProbe {
+func StartProbe(p policy.Policy) Probe {
 	if p.Backend != policy.BackendMacOSSeatbelt {
-		return denialProbe{}
+		return Probe{}
 	}
-	return denialProbe{start: time.Now(), enabled: true}
+	return Probe{start: time.Now(), enabled: true}
 }
 
 // hints returns copy-pasteable suggestions for sandbox denials logged since
 // the probe started, or nil when the log is unreadable or shows no denials.
 // Best-effort: violation records are written asynchronously, so denials from
 // the very end of a run can be missed.
-func (probe denialProbe) hints() []string {
+func (probe Probe) Hints() []string {
 	home, _ := os.UserHomeDir()
 	return seatbeltHints(probe.records(), home)
 }
 
 // records returns the Seatbelt violations logged since the probe started.
-func (probe denialProbe) records() []seatbeltDenial {
+func (probe Probe) records() []seatbeltDenial {
 	if !probe.enabled {
 		return nil
 	}
@@ -62,11 +62,11 @@ func (probe denialProbe) records() []seatbeltDenial {
 
 // grants returns the same violations as the policy entries that would allow
 // them, for profile recording.
-func (probe denialProbe) grants() []observedGrant {
+func (probe Probe) Grants() []ObservedGrant {
 	return grantsForSeatbeltDenials(probe.records())
 }
 
-// recordingSupported reports whether this machine can record a profile.
+// Supported reports whether this machine can record a profile.
 //
 // The check is weaker than the Linux one, and deliberately so. There, a
 // deliberately triggered denial is confirmed to reach the log, because a kernel
@@ -81,7 +81,7 @@ func (probe denialProbe) grants() []observedGrant {
 // cannot be traced back to this run's process group. Rather than guess — a
 // filter by process name would drop real grants from a command's helpers —
 // recording keeps the process name on each entry and says so in the output.
-func recordingSupported() (string, bool) {
+func Supported() (string, bool) {
 	if policy.RuntimeDefaultBackend() != policy.BackendMacOSSeatbelt {
 		return "recording needs the Seatbelt backend", false
 	}

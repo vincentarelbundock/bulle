@@ -1,6 +1,6 @@
 //go:build linux
 
-package app
+package record
 
 import (
 	"context"
@@ -68,24 +68,24 @@ func readKernelLog(since time.Time) (lines []string, viaDmesg bool) {
 	return nil, false
 }
 
-type denialProbe struct {
+type Probe struct {
 	start       time.Time
 	startUptime float64
 	enabled     bool
 }
 
-// startDenialProbe records where the kernel log ends before the sandboxed
+// StartProbe records where the kernel log ends before the sandboxed
 // command runs, so only this run's denials are reported afterwards.
-func startDenialProbe(p policy.Policy) denialProbe {
+func StartProbe(p policy.Policy) Probe {
 	if p.Backend != policy.BackendLinuxLandlock || !denialLogSupported() {
-		return denialProbe{}
+		return Probe{}
 	}
-	return denialProbe{start: time.Now(), startUptime: currentUptime(), enabled: true}
+	return Probe{start: time.Now(), startUptime: currentUptime(), enabled: true}
 }
 
 // records returns the denial records the kernel logged since the probe
 // started, or nil when logs are unavailable or show no denials.
-func (probe denialProbe) records() []landlockDenial {
+func (probe Probe) records() []landlockDenial {
 	if !probe.enabled {
 		return nil
 	}
@@ -102,22 +102,22 @@ func (probe denialProbe) records() []landlockDenial {
 
 // hints returns copy-pasteable suggestions for sandbox denials logged since
 // the probe started, or nil when logs are unavailable or show no denials.
-func (probe denialProbe) hints() []string {
+func (probe Probe) Hints() []string {
 	home, _ := os.UserHomeDir()
 	return denialHints(probe.records(), home)
 }
 
 // grants returns the same denials as the policy entries that would allow
 // them, for profile recording.
-func (probe denialProbe) grants() []observedGrant {
+func (probe Probe) Grants() []ObservedGrant {
 	return grantsForDenials(probe.records())
 }
 
-// recordingSupported reports whether this machine can record a profile, and
+// Supported reports whether this machine can record a profile, and
 // why not when it cannot. Recording reads back what the sandbox refused, so
 // without denial logging it would converge instantly on an empty profile that
 // looks like success — worth refusing up front rather than discovering later.
-func recordingSupported() (string, bool) {
+func Supported() (string, bool) {
 	if policy.RuntimeDefaultBackend() != policy.BackendLinuxLandlock {
 		return "recording needs the Landlock backend", false
 	}
