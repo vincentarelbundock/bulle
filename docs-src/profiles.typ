@@ -85,6 +85,7 @@ codex
 default
 git
 go
+gui
 keychain
 latex
 macos-certs

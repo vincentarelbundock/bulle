@@ -23,6 +23,11 @@
   - The real limitation is attribution, and it is structural. The unified log reports violations from every sandboxed process, and a violation names an exited pid, so it cannot be tied to the run's process group. Recording annotates each entry with the denied process rather than guessing — filtering by name would drop a command's helpers.
   - **Unverified on real hardware.** Written and cross-compiled on Linux; needs a run on a Mac before the macOS path is trusted.
 
+- [ ] Give the `gui` profile a working macOS half.
+  - The Linux half (display socket, `/dev/dri`, shader caches, fontconfig) has no macOS analogue: a process reaches the window server over Mach IPC, so it needs `mach_lookup` entries, not paths.
+  - The profile currently ships only the macOS font directories. The window-server service list was deliberately not guessed — a wrong list looks like support and fails, and mach-lookup denials are filtered out of denial hints, so the failure is silent.
+  - Needs a Mac: determine the minimum service set for a CLI-launched graphical binary, and decide whether mach-lookup denials should be reported when a profile declares `mach_lookup` (currently they are always dropped as noise).
+
 - [ ] Consider `(trace)` with `sandbox-simplify` as a second macOS source.
   - Would give per-run attribution the unified log cannot, at the cost of a separate mechanism and output format.
 

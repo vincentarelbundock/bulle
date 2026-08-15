@@ -164,6 +164,23 @@ func grantSuggestionPath(path string) string {
 	return path
 }
 
+// isPackageStoreRoot reports whether a path is a package's own root inside a
+// content-addressed store — /nix/store/<item>, /opt/homebrew/Cellar/<name>/<v>
+// — rather than something below it.
+//
+// These are exactly the paths grantSuggestionPath produces when it collapses a
+// denial inside a store, and they must never be merged upward: their parent is
+// the store itself, and granting that hands over every package on the machine.
+func isPackageStoreRoot(path string) bool {
+	for _, root := range storeGrantRoots {
+		if !strings.HasPrefix(path, root.prefix) {
+			continue
+		}
+		return len(strings.Split(strings.TrimPrefix(path, "/"), "/")) == root.components
+	}
+	return false
+}
+
 // procGrantPath reports whether a denied path is a per-process /proc entry
 // such as /proc/1234/cgroup.
 //

@@ -93,6 +93,15 @@ func addPlatformDirVars(vars bpaths.Vars, home string, parentEnv map[string]stri
 	vars["XDG_DATA_HOME"] = vars["DATA"]
 	vars["XDG_CACHE_HOME"] = vars["CACHE"]
 	vars["XDG_STATE_HOME"] = vars["STATE"]
+	// The runtime directory holds the sockets a desktop session is reached
+	// through — the Wayland compositor's above all — so a profile that cannot
+	// name it has to hardcode /run/user/<uid> and stops being portable. It
+	// gets no fallback: unlike the other XDG directories there is no sensible
+	// default under $HOME, and inventing one would produce a path that exists
+	// nowhere. A profile referencing it should mark the entry optional.
+	if value, err := safeVarPath(parentEnv["XDG_RUNTIME_DIR"], home); err == nil {
+		vars["XDG_RUNTIME_DIR"] = value
+	}
 }
 
 func validateVarName(name string) error {

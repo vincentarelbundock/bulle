@@ -175,3 +175,20 @@ func TestRecorderDeduplicatesGrantsButAccumulatesOrigins(t *testing.T) {
 		t.Errorf("origins = %v, want [mytool helper]", got)
 	}
 }
+
+func TestStallExplanationDistinguishesNoDenialsFromCoveredOnes(t *testing.T) {
+	// No denials at all: the sandbox is not what failed, and the environment
+	// is the usual culprit — something recording cannot discover.
+	none := strings.Join(stallExplanation(0), " ")
+	if !strings.Contains(none, "environment variable") || !strings.Contains(none, "--env") {
+		t.Errorf("zero-denial stall does not point at the environment: %q", none)
+	}
+	// Denials seen but all covered: a different problem entirely.
+	covered := strings.Join(stallExplanation(3), " ")
+	if strings.Contains(covered, "environment variable") {
+		t.Errorf("covered-denial stall blames the environment: %q", covered)
+	}
+	if !strings.Contains(covered, "already granted") {
+		t.Errorf("covered-denial stall does not explain itself: %q", covered)
+	}
+}

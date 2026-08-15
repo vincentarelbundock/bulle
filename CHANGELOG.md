@@ -34,6 +34,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   entry is optional, because a path this machine has is not one the next
   machine has. Clusters of denied siblings collapse into a directory grant. A
   denial on a variable root never becomes a grant on that root.
+- **Clusters collapse at any depth, and never into a package store.** Two
+  fixes found by recording a real graphical application. A cluster of package
+  roots used to merge into a grant on the whole store — `/nix/store` — undoing
+  the per-package collapse that produced them; store roots are now never merged
+  upward. And a content-addressed cache spreads one file per fanout directory,
+  so grouping by immediate parent found nothing and recorded dozens of hashes
+  that will never recur; promotion now considers ancestors at any depth and
+  picks the deepest directory covering a cluster. A final pass drops entries
+  another grant already covers, at an access level at least as strong.
+- **A stall says where to look.** When a round adds nothing and the command
+  still fails, recording distinguishes the two cases. If the sandbox refused
+  nothing at all, the failure is not about access, and the usual cause is a
+  missing environment variable — bulle passes only what the profile's `env`
+  list names, and recording cannot discover that, since nothing is logged when
+  a variable is simply absent. If denials were seen but all were already
+  granted, the command's own error is the thing to read.
 - **The output says what it proves.** A denial aborts the operation that hit
   it, so a recording is evidence that one run of one command needed these
   grants, not that they are sufficient; the emitted header says so, and says
@@ -42,6 +58,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   kernel log — a kernel can advertise Landlock audit support with auditing
   disabled, and recording would otherwise converge instantly on an empty
   profile that reads exactly like success.
+
+#### Graphical applications
+
+- **A `gui` profile.** Graphical programs need a display connection before they
+  need anything else: the session's environment variables, the compositor
+  socket under `$XDG_RUNTIME_DIR`, `/tmp/.X11-unix` for X11 and XWayland,
+  `/dev/dri` and `/dev/shm` for rendering, fontconfig's configuration, and
+  writable shader and font caches. On macOS the profile carries only the font
+  directories: a process there reaches the window server over Mach IPC, and the
+  service list was deliberately not guessed, since a wrong one would look like
+  support and fail silently — mach-lookup denials are filtered out of denial
+  hints as noise.
+- **`$XDG_RUNTIME_DIR` is available to profiles.** The desktop session's
+  sockets live there, so without it a graphical profile has to hardcode
+  `/run/user/<uid>` and stops being portable. It has no fallback, unlike the
+  other XDG variables: there is no sensible default under `$HOME`, so entries
+  referring to it should be optional.
+- **Some font locations cannot be written down.** Distributions that assemble
+  `/etc` from a package store reach fontconfig's configuration through symlinks
+  a directory grant does not follow, which the profile handles by globbing; but
+  NixOS also writes absolute store paths for each font package into its
+  generated fontconfig files, and those hashes differ per machine. Record the
+  set for yours: `bulle record --profile gui -- <app>`. A denied font tree is
+  not fatal — text renders in the wrong typeface — so it is easy to miss.
 
 #### Resource limits
 

@@ -54,6 +54,40 @@ exactly the mistake this warning exists to prevent. Treat the output as a first
 draft that ran once, and read every line before installing it. The emitted
 profile repeats this in its own header, so it travels with the file.
 
+== What recording cannot see
+
+Recording discovers _paths_. It cannot discover environment variables, and the
+difference matters more often than it sounds.
+
+`bulle` passes only the variables a profile's `env` list names. A command that
+needs one it does not have --- `DISPLAY` for a graphical program, `HOME` for a
+toolchain that keeps a cache there --- fails at startup, and the kernel logs
+nothing, because nothing was denied. There is no record for recording to read.
+
+This is the most common way a recording comes back empty:
+
+```text
+$ bulle record -p tool -- mygui
+bulle: record: round 1
+mygui: neither WAYLAND_DISPLAY nor DISPLAY is set
+bulle: record: round 1 added no grants but the command still failed with exit 1
+bulle: record: no grant will fix that; recording what was learned so far
+bulle: record: the sandbox refused nothing this round, so the failure is not about access
+bulle: record: a command that fails without any denial is most often missing an environment variable:
+bulle: record: bulle passes only what the profile's env list names, and recording cannot discover that
+bulle: record: if the command needs one, add it and record again (e.g. --env DISPLAY)
+```
+
+Add the variables the command needs, then record again. Everything after the
+base profile is an ordinary run, so they go on the same line:
+
+```bash
+bulle record -p tool -- --env DISPLAY --env WAYLAND_DISPLAY -- mygui
+```
+
+Once the command gets past its startup checks, recording can do its job on the
+paths behind them.
+
 = Usage
 
 ```text

@@ -1,0 +1,90 @@
+title = "GUI"
+description = "graphical session access: Wayland or X11 display, GPU, and fonts"
+inherits = ["tool"]
+# A graphical program fails before it touches the filesystem if it cannot find
+# the session, and no denial is logged for a variable that is simply absent, so
+# these come first. XDG_SESSION_TYPE and XCURSOR_* are read by toolkits to pick
+# a backend and a cursor theme; without them the program still starts, but with
+# the wrong backend or an invisible pointer.
+env = [
+  "WAYLAND_DISPLAY",
+  "DISPLAY",
+  "XAUTHORITY",
+  "XDG_RUNTIME_DIR",
+  "XDG_SESSION_TYPE",
+  "XCURSOR_THEME",
+  "XCURSOR_SIZE",
+]
+ro = [
+  # Fontconfig's configuration, and the font trees it points at. The user
+  # directories are where a locally installed font lands.
+  "?/etc/fonts",
+  # On distributions that assemble /etc from a package store (NixOS, Guix),
+  # every file here is a symlink into the store and a grant on the directory
+  # does not reach the target. Globbing resolves each entry, and bulle grants
+  # a resolved symlink alongside the link itself.
+  "?/etc/fonts/fonts.conf",
+  "?/etc/fonts/conf.d/*.conf",
+  "?$DATA/fonts",
+  "?$CONFIG/fontconfig",
+  "?$HOME/.fonts",
+  "?/usr/share/fonts",
+  "?/usr/local/share/fonts",
+  "?/run/current-system/sw/share/fonts",
+  "?/run/current-system/sw/share/X11/fonts",
+  # Fonts themselves are not always reachable by a portable path. NixOS writes
+  # absolute store paths for every font package into its generated fontconfig
+  # files, and those hashes differ on every machine, so no entry here can name
+  # them. A denial on a font tree is not fatal — fontconfig falls back and text
+  # still renders, in the wrong typeface — which is why it is easy to miss.
+  # Record the set for your machine and inherit from this profile:
+  #   bulle record --profile gui --out ~/.config/bulle/profiles/mygui.toml -- <app>
+  # Mesa and Vulkan enumerate devices and drivers through sysfs and these
+  # manifests. A denial here does not fail the program: it silently falls back
+  # to software rendering, which is why they are worth granting explicitly.
+  "?/sys/devices",
+  "?/sys/class/drm",
+  "?/sys/dev/char",
+  "?/usr/share/vulkan",
+  "?/usr/share/glvnd",
+  "?/etc/drirc",
+  "?$CONFIG/drirc",
+]
+rw = [
+  # The compositor socket. WAYLAND_DISPLAY names it, and it is usually a bare
+  # socket name inside the runtime directory rather than a path; granting the
+  # directory covers both spellings, and the lock file beside it.
+  "?$XDG_RUNTIME_DIR/",
+  # XWayland and plain X11 both reach the server through this directory.
+  "?/tmp/.X11-unix",
+  # Direct rendering nodes, plus the shared-memory and buffer-sharing paths
+  # every GPU client uses to hand buffers to the compositor.
+  "?/dev/dri",
+  "?/dev/shm",
+  "?/dev/udmabuf",
+  # Shader and font caches are written on first use and read afterwards. A
+  # read-only grant makes every run pay the compile cost again.
+  "?+$CACHE/mesa_shader_cache/",
+  "?+$CACHE/fontconfig/",
+  "?+$CACHE/radv_builtin_shaders",
+]
+
+# macOS shares almost none of the above. There is no DISPLAY, no compositor
+# socket, and no /dev/dri: a process reaches the window server over Mach IPC,
+# so the equivalent of the Wayland grant is a mach_lookup entry rather than a
+# path, and the environment variables in this profile mean nothing outside
+# XQuartz. What is listed here is the part that is the same everywhere — where
+# fonts live — which is also what a headless tool that renders text needs.
+#
+# Window server access is deliberately absent rather than guessed. Getting the
+# service list wrong would produce a profile that looks like it supports
+# graphical apps and does not, and denied mach-lookups are filtered out of
+# bulle's denial hints (they are too noisy to report), so the failure would be
+# silent. It needs to be worked out on a Mac; see TODO.md.
+[macos]
+ro = [
+  "?/System/Library/Fonts",
+  "?/Library/Fonts",
+  "?$HOME/Library/Fonts",
+  "?$HOME/Library/Preferences/com.apple.HIToolbox.plist",
+]

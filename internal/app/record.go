@@ -35,6 +35,11 @@ type recorder struct {
 	// lastAdded is how many grants the most recent round contributed. Zero
 	// after a round that ran is the loop's stop condition.
 	lastAdded int
+	// lastObserved is how many denials the most recent round saw at all,
+	// before deduplication and coverage filtering. It separates the two very
+	// different ways a round can add nothing: the sandbox refused nothing, or
+	// it refused only things already granted.
+	lastObserved int
 }
 
 func newRecorder() *recorder {
@@ -45,7 +50,7 @@ func newRecorder() *recorder {
 // command ever runs — an invalid policy, a missing backend — reads as having
 // learned nothing rather than inheriting the previous round's progress and
 // spinning to the cap.
-func (r *recorder) beginRound() { r.lastAdded = 0 }
+func (r *recorder) beginRound() { r.lastAdded, r.lastObserved = 0, 0 }
 
 // observe collects the denials of one round, dropping those the round's own
 // policy already granted, and reports how many were new. Zero means the round
@@ -53,7 +58,9 @@ func (r *recorder) beginRound() { r.lastAdded = 0 }
 // no grant will fix.
 func (r *recorder) observe(p policy.Policy, probe denialProbe) int {
 	added := 0
-	for _, observed := range filterCoveredGrants(probe.grants(), p) {
+	all := probe.grants()
+	r.lastObserved = len(all)
+	for _, observed := range filterCoveredGrants(all, p) {
 		gr := observed.Grant
 		if isProbeArtifact(gr.Path) {
 			continue
@@ -160,6 +167,9 @@ func runRecordCommand(argv0 string, args []string, stdout io.Writer, stderr io.W
 			stalled = true
 			fmt.Fprintf(stderr, "bulle: record: round %d added no grants but the command still failed with exit %d\n", rounds, exit)
 			fmt.Fprintln(stderr, "bulle: record: no grant will fix that; recording what was learned so far")
+			for _, line := range stallExplanation(rec.lastObserved) {
+				fmt.Fprintf(stderr, "bulle: record: %s\n", line)
+			}
 		default:
 			fmt.Fprintf(stderr, "bulle: record: %d new grant(s); retrying\n", added)
 		}
@@ -189,6 +199,34 @@ func runRecordCommand(argv0 string, args []string, stdout io.Writer, stderr io.W
 	// not, so the exit code reports the recording. The header says what the
 	// command did.
 	return ExitOK
+}
+
+// stallExplanation suggests where to look when a round adds nothing and the
+// command still fails.
+//
+// The distinction is worth drawing because the two cases point in opposite
+// directions. When the sandbox refused nothing at all, the failure is not about
+// access, and in practice it is usually the environment: bulle passes only the
+// variables a profile lists, so a command that needs DISPLAY, HOME, or a
+// toolchain variable fails with no denial to observe. Recording cannot discover
+// those — nothing is logged when a variable is simply absent — so naming the
+// possibility is the most the tool can honestly do.
+//
+// When denials were seen but every one was already granted, the sandbox is not
+// what is failing, and the command's own error message is the thing to read.
+func stallExplanation(observed int) []string {
+	if observed == 0 {
+		return []string{
+			"the sandbox refused nothing this round, so the failure is not about access",
+			"a command that fails without any denial is most often missing an environment variable:",
+			"bulle passes only what the profile's env list names, and recording cannot discover that",
+			"if the command needs one, add it and record again (e.g. --env DISPLAY)",
+		}
+	}
+	return []string{
+		"every denial this round was already granted, so the sandbox is not what is failing",
+		"read the command's own error above",
+	}
 }
 
 // withGrantFlags inserts the accumulated grants ahead of the run arguments.
@@ -272,7 +310,7 @@ func buildRecordedProfile(opts recordOptions, rec *recorder, outcome recordOutco
 		entry.Comment = appendOrigins(entry.Comment, rec.origins[gr])
 		entries = append(entries, entry)
 	}
-	entries = promoteDirectories(mergeEntries(entries))
+	entries = finalizeEntries(entries)
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Recorded by bulle %s on %s.\n", Version, time.Now().Format("2006-01-02"))

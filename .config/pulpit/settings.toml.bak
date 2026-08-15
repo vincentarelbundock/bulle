@@ -1,0 +1,230 @@
+schema = 2
+recent = []
+
+[display]
+hotplug = "automatic"
+settle_ms = 250
+poll_ms = 1000
+inhibit_screensaver = true
+blank_color = "black"
+
+[display.roles]
+presenter = "Auto"
+audience = "Auto"
+audience_fullscreen = true
+allow_shared_display = false
+
+[rendering]
+workers = 6
+cache_budget_mib = 256
+coarse_width = 640
+worker_deadline_secs = 10
+watch_document = true
+watch_debounce_ms = 300
+
+[notes]
+default_mapping = "SlidesOnly"
+honour_metadata_contract = false
+detect_split = true
+per_document = []
+
+[timer]
+count_down = false
+start_on_first_navigation = true
+alarms = []
+snooze_minutes = 5
+
+[keymap]
+bindings = [
+    [
+    { kind = "named", key = "Right" },
+    "next",
+],
+    [
+    { kind = "named", key = "Down" },
+    "next",
+],
+    [
+    { kind = "named", key = "Space" },
+    "next",
+],
+    [
+    { kind = "named", key = "PageDown" },
+    "next",
+],
+    [
+    { kind = "named", key = "Enter" },
+    "next",
+],
+    [
+    { kind = "named", key = "Left" },
+    "previous",
+],
+    [
+    { kind = "named", key = "Up" },
+    "previous",
+],
+    [
+    { kind = "named", key = "PageUp" },
+    "previous",
+],
+    [
+    { kind = "named", key = "Backspace" },
+    "previous",
+],
+    [
+    { kind = "named", key = "Home" },
+    "first",
+],
+    [
+    { kind = "named", key = "End" },
+    "last",
+],
+    [
+    { kind = "named", key = "Tab" },
+    "preview-next",
+],
+    [
+    { kind = "named", key = "ShiftTab" },
+    "preview-previous",
+],
+    [
+    { kind = "named", key = "Return" },
+    "commit-preview",
+],
+    [
+    { kind = "named", key = "Escape" },
+    "cancel-preview",
+],
+    [
+    { kind = "named", key = "b" },
+    "blank",
+],
+    [
+    { kind = "named", key = "w" },
+    "blank-alternate",
+],
+    [
+    { kind = "named", key = "p" },
+    "toggle-timer",
+],
+    [
+    { kind = "named", key = "r" },
+    "reset-timer",
+],
+    [
+    { kind = "named", key = "s" },
+    "swap-displays",
+],
+    [
+    { kind = "named", key = "f" },
+    "toggle-audience-fullscreen",
+],
+    [
+    { kind = "named", key = "o" },
+    "open-document",
+],
+    [
+    { kind = "named", key = "F5" },
+    "reload-document",
+],
+    [
+    { kind = "named", key = "j" },
+    "show-overview",
+],
+    [
+    { kind = "named", key = "1" },
+    "annotate-ink",
+],
+    [
+    { kind = "named", key = "2" },
+    "annotate-highlighter",
+],
+    [
+    { kind = "named", key = "3" },
+    "annotate-eraser",
+],
+    [
+    { kind = "named", key = "4" },
+    "annotate-pointer",
+],
+    [
+    { kind = "named", key = "z" },
+    "undo-annotation",
+],
+    [
+    { kind = "named", key = "ShiftZ" },
+    "redo-annotation",
+],
+    [
+    { kind = "named", key = "c" },
+    "clear-annotations",
+],
+    [
+    { kind = "named", key = "v" },
+    "toggle-annotation-audience",
+],
+    [
+    { kind = "named", key = "l" },
+    "focus-next-link",
+],
+    [
+    { kind = "named", key = "k" },
+    "focus-previous-link",
+],
+    [
+    { kind = "named", key = "q" },
+    "quit",
+],
+    [
+    { kind = "named", key = "F1" },
+    "blank",
+],
+    [
+    { kind = "named", key = "Escape" },
+    "cancel-preview",
+],
+    [
+    { kind = "named", key = "MediaPlayPause" },
+    "blank",
+],
+    [
+    { kind = "named", key = "MediaTrackNext" },
+    "next",
+],
+    [
+    { kind = "named", key = "MediaTrackPrevious" },
+    "previous",
+],
+    [
+    { kind = "named", key = "BrowserForward" },
+    "next",
+],
+    [
+    { kind = "named", key = "BrowserBack" },
+    "previous",
+],
+    [
+    { kind = "named", key = "AudioVolumeUp" },
+    "next",
+],
+    [
+    { kind = "named", key = "AudioVolumeDown" },
+    "previous",
+],
+]
+
+[diagnostics]
+persistent_log = true
+level = "info"
+
+[layout]
+ratio_notice_dismissed = false
+
+[appearance]
+appearance = "system"
+motion = "system"
+
+[appearance.colors.light]
+
+[appearance.colors.dark]

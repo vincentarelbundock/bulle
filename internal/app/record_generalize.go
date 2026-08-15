@@ -274,6 +274,53 @@ func mergeEntries(entries []recordedEntry) []recordedEntry {
 	return out
 }
 
+// finalizeEntries turns the per-denial entries into the set a profile should
+// contain: duplicates merged, clusters promoted to directory grants, then
+// merged and pruned again.
+//
+// The second pass is not redundant. Promotion works within one access list at
+// a time, so a directory denied both read and write comes out of it twice, and
+// a cluster promoted deep can end up inside a directory promoted shallower —
+// both of which are entries covered by another entry in the same output.
+func finalizeEntries(entries []recordedEntry) []recordedEntry {
+	entries = promoteDirectories(mergeEntries(entries))
+	return dropCoveredEntries(mergeEntries(entries))
+}
+
+// dropCoveredEntries removes entries another directory grant already covers,
+// at an access level at least as strong.
+//
+// Only entries written as directories (a trailing slash, which promotion adds)
+// count as covering. A plain path may well be a directory on this machine, but
+// assuming so would drop entries on the strength of a guess about a filesystem
+// the profile may never run on; leaving a redundant entry is harmless, dropping
+// a needed one is not.
+func dropCoveredEntries(entries []recordedEntry) []recordedEntry {
+	out := make([]recordedEntry, 0, len(entries))
+	for _, e := range entries {
+		if !coveredByAnother(e, entries) {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+func coveredByAnother(e recordedEntry, entries []recordedEntry) bool {
+	for _, other := range entries {
+		if other.Entry == e.Entry || !strings.HasSuffix(other.Entry, "/") {
+			continue
+		}
+		if !strings.HasPrefix(e.Entry, other.Entry) {
+			continue
+		}
+		// The covering grant must permit everything this entry asks for.
+		if accessForList(e.List)&^accessForList(other.List) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // promotionThreshold is how many sibling entries in one directory justify
 // granting the directory instead. Two is a coincidence; three is a pattern,
 // and a tool that touched three files in a directory will touch a fourth.
@@ -285,28 +332,56 @@ const promotionThreshold = 3
 // variable or root it sits under — a cluster directly inside $HOME or $CACHE
 // promotes to nothing.
 func promoteDirectories(entries []recordedEntry) []recordedEntry {
-	groups := map[string][]int{}
+	// Every ancestor of every promotable entry is a candidate, not just the
+	// immediate parent. Content-addressed caches fan out over subdirectories
+	// holding one file each — a Mesa shader cache writes
+	// $CACHE/mesa_shader_cache/0d/<hash> — so grouping by parent alone finds
+	// nothing to merge and records a pile of paths that will never recur.
+	members := map[string][]int{}
 	for i, e := range entries {
 		if !promotableEntry(e) {
 			continue
 		}
-		key := e.List + "\x00" + parentEntry(e.Entry)
-		groups[key] = append(groups[key], i)
+		for _, ancestor := range ancestorEntries(e.Entry) {
+			key := e.List + "\x00" + ancestor
+			members[key] = append(members[key], i)
+		}
 	}
+	candidates := make([]string, 0, len(members))
+	for key := range members {
+		candidates = append(candidates, key)
+	}
+	// Deepest first, so the most specific directory that covers a cluster
+	// wins and a shallower one never swallows it. Equal depths are ordered by
+	// name to keep the result deterministic.
+	sort.Slice(candidates, func(i, j int) bool {
+		di, dj := strings.Count(candidates[i], "/"), strings.Count(candidates[j], "/")
+		if di != dj {
+			return di > dj
+		}
+		return candidates[i] < candidates[j]
+	})
+
 	dropped := map[int]bool{}
 	var promoted []recordedEntry
-	for key, members := range groups {
-		if len(members) < promotionThreshold {
+	for _, key := range candidates {
+		remaining := 0
+		for _, i := range members[key] {
+			if !dropped[i] {
+				remaining++
+			}
+		}
+		if remaining < promotionThreshold {
 			continue
 		}
-		list, parent, _ := strings.Cut(key, "\x00")
-		for _, i := range members {
+		list, dir, _ := strings.Cut(key, "\x00")
+		for _, i := range members[key] {
 			dropped[i] = true
 		}
 		promoted = append(promoted, recordedEntry{
 			List:    list,
-			Entry:   parent + "/",
-			Comment: "directory grant for " + strconv.Itoa(len(members)) + " files denied inside it",
+			Entry:   dir + "/",
+			Comment: "directory grant for " + strconv.Itoa(remaining) + " files denied inside it",
 		})
 	}
 	out := make([]recordedEntry, 0, len(entries))
@@ -329,18 +404,44 @@ func promotableEntry(e recordedEntry) bool {
 	if e.Entry == "" || strings.HasSuffix(e.Entry, "/") || bpaths.IsResolverEntry(e.Entry) {
 		return false
 	}
-	parent := parentEntry(e.Entry)
-	if parent == "" {
+	// A package root's parent is the store itself. Merging several of them
+	// would replace one grant per package with a grant on every package on the
+	// machine, undoing the collapse that produced them.
+	if isPackageStoreRoot(e.Entry) {
 		return false
 	}
-	// The parent must have a component below whatever root it hangs from:
-	// "$CACHE/foo" is promotable, "$CACHE" is not; "/usr/lib/x" is, "/usr" is
-	// not.
-	rest := parent
-	if strings.HasPrefix(parent, "$") {
-		_, rest, _ = strings.Cut(parent, "/")
+	return len(ancestorEntries(e.Entry)) > 0
+}
+
+// ancestorEntries lists the directories an entry could be merged into,
+// deepest first, keeping only those that clear the safety floor.
+func ancestorEntries(entry string) []string {
+	var out []string
+	for dir := parentEntry(entry); dir != ""; dir = parentEntry(dir) {
+		if isStoreRootDirectory(dir) {
+			// Nothing above a package store root is safe either.
+			break
+		}
+		if promotableDirectory(dir) {
+			out = append(out, dir)
+		}
+	}
+	return out
+}
+
+// promotableDirectory reports whether a directory is deep enough to grant.
+// It must have a component of its own below whatever root it hangs from:
+// "$CACHE/foo" qualifies and "$CACHE" does not; "/usr/lib/x" qualifies and
+// "/usr" does not. Those roots are the trees a sandbox exists to withhold.
+func promotableDirectory(dir string) bool {
+	if dir == "" || isStoreRootDirectory(dir) {
+		return false
+	}
+	var rest string
+	if strings.HasPrefix(dir, "$") {
+		_, rest, _ = strings.Cut(dir, "/")
 	} else {
-		rest = strings.TrimPrefix(parent, "/")
+		rest = strings.TrimPrefix(dir, "/")
 		if i := strings.Index(rest, "/"); i >= 0 {
 			rest = rest[i+1:]
 		} else {
@@ -348,6 +449,20 @@ func promotableEntry(e recordedEntry) bool {
 		}
 	}
 	return rest != ""
+}
+
+// isStoreRootDirectory reports whether a path is the root of a package store
+// (/nix/store, /opt/homebrew/Cellar). Promoting into one is never right: it
+// grants every package installed on the machine, whatever the entries below it
+// happened to be.
+func isStoreRootDirectory(path string) bool {
+	clean := strings.TrimSuffix(path, "/")
+	for _, root := range storeGrantRoots {
+		if clean == strings.TrimSuffix(root.prefix, "/") {
+			return true
+		}
+	}
+	return false
 }
 
 func parentEntry(entry string) string {

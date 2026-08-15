@@ -255,3 +255,164 @@ func TestGeneralizeExplainsAWholeProcGrant(t *testing.T) {
 		t.Errorf("comment does not state the tradeoff: %q", got.Comment)
 	}
 }
+
+func TestPromoteDirectoriesNeverGrantsAWholePackageStore(t *testing.T) {
+	// Each of these is a package root produced by the store collapse. Merging
+	// them would replace three package grants with a grant on every package on
+	// the machine — the exact opposite of what the collapse is for.
+	entries := promoteDirectories([]recordedEntry{
+		{List: "ro", Entry: "/nix/store/aaa-openblas-0.3"},
+		{List: "ro", Entry: "/nix/store/bbb-lapack-3"},
+		{List: "ro", Entry: "/nix/store/ccc-glibc-2.42"},
+	})
+	if len(entries) != 3 {
+		t.Fatalf("entries = %+v, want the three package roots kept", entries)
+	}
+	for _, e := range entries {
+		if e.Entry == "/nix/store/" || e.Entry == "/nix/store" {
+			t.Fatalf("promoted to the whole store: %+v", entries)
+		}
+	}
+
+	// Same for Homebrew, whose package root sits deeper.
+	entries = promoteDirectories([]recordedEntry{
+		{List: "ro", Entry: "/opt/homebrew/Cellar/r/4.5.0"},
+		{List: "ro", Entry: "/opt/homebrew/Cellar/r/4.4.0"},
+		{List: "ro", Entry: "/opt/homebrew/Cellar/r/4.3.0"},
+	})
+	for _, e := range entries {
+		if strings.HasSuffix(e.Entry, "Cellar/r/") || strings.HasSuffix(e.Entry, "Cellar/") {
+			t.Fatalf("promoted above a package root: %+v", entries)
+		}
+	}
+}
+
+func TestIsPackageStoreRoot(t *testing.T) {
+	cases := map[string]bool{
+		"/nix/store/abc-openblas-0.3":     true,
+		"/nix/store/abc-openblas-0.3/lib": false,
+		"/nix/store":                      false,
+		"/opt/homebrew/Cellar/r/4.5.0":    true,
+		"/opt/homebrew/Cellar/r":          false,
+		"/home/user/.cache":               false,
+	}
+	for path, want := range cases {
+		if got := isPackageStoreRoot(path); got != want {
+			t.Errorf("isPackageStoreRoot(%q) = %v, want %v", path, got, want)
+		}
+	}
+}
+
+func TestPromoteDirectoriesCollapsesFannedOutCaches(t *testing.T) {
+	// A content-addressed cache spreads one file per fanout directory, so
+	// grouping by immediate parent finds nothing. The grant that is worth
+	// writing is the cache root; the individual hashes never recur.
+	var entries []recordedEntry
+	for _, hash := range []string{"0d/aaa", "0f/bbb", "29/ccc", "3c/ddd", "5d/eee"} {
+		entries = append(entries, recordedEntry{List: "ro", Entry: "$CACHE/mesa_shader_cache/" + hash})
+	}
+	got := promoteDirectories(entries)
+	if len(got) != 1 || got[0].Entry != "$CACHE/mesa_shader_cache/" {
+		t.Fatalf("entries = %+v, want one grant on the cache root", got)
+	}
+}
+
+func TestPromoteDirectoriesPrefersTheDeepestCoveringDirectory(t *testing.T) {
+	// Two unrelated clusters under one root must not merge into that root:
+	// the deepest directory covering each cluster is the specific one.
+	entries := promoteDirectories([]recordedEntry{
+		{List: "ro", Entry: "$CACHE/alpha/a"},
+		{List: "ro", Entry: "$CACHE/alpha/b"},
+		{List: "ro", Entry: "$CACHE/alpha/c"},
+		{List: "ro", Entry: "$CACHE/beta/x"},
+		{List: "ro", Entry: "$CACHE/beta/y"},
+		{List: "ro", Entry: "$CACHE/beta/z"},
+	})
+	want := map[string]bool{"$CACHE/alpha/": true, "$CACHE/beta/": true}
+	if len(entries) != 2 {
+		t.Fatalf("entries = %+v, want two directory grants", entries)
+	}
+	for _, e := range entries {
+		if !want[e.Entry] {
+			t.Errorf("unexpected entry %q; the clusters merged too far up", e.Entry)
+		}
+	}
+}
+
+func TestPromoteDirectoriesStillRefusesToReachAVariableRoot(t *testing.T) {
+	// Enough scattered files to tempt a merge all the way to $CACHE.
+	var entries []recordedEntry
+	for _, name := range []string{"a/1", "b/1", "c/1", "d/1", "e/1"} {
+		entries = append(entries, recordedEntry{List: "ro", Entry: "$CACHE/" + name})
+	}
+	for _, e := range promoteDirectories(entries) {
+		if e.Entry == "$CACHE/" || e.Entry == "$CACHE" {
+			t.Fatalf("promoted to the variable root: %+v", e)
+		}
+	}
+}
+
+func TestFinalizeEntriesPrunesWhatAnotherGrantCovers(t *testing.T) {
+	// A cache denied both read and write, with a deeper cluster inside it.
+	// The output should be one writable directory grant.
+	var entries []recordedEntry
+	for _, name := range []string{"0d/a", "0f/b", "29/c", "3c/d"} {
+		entries = append(entries, recordedEntry{List: "ro", Entry: "$CACHE/shader/" + name})
+	}
+	for _, name := range []string{"cb/x", "cb/y", "cb/z"} {
+		entries = append(entries, recordedEntry{List: "rw", Entry: "$CACHE/shader/" + name})
+	}
+	got := finalizeEntries(entries)
+	// The write was only ever denied inside cb/, so the writable grant stays
+	// there: promoting it to the whole cache would hand out write access the
+	// run never needed.
+	byEntry := map[string]string{}
+	for _, e := range got {
+		byEntry[e.Entry] = e.List
+	}
+	if byEntry["$CACHE/shader/"] != "ro" || byEntry["$CACHE/shader/cb/"] != "rw" {
+		t.Fatalf("entries = %+v, want ro on the cache and rw only on cb/", got)
+	}
+	if len(got) != 2 {
+		t.Errorf("entries = %+v, want exactly the two grants", got)
+	}
+}
+
+func TestFinalizeEntriesMergesADirectoryPromotedInTwoLists(t *testing.T) {
+	// What a real recording produced: the same cache denied read and write,
+	// promoted once per list, plus a read cluster in a subdirectory. The two
+	// promotions are the same directory and must merge, after which the
+	// subdirectory grant is redundant.
+	var entries []recordedEntry
+	for _, name := range []string{"0d/a", "0f/b", "29/c"} {
+		entries = append(entries, recordedEntry{List: "ro", Entry: "$CACHE/shader/" + name})
+		entries = append(entries, recordedEntry{List: "rw", Entry: "$CACHE/shader/" + name})
+	}
+	for _, name := range []string{"cb/x", "cb/y", "cb/z"} {
+		entries = append(entries, recordedEntry{List: "ro", Entry: "$CACHE/shader/" + name})
+	}
+	got := finalizeEntries(entries)
+	if len(got) != 1 {
+		t.Fatalf("entries = %+v, want one merged grant", got)
+	}
+	if got[0].Entry != "$CACHE/shader/" || got[0].List != "rw" {
+		t.Errorf("entry = %+v, want a single rw grant on $CACHE/shader/", got[0])
+	}
+}
+
+func TestDropCoveredEntriesKeepsStrongerNestedGrants(t *testing.T) {
+	// A read-only directory grant does not cover a writable file inside it.
+	entries := dropCoveredEntries([]recordedEntry{
+		{List: "ro", Entry: "/dev/dri/"},
+		{List: "rw", Entry: "/dev/dri/renderD128"},
+		{List: "ro", Entry: "/dev/dri/card0"},
+	})
+	if len(entries) != 2 {
+		t.Fatalf("entries = %+v, want the directory and the writable file", entries)
+	}
+	for _, e := range entries {
+		if e.Entry == "/dev/dri/card0" {
+			t.Errorf("read-only file inside a read-only directory was kept: %+v", entries)
+		}
+	}
+}

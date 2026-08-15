@@ -159,3 +159,35 @@ func TestResolveTraceRecordsOutcomes(t *testing.T) {
 		t.Fatalf("Trace = %#v", p.Trace)
 	}
 }
+
+func TestBuildVarsExposesRuntimeDirWhenTheSessionHasOne(t *testing.T) {
+	home := t.TempDir()
+	vars, err := buildVars("/work", home, "/tmpdir", map[string]string{"XDG_RUNTIME_DIR": "/run/user/1000"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vars["XDG_RUNTIME_DIR"] != "/run/user/1000" {
+		t.Errorf("XDG_RUNTIME_DIR = %q, want /run/user/1000", vars["XDG_RUNTIME_DIR"])
+	}
+}
+
+func TestBuildVarsOmitsRuntimeDirWithoutOne(t *testing.T) {
+	home := t.TempDir()
+	// No fallback: there is no sensible default under $HOME, and inventing one
+	// would name a path that exists nowhere.
+	vars, err := buildVars("/work", home, "/tmpdir", map[string]string{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := vars["XDG_RUNTIME_DIR"]; ok {
+		t.Errorf("XDG_RUNTIME_DIR = %q, want it absent", vars["XDG_RUNTIME_DIR"])
+	}
+	// A hostile or nonsensical value is refused like any other path variable.
+	vars, err = buildVars("/work", home, "/tmpdir", map[string]string{"XDG_RUNTIME_DIR": "relative/path"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := vars["XDG_RUNTIME_DIR"]; ok {
+		t.Error("a relative XDG_RUNTIME_DIR was accepted")
+	}
+}
