@@ -6,12 +6,12 @@
 
 #title()
 
-The sandbox limits _where_ a command can write. `--scratch` limits whether
-those writes reach your real checkout at all: the command runs against a
-disposable local clone, and its changes become a reviewable diff.
+The sandbox limits _where_ a command can write. A scratch limits whether those
+writes reach your real checkout at all: the command runs against a disposable
+local clone, and its changes become a reviewable diff.
 
 ```text
-$ bulle --scratch --profile claude
+$ bulle scratch --profile claude
 bulle: scratch ~/.local/state/bulle/scratch/project-a1b2c3d4 (origin ~/project, from HEAD + 3 modified, 1 untracked)
 # ... agent works ...
 scratch: 4 files changed, 1 added, 0 deleted
@@ -21,11 +21,44 @@ scratch: 4 files changed, 1 added, 0 deleted
 [d]iff  [p]ull  [k]eep  [s]hell  [w]ipe?
 ```
 
-The whole model in three sentences: `--scratch` clones the repository locally
+The whole model in three sentences: bulle clones the repository locally
 (carrying your uncommitted work), runs the sandboxed command there, and shows
 a diff at the end. You pull the changes in, keep the scratch, or wipe it.
 Nothing reaches your checkout except a deliberate pull or push from outside
 the sandbox.
+
+= Two ways to ask for one
+
+`bulle scratch` is the subcommand form, and the one to reach for: everything
+after `scratch` is an ordinary run, so any invocation becomes a scratched one
+by inserting a single word.
+
+```text
+bulle --profile claude              # runs in your checkout
+bulle scratch --profile claude      # runs in a disposable clone
+```
+
+`--scratch` is the same thing as a run flag. It exists so scratches compose
+with the other subcommands, which have their own first word:
+
+```text
+bulle rerun --scratch               # replay the last run, in a clone
+bulle policy --scratch              # resolve the policy, without running
+```
+
+The subcommand's one ambiguity is a command named like a review verb
+(#link("#coming-back-later")[`list`, `diff`, `pull`, `wipe`, `shell`]). Those
+five words after `scratch` are read as review verbs; anything else starts a
+run. Use `--` to be explicit:
+
+```text
+bulle scratch -- diff HEAD~1        # run `diff`, do not review
+```
+
+A near-miss of a verb is reported rather than run, so a mistyped `bulle
+scratch lst` tells you what you meant instead of cloning your repository to
+run a nonexistent command. And `--scratch` takes no value: there is no
+`--scratch=worktree`, for #link("#why-not-a-worktree")[reasons below].
 
 = How it works
 
@@ -158,7 +191,7 @@ go to die.
 
 = Details and edge cases
 
-- *Git only.* `--scratch` requires a git repository with at least one
+- *Git only.* A scratch requires a git repository with at least one
   commit. For a plain directory, `git init && git add -A && git commit` takes
   three commands and also buys you the review diff.
 - *Location.* Scratches live under `$XDG_STATE_HOME/bulle/scratch/` --- not

@@ -5,14 +5,6 @@
   - Expect backend changes because the Linux backend currently `exec`s into the target process.
   - Document platform differences clearly.
 
-- [ ] Document `--scratch` in the user docs.
-  - Name the composition explicitly: for parallel trusted sessions, use a
-    worktree manager (`wt`-style tools) around bulle; for reviewable untrusted
-    runs, use `--scratch`.
-  - Worktree integration is deliberately not offered: worktrees share the
-    origin's `.git` (including hooks) and need write access to it, which
-    defeats scratch isolation. Scratch uses `git clone --local` instead.
-
 - [ ] Consider an `r-build` profile for source compilation.
   - `install.packages()` from source needs a C/Fortran toolchain, `$R_HOME/etc/Makeconf`, and headers.
   - Much larger grant than the binary installation `r-install` targets; specify only after `r-install` has been exercised in the wild.
