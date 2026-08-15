@@ -21,6 +21,22 @@ var wellKnownToolEnvVars = []string{
 	"RBENV_ROOT", "NODENV_ROOT", "SDKMAN_DIR", "MISE_DATA_DIR", "ASDF_DATA_DIR",
 }
 
+// RecordingVars exposes the same variable table a run resolves paths against,
+// for rewriting observed paths back into the variables a profile should use.
+// It shares buildVars with Resolve so the two cannot drift: a variable a run
+// can expand is one a recording can substitute, and no other.
+//
+// User-defined [vars] are deliberately absent. They are machine-local by
+// definition, so spelling a recorded entry with one would produce a profile
+// that resolves nowhere else.
+func RecordingVars(workspace, home, tmp string, parentEnv map[string]string) bpaths.Vars {
+	vars, err := buildVars(workspace, home, tmp, parentEnv, nil)
+	if err != nil {
+		return bpaths.Vars{}
+	}
+	return vars
+}
+
 func reservedVarName(name string) bool {
 	switch name {
 	case "HOME", "WORKSPACE", "TMP", "TMPDIR", "CONFIG", "DATA", "CACHE", "STATE":

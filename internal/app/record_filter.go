@@ -84,6 +84,21 @@ func grantsForDenials(denials []landlockDenial) []grant {
 	return out
 }
 
+// grantsForSeatbeltDenials is the macOS counterpart of grantsForDenials.
+func grantsForSeatbeltDenials(denials []seatbeltDenial) []grant {
+	seen := map[grant]bool{}
+	out := []grant{}
+	for _, d := range denials {
+		gr, ok := grantForSeatbeltDenial(d)
+		if !ok || seen[gr] {
+			continue
+		}
+		seen[gr] = true
+		out = append(out, gr)
+	}
+	return out
+}
+
 func concat(lists ...[]string) []string {
 	total := 0
 	for _, list := range lists {

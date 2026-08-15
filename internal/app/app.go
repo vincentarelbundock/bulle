@@ -39,6 +39,9 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if isPreparedPolicyRunner(args) {
 		return runPreparedPolicy(args, stderr)
 	}
+	if isDenialLoggingProbe(args) {
+		return runDenialLoggingProbe(args, stderr)
+	}
 	// An incomplete internal-runner invocation must not fall through to the
 	// public CLI, where command inference would try to execute the reserved
 	// name as a sandboxed command.
@@ -63,9 +66,11 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 			}
 			if isRun {
 				runArgs := append([]string{args[0], "--scratch"}, args[2:]...)
-				return runMain(runArgs, "", stdout, stderr)
+				return runMain(runArgs, "", stdout, stderr, nil)
 			}
 			return runScratchCommand(args[2:], stdout, stderr)
+		case "record":
+			return runRecordCommand(args[0], args[2:], stdout, stderr)
 		case "profiles":
 			return runProfilesCommand(args[2:], stdout, stderr)
 		case "resolvers":
@@ -81,7 +86,7 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 				fmt.Fprintln(stderr, err)
 				return ExitConfigError
 			}
-			return runMain(append([]string{args[0]}, runArgs...), format, stdout, stderr)
+			return runMain(append([]string{args[0]}, runArgs...), format, stdout, stderr, nil)
 		case "rerun":
 			stored, err := loadLastRun()
 			if err != nil {
@@ -99,10 +104,10 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 				}
 			}
 			fmt.Fprintf(stderr, "bulle: repeating: bulle %s\n", strings.Join(merged, " "))
-			return runMain(append([]string{args[0]}, merged...), "", stdout, stderr)
+			return runMain(append([]string{args[0]}, merged...), "", stdout, stderr, nil)
 		}
 	}
-	return runMain(args, "", stdout, stderr)
+	return runMain(args, "", stdout, stderr, nil)
 }
 
 // extractPolicyFormat pulls --json out of `bulle policy` arguments; the rest
@@ -125,7 +130,7 @@ func extractPolicyFormat(args []string) ([]string, string, error) {
 
 // runMain is the sandboxed run itself — and, when policyFormat is non-empty,
 // the `bulle policy` variant that resolves and prints without running.
-func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Writer) int {
+func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Writer, rec *recorder) int {
 	opts, err := cli.Parse(args)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -315,7 +320,16 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 		Stderr:  os.Stderr,
 	}); err != nil {
 		code = exitCodeForSupervisorError(err, stderr)
-		printDenialHints(probe, scratch, home, stderr)
+		if rec == nil {
+			printDenialHints(probe, scratch, home, stderr)
+		}
+	}
+	// Recording reads the same denials the hints are built from, against the
+	// policy that was actually in effect for this run. It runs on success too:
+	// a run can be denied an optional access and still exit zero, and that
+	// grant belongs in the profile.
+	if rec != nil {
+		rec.observe(p, probe)
 	}
 	// The review gate runs on every exit path — success, command failure,
 	// and timeout alike — and never changes the exit code.

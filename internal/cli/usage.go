@@ -22,6 +22,7 @@ Usage:
   bulle scratch list|diff|pull|wipe|shell [id]
   bulle profiles list|install SOURCE
   bulle resolvers
+  bulle record --profile NAME [--out FILE] [--max-rounds N] -- command [args...]
   bulle help | version
 
 The workspace is the command's working directory and writable area. If omitted,
@@ -73,6 +74,9 @@ Subcommands:
                     install profile TOML files from a file, directory, local
                     git repository, or GitHub source
   resolvers         list path resolvers and what they resolve to here
+  record            run a command repeatedly, widening the sandbox by what it
+                    was denied each time, and print a profile of the additions
+                    (Linux only; see below)
 
 Configuration:
   --config PATH     path to a configuration directory
@@ -107,6 +111,21 @@ Disposable workspaces:
   bulle scratch list|diff|pull|wipe|shell [id]
                     resume the review of a kept scratch later; id may be a
                     unique prefix, and is optional when unambiguous
+
+Profile recording (Linux only):
+  bulle record --profile NAME -- command [args...]
+                    run the command under NAME, collect what the sandbox
+                    denied, add those grants, and run again until nothing new
+                    is denied. Prints a profile inheriting from NAME that
+                    contains only the additions.
+  --out FILE        write the profile to FILE instead of stdout
+  --max-rounds N    stop after N rounds (default 10); reaching the cap with the
+                    command still failing is reported, and the profile says so
+
+                    A recording is evidence that one run of one command needed
+                    these grants — not that they are sufficient. A denial
+                    aborts the operation that hit it, so anything the command
+                    did not reach is missing. Review before installing.
 
 Output and safety:
   --timeout DURATION

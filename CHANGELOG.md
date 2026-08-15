@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Profile recording
+
+- **`bulle record` drafts a profile from a real run.** `bulle record --profile
+  <base> -- <command>` runs the command under an existing profile, collects
+  what the sandbox denied, adds those grants, and runs again until nothing new
+  is denied. It prints a profile inheriting from the base that contains only
+  the additions, so recording against `claude` does not restate everything
+  `tool`, `terminal`, `git`, and `node` already grant. Linux only, for now:
+  macOS logs Seatbelt violations too, but denies many benign probes the
+  Landlock path never sees, and emitting those as grants would produce a
+  profile far wider than the run needs.
+- **Recorded entries are written to travel.** Paths are rewritten into the
+  spelling a hand-written profile would use — `go:modcache` rather than one
+  machine's module cache, `$CONFIG/...` rather than `$HOME/.config/...`,
+  `which:NAME` for a binary that is simply what `PATH` resolves — and every
+  entry is optional, because a path this machine has is not one the next
+  machine has. Clusters of denied siblings collapse into a directory grant. A
+  denial on a variable root never becomes a grant on that root.
+- **The output says what it proves.** A denial aborts the operation that hit
+  it, so a recording is evidence that one run of one command needed these
+  grants, not that they are sufficient; the emitted header says so, and says
+  more when the command still failed or the round cap was reached. Recording
+  refuses to start unless a deliberately triggered denial actually reaches the
+  kernel log — a kernel can advertise Landlock audit support with auditing
+  disabled, and recording would otherwise converge instantly on an empty
+  profile that reads exactly like success.
+
 #### Resource limits
 
 - **Resource limits on a run.** `--memory`, `--cpu`, `--nproc`, `--nofile`,

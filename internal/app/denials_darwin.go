@@ -38,6 +38,12 @@ func startDenialProbe(p policy.Policy) denialProbe {
 // Best-effort: violation records are written asynchronously, so denials from
 // the very end of a run can be missed.
 func (probe denialProbe) hints() []string {
+	home, _ := os.UserHomeDir()
+	return seatbeltHints(probe.records(), home)
+}
+
+// records returns the Seatbelt violations logged since the probe started.
+func (probe denialProbe) records() []seatbeltDenial {
 	if !probe.enabled {
 		return nil
 	}
@@ -51,6 +57,20 @@ func (probe denialProbe) hints() []string {
 	if err != nil {
 		return nil
 	}
-	home, _ := os.UserHomeDir()
-	return seatbeltHints(parseSeatbeltDenials(strings.Split(string(out), "\n")), home)
+	return parseSeatbeltDenials(strings.Split(string(out), "\n"))
+}
+
+// grants returns the same violations as the policy entries that would allow
+// them, for profile recording.
+func (probe denialProbe) grants() []grant {
+	return grantsForSeatbeltDenials(probe.records())
+}
+
+// recordingSupported reports whether this machine can record a profile.
+// Seatbelt violations are readable here, but the recording loop has not been
+// exercised against them: macOS denies many benign probes that the Linux path
+// never sees, and emitting those as grants would produce a profile far wider
+// than the run needs. Refusing is honest until that is worked through.
+func recordingSupported() (string, bool) {
+	return "recording is not supported on macOS yet; only the Landlock backend is covered", false
 }

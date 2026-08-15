@@ -13,11 +13,18 @@
   - System python layouts vary widely and some machines have no `python3` at all.
   - Could be a thin alias selecting `uv` plus a bare-interpreter fallback.
 
-- [ ] Add record mode for profile authoring.
-  - Run a command once under observation and emit a minimal profile from what it touched.
-  - Use Seatbelt `(trace)` with `sandbox-simplify` on macOS, and `fanotify` or `ptrace` on Linux.
-  - Generalize literal hits into `which:`, platform-neutral directory variables, and globs instead of dumping raw paths.
-  - Make recording explicit and loud, and prefer scoping it to an existing profile, because a recording run needs more access than the profile it produces.
+- [x] Add record mode for profile authoring (Linux).
+  - `bulle record --profile <base> -- <command>` iterates: run, collect denials, add grants, repeat.
+  - Iteration replaced the planned `fanotify`/`ptrace` observation: each round runs under a sandbox no wider than the base plus what it has already been denied, so recording never needs the elevated grant that tracing would.
+  - Entries are generalized to `which:`, tool resolvers, and directory variables; clusters collapse to directory grants; variable roots are never granted.
+
+- [ ] Extend record mode to macOS.
+  - Seatbelt violations are already parsed, and `grantForSeatbeltDenial` maps them to entries.
+  - The blocker is noise: macOS denies many benign probes the Landlock path never sees, so a recorded profile would be far wider than the run needs. Needs a filter before it can be honest.
+  - Consider `(trace)` with `sandbox-simplify` as an alternative source.
+
+- [ ] Consider zero-to-profile recording (no `--profile`).
+  - Deferred deliberately: the recording grant is widest and the output least trustworthy with no base to diff against.
 
 ## Deferred
 

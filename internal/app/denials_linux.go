@@ -83,9 +83,9 @@ func startDenialProbe(p policy.Policy) denialProbe {
 	return denialProbe{start: time.Now(), startUptime: currentUptime(), enabled: true}
 }
 
-// hints returns copy-pasteable suggestions for sandbox denials logged since
-// the probe started, or nil when logs are unavailable or show no denials.
-func (probe denialProbe) hints() []string {
+// records returns the denial records the kernel logged since the probe
+// started, or nil when logs are unavailable or show no denials.
+func (probe denialProbe) records() []landlockDenial {
 	if !probe.enabled {
 		return nil
 	}
@@ -97,6 +97,40 @@ func (probe denialProbe) hints() []string {
 	if viaDmesg {
 		sinceUptime = probe.startUptime
 	}
+	return parseLandlockDenials(lines, sinceUptime)
+}
+
+// hints returns copy-pasteable suggestions for sandbox denials logged since
+// the probe started, or nil when logs are unavailable or show no denials.
+func (probe denialProbe) hints() []string {
 	home, _ := os.UserHomeDir()
-	return denialHints(parseLandlockDenials(lines, sinceUptime), home)
+	return denialHints(probe.records(), home)
+}
+
+// grants returns the same denials as the policy entries that would allow
+// them, for profile recording.
+func (probe denialProbe) grants() []grant {
+	return grantsForDenials(probe.records())
+}
+
+// recordingSupported reports whether this machine can record a profile, and
+// why not when it cannot. Recording reads back what the sandbox refused, so
+// without denial logging it would converge instantly on an empty profile that
+// looks like success — worth refusing up front rather than discovering later.
+func recordingSupported() (string, bool) {
+	if policy.RuntimeDefaultBackend() != policy.BackendLinuxLandlock {
+		return "recording needs the Landlock backend", false
+	}
+	if !denialLogSupported() {
+		return "recording needs Landlock audit logging (ABI v7, Linux 6.15 or newer)", false
+	}
+	if lines, _ := readKernelLog(time.Now().Add(-time.Minute)); lines == nil {
+		return "recording needs readable kernel logs; neither journalctl nor dmesg would report them here", false
+	}
+	if !denialLoggingWorks() {
+		return "this kernel reports Landlock audit support, but a denial deliberately triggered here never reached the log;" +
+			" recording would observe nothing and produce an empty profile that looks like success." +
+			" Auditing is most often disabled at boot (audit=0) or filtered by an audit rule", false
+	}
+	return "", true
 }
