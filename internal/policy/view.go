@@ -1,8 +1,23 @@
 package policy
 
-import "sort"
+import (
+	"sort"
+
+	"github.com/vincentarelbundock/bulle/internal/limits"
+)
 
 func NewView(p Policy) View {
+	return newView(p, limits.Current())
+}
+
+// NewViewWithSupport builds the view against an explicit support report, so a
+// caller that has already probed the machine reuses that result instead of
+// probing again and risking a different answer.
+func NewViewWithSupport(p Policy, support limits.Support) View {
+	return newView(p, support)
+}
+
+func newView(p Policy, support limits.Support) View {
 	network := p.Network
 	if network == "" {
 		network = NetworkFull
@@ -30,5 +45,6 @@ func NewView(p Policy) View {
 		AddLibs:       p.AddLibs,
 		MachLookup:    append([]string{}, p.MachLookup...),
 		Network:       network,
+		Limits:        limits.Plan(p.Limits, support),
 	}
 }

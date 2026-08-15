@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Resource limits
+
+- **Resource limits on a run.** `--memory`, `--cpu`, `--nproc`, `--nofile`,
+  `--fsize`, and `--cpu-time` cap what a sandboxed command consumes, alongside
+  the existing wall-clock `--timeout`. They are configurable under
+  `[defaults.limits]`, and under `[defaults.linux.limits]` or
+  `[defaults.macos.limits]` to request a limit only where it applies.
+- **Honest reporting of what is enforced.** `--memory`, `--cpu`, and `--nproc`
+  need cgroup v2, so they bind on Linux with a delegated cgroup and nowhere
+  else. macOS has no per-process-tree equivalent, and the POSIX limits that
+  resemble one are not substitutes: `RLIMIT_AS` caps virtual address space
+  rather than resident memory, killing runtimes that merely reserve it, and
+  `RLIMIT_NPROC` counts processes per UID across the whole system, which would
+  throttle the user's unrelated programs. bulle declines to substitute them,
+  warns on stderr about any limit it cannot enforce, and names the mechanism
+  behind each limit in `bulle policy` output. `--strict-limits` turns the
+  warning into a refusal to run, for continuous integration.
+- **Timeouts now kill through the cgroup when there is one.** A cgroup-backed
+  run terminates via `cgroup.kill`, which identifies the process tree directly.
+  This closes the PGID-recycling race that group-signalling could not, and
+  catches processes that called `setsid` to leave the group. Runs without a
+  cgroup keep the previous best-effort group-signalling behavior.
+
 #### Workspaces
 
 - **`bulle scratch` disposable workspaces.** Run the sandboxed command against

@@ -15,6 +15,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/vincentarelbundock/bulle/internal/limits"
 	"github.com/vincentarelbundock/bulle/internal/policy"
 )
 
@@ -49,8 +50,11 @@ func (processSignalNotifier) Stop(signals chan<- os.Signal) {
 var supervisorSignalNotifier signalNotifier = processSignalNotifier{}
 
 type Options struct {
-	Executable  string
-	Timeout     time.Duration
+	Executable string
+	Timeout    time.Duration
+	// Limits carries the cgroup-backed resource limits. The rlimit-backed ones
+	// are applied in the sandboxed child instead, from the policy.
+	Limits      limits.Limits
 	GracePeriod time.Duration
 	Stdin       *os.File
 	Stdout      *os.File
@@ -100,6 +104,8 @@ func Run(p policy.Policy, opts Options) error {
 	cmd.Env = os.Environ()
 	cmd.ExtraFiles = []*os.File{read}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cgroup := prepareCgroup(cmd, opts.Limits)
+	defer cgroup.close()
 
 	term, err := prepareForegroundTerminal(stdin)
 	if err != nil {
@@ -184,10 +190,11 @@ func Run(p policy.Policy, opts Options) error {
 		case <-timeoutC:
 			_ = closeWrite()
 			return handleTimeout(waitDone, writeDone, term, timeoutContext{
-				duration: opts.Timeout,
-				grace:    grace,
-				pgid:     pgid,
-				kill:     killProcessGroup,
+				duration:   opts.Timeout,
+				grace:      grace,
+				pgid:       pgid,
+				kill:       killProcessGroup,
+				killCgroup: cgroup.kill,
 			})
 		}
 	}
@@ -198,6 +205,29 @@ type timeoutContext struct {
 	grace    time.Duration
 	pgid     int
 	kill     func(int, syscall.Signal) error
+	// killCgroup terminates the run's cgroup atomically, reporting whether it
+	// did. It is nil when the run has no cgroup.
+	killCgroup func() bool
+}
+
+// killAll terminates the whole sandboxed tree. The cgroup route is preferred
+// because it names the tree by identity: it cannot miss a process that called
+// setsid to leave the process group, and it cannot hit an unrelated process
+// that inherited a recycled group id. Signalling the group is the fallback.
+func (ctx timeoutContext) killAll() {
+	if ctx.killCgroup != nil && ctx.killCgroup() {
+		return
+	}
+	// Without a cgroup the leader may already have been reaped, in which case
+	// its PGID can in principle have been recycled and reassigned to an
+	// unrelated same-user group. Probe with signal 0 first: if the group is
+	// already empty the SIGKILL is skipped, which removes the reuse hazard in
+	// the common case. This does NOT fully close the race — the group can
+	// still empty out between the probe and the SIGKILL — which is why a
+	// cgroup-backed run takes the branch above.
+	if ctx.kill(ctx.pgid, syscall.Signal(0)) == nil {
+		_ = ctx.kill(ctx.pgid, syscall.SIGKILL)
+	}
 }
 
 func handleTimeout(waitDone <-chan error, writeDone <-chan error, term *foregroundTerminal, ctx timeoutContext) error {
@@ -225,21 +255,12 @@ func handleTimeout(waitDone <-chan error, writeDone <-chan error, term *foregrou
 	}
 
 	if !waitReaped {
-		_ = ctx.kill(ctx.pgid, syscall.SIGKILL)
-		<-waitDone
-	} else {
-		// The leader has already been reaped, so its PGID can in principle be
-		// recycled by the kernel and reassigned to an unrelated same-user group.
-		// Probe with signal 0 first: if the group is already empty we skip the
-		// SIGKILL entirely, which removes the reuse hazard in the common case.
-		// This does NOT fully close the race — the group can still empty out
-		// between the probe and the SIGKILL. Eliminating it requires an
-		// identity-preserving mechanism (cgroup.kill or a PID namespace); see the
-		// deferred supervision-hardening work. Group-signalling remains
-		// best-effort against an adversarial child that calls setsid/setpgid.
-		if ctx.kill(ctx.pgid, syscall.Signal(0)) == nil {
+		if ctx.killCgroup == nil || !ctx.killCgroup() {
 			_ = ctx.kill(ctx.pgid, syscall.SIGKILL)
 		}
+		<-waitDone
+	} else {
+		ctx.killAll()
 	}
 	drainWrite(writeDone)
 	return finishWithRestore(&TimeoutError{Duration: ctx.duration}, term)

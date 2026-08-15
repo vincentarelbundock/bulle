@@ -207,8 +207,32 @@ func mergeDefaults(parent, child DefaultsSettings) DefaultsSettings {
 		Profile:      choose(child.Profile, parent.Profile),
 		Timeout:      choose(child.Timeout, parent.Timeout),
 		Env:          mergeEnv(parent.Env, child.Env),
+		StrictLimits: chooseBool(child.StrictLimits, parent.StrictLimits),
+		Limits:       mergeLimits(parent.Limits, child.Limits),
+		MacOS:        DefaultsPlatformSettings{Limits: mergeLimits(parent.MacOS.Limits, child.MacOS.Limits)},
+		Linux:        DefaultsPlatformSettings{Limits: mergeLimits(parent.Linux.Limits, child.Linux.Limits)},
 		PathSettings: MergePathSettings(parent.PathSettings, child.PathSettings),
 	}
+}
+
+// mergeLimits layers a limits block over another, per key: a child that sets
+// only memory leaves the parent's other limits standing.
+func mergeLimits(parent, child LimitSettings) LimitSettings {
+	return LimitSettings{
+		Memory:  choose(child.Memory, parent.Memory),
+		CPU:     choose(child.CPU, parent.CPU),
+		NProc:   choose(child.NProc, parent.NProc),
+		NoFile:  choose(child.NoFile, parent.NoFile),
+		FSize:   choose(child.FSize, parent.FSize),
+		CPUTime: choose(child.CPUTime, parent.CPUTime),
+	}
+}
+
+func chooseBool(preferred, fallback *bool) *bool {
+	if preferred != nil {
+		return preferred
+	}
+	return fallback
 }
 
 func mergeVars(parent, child map[string]string) map[string]string {

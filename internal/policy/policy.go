@@ -3,6 +3,7 @@ package policy
 import (
 	"time"
 
+	"github.com/vincentarelbundock/bulle/internal/limits"
 	bpaths "github.com/vincentarelbundock/bulle/internal/paths"
 )
 
@@ -21,6 +22,11 @@ type Policy struct {
 	ProjectPath string
 	Command     []string
 	Timeout     time.Duration
+
+	// Limits are the requested resource constraints. The cgroup-backed ones
+	// are applied by the supervisor around the sandboxed child; the rlimit
+	// ones travel with the policy and are applied inside it.
+	Limits limits.Limits
 
 	ReadOnly      []string
 	ReadOnlyExec  []string
@@ -61,4 +67,8 @@ type View struct {
 	AddLibs       bool        `json:"add_libs"`
 	MachLookup    []string    `json:"mach_lookup"`
 	Network       NetworkMode `json:"network"`
+	// Limits reports each requested resource limit together with what enforces
+	// it here, so "am I actually capped?" is answerable from bulle policy
+	// rather than inferred from the platform.
+	Limits []limits.Status `json:"limits,omitempty"`
 }

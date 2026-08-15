@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/vincentarelbundock/bulle/internal/cli"
+	"github.com/vincentarelbundock/bulle/internal/limits"
 	bpaths "github.com/vincentarelbundock/bulle/internal/paths"
 	"github.com/vincentarelbundock/bulle/internal/policy"
 )
@@ -35,6 +36,7 @@ func writeProfilePermissionSummary(profileName string, p policy.Policy, w io.Wri
 	if view.Timeout != "" {
 		fmt.Fprintf(w, "  timeout: %s\n", view.Timeout)
 	}
+	writeLimits(w, view.Limits)
 	// With a command, add_exec and add_libs have already materialized into the
 	// filesystem lists above; the flags add nothing. Without one, the lists
 	// under-state a real run, so say what would be added.
@@ -45,6 +47,29 @@ func writeProfilePermissionSummary(profileName string, p policy.Policy, w io.Wri
 	}
 	if len(view.MachLookup) > 0 {
 		fmt.Fprintf(w, "  mach_lookup: %s\n", formatInlineList(view.MachLookup))
+	}
+}
+
+// writeLimits reports the requested resource limits with the mechanism behind
+// each one. The mechanism is shown rather than implied because "memory: 4G"
+// means something materially different when a cgroup is counting resident
+// memory than when nothing is counting at all, and the difference varies by
+// platform and by whether this host delegates a cgroup.
+func writeLimits(w io.Writer, statuses []limits.Status) {
+	if len(statuses) == 0 {
+		return
+	}
+	fmt.Fprintln(w, "  limits:")
+	width := 0
+	for _, status := range statuses {
+		width = max(width, len(status.Name)+1)
+	}
+	for _, status := range statuses {
+		enforcement := string(status.Mechanism)
+		if !status.Enforced {
+			enforcement = "NOT ENFORCED — " + status.Reason
+		}
+		fmt.Fprintf(w, "    %-*s %s  (%s)\n", width, status.Name+":", status.Value, enforcement)
 	}
 }
 

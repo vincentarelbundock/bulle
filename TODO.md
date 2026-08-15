@@ -1,9 +1,9 @@
 # TODO
 
-- [ ] Add resource and time limits.
-  - Support timeouts first, then consider CPU, memory, and disk limits.
-  - Expect backend changes because the Linux backend currently `exec`s into the target process.
-  - Document platform differences clearly.
+- [x] Add resource and time limits.
+  - `--timeout`, then `--memory`, `--cpu`, `--nproc` (cgroup v2, Linux only) and
+    `--nofile`, `--fsize`, `--cpu-time` (rlimits, portable).
+  - Unenforceable limits warn on stderr; `--strict-limits` refuses to run instead.
 
 - [ ] Consider an `r-build` profile for source compilation.
   - `install.packages()` from source needs a C/Fortran toolchain, `$R_HOME/etc/Makeconf`, and headers.

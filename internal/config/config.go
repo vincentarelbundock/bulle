@@ -13,6 +13,8 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pelletier/go-toml/v2/unstable"
+
+	"github.com/vincentarelbundock/bulle/internal/limits"
 )
 
 type Config struct {
@@ -42,7 +44,66 @@ type DefaultsSettings struct {
 	Timeout string   `toml:"timeout"`
 	Env     []string `toml:"env"`
 
+	// StrictLimits turns an unenforceable resource limit from a warning into a
+	// refusal to run. It is a pointer so that an explicit false in the user
+	// configuration is distinguishable from an absent key when merging.
+	StrictLimits *bool `toml:"strict_limits"`
+
+	// Limits applies on every platform. The per-platform blocks below apply
+	// only where they match, which is how a limit that one platform cannot
+	// enforce is requested without warning on the other.
+	Limits LimitSettings `toml:"limits"`
+
+	MacOS DefaultsPlatformSettings `toml:"macos"`
+	Linux DefaultsPlatformSettings `toml:"linux"`
+
 	PathSettings `toml:",inline"`
+}
+
+// DefaultsPlatformSettings is a [defaults.macos] or [defaults.linux] block:
+// the parts of [defaults] that are worth scoping to one platform.
+type DefaultsPlatformSettings struct {
+	Limits LimitSettings `toml:"limits"`
+}
+
+// LimitSettings is a [limits] block. Values are kept as written and parsed
+// once the flags and the configuration have been merged, so an invalid value
+// is reported against whichever source actually won.
+type LimitSettings struct {
+	Memory  string `toml:"memory"`
+	CPU     string `toml:"cpu"`
+	NProc   string `toml:"nproc"`
+	NoFile  string `toml:"nofile"`
+	FSize   string `toml:"fsize"`
+	CPUTime string `toml:"cpu_time"`
+}
+
+// Spec converts the configuration block into the limits package's unparsed
+// form.
+func (l LimitSettings) Spec() limits.Spec {
+	return limits.Spec{
+		Memory:  l.Memory,
+		CPU:     l.CPU,
+		NProc:   l.NProc,
+		NoFile:  l.NoFile,
+		FSize:   l.FSize,
+		CPUTime: l.CPUTime,
+	}
+}
+
+// LimitSpec returns the limits requested by [defaults] for goos: the unscoped
+// block with the matching platform block layered on top. A limit written only
+// under a non-matching platform is absent from the result, so it is never
+// requested and never warned about.
+func (d DefaultsSettings) LimitSpec(goos string) limits.Spec {
+	spec := d.Limits.Spec()
+	switch PlatformKey(goos) {
+	case "macos":
+		return spec.Merge(d.MacOS.Limits.Spec())
+	case "linux":
+		return spec.Merge(d.Linux.Limits.Spec())
+	}
+	return spec
 }
 
 type ProfileMetadata struct {

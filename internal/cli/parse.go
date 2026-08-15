@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+
+	"github.com/vincentarelbundock/bulle/internal/limits"
 )
 
 func Parse(args []string) (Options, error) {
@@ -45,6 +47,12 @@ func Parse(args []string) (Options, error) {
 		return opts, err
 	}
 	opts.Timeout = timeout
+	// Parse the flags on their own so an invalid value is rejected even when
+	// no configuration is loaded; applyConfigDefaults re-parses once the
+	// [defaults] block has been layered underneath.
+	if opts.Limits, err = limits.Parse(parsed.Flags.LimitSpec()); err != nil {
+		return opts, err
+	}
 	opts.ProjectPath = parsed.ProjectPath
 	if opts.ProjectPath == "" {
 		opts.ProjectPath = "."
@@ -85,6 +93,28 @@ type Flags struct {
 	AddLibs     bool   `name:"add-libs" help:"Add runtime library access for executables."`
 	NoWorkspace bool   `name:"no-workspace" help:"Do not automatically grant the workspace read-write access."`
 	Timeout     string `name:"timeout" placeholder:"DURATION" help:"Kill the sandboxed command if it runs longer than DURATION, using Go duration syntax such as 30s, 2m, or 1h30m; 0 disables."`
+
+	Memory  string `name:"memory" placeholder:"SIZE" help:"Cap the sandbox's resident memory, as in 512M or 4G. Linux only (cgroup v2)."`
+	CPU     string `name:"cpu" placeholder:"PERCENT" help:"Cap the sandbox's CPU use as a percentage of one core, as in 200% for two cores. Linux only (cgroup v2)."`
+	NProc   string `name:"nproc" placeholder:"N" help:"Cap the number of processes in the sandbox. Linux only (cgroup v2)."`
+	NoFile  string `name:"nofile" placeholder:"N" help:"Cap the number of open file descriptors."`
+	FSize   string `name:"fsize" placeholder:"SIZE" help:"Cap the size of any single file the sandbox writes, as in 100M."`
+	CPUTime string `name:"cpu-time" placeholder:"DURATION" help:"Cap consumed CPU time (not wall clock), using Go duration syntax. Applies per process rather than to the whole tree."`
+
+	StrictLimits bool `name:"strict-limits" help:"Refuse to run when a requested resource limit cannot be enforced here, instead of warning."`
+}
+
+// LimitSpec collects the resource-limit flags in the form the limits package
+// merges and parses.
+func (f Flags) LimitSpec() limits.Spec {
+	return limits.Spec{
+		Memory:  f.Memory,
+		CPU:     f.CPU,
+		NProc:   f.NProc,
+		NoFile:  f.NoFile,
+		FSize:   f.FSize,
+		CPUTime: f.CPUTime,
+	}
 }
 
 // rejectScratchValue turns kong's generic bool-parse failure for
@@ -164,9 +194,11 @@ func NormalizeSeparator(args []string) []string {
 var valueFlags = map[string]bool{
 	"--profile": true, "-p": true,
 	"--config": true,
-	"--ro": true, "--rox": true, "--rw": true, "--rwx": true,
+	"--ro":     true, "--rox": true, "--rw": true, "--rwx": true,
 	"--env": true, "--env-file": true, "--env-all-except": true,
 	"--var": true, "--timeout": true,
+	"--memory": true, "--cpu": true, "--nproc": true,
+	"--nofile": true, "--fsize": true, "--cpu-time": true,
 }
 
 // splitCommand separates bulle's own arguments from the sandboxed command.

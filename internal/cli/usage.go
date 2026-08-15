@@ -113,6 +113,29 @@ Output and safety:
                     kill the sandboxed command if it runs longer than DURATION.
                     Uses Go duration syntax such as 30s, 2m, or 1h30m.
                     Use 0 to disable. Timed-out commands exit 124.
+
+Resource limits:
+  --memory SIZE     cap resident memory, as in 512M or 4G
+  --cpu PERCENT     cap CPU use as a percentage of one core, as in 200%
+  --nproc N         cap the number of processes in the sandbox
+  --nofile N        cap the number of open file descriptors
+  --fsize SIZE      cap the size of any single file written, as in 100M
+  --cpu-time DURATION
+                    cap consumed CPU time, as opposed to the wall clock
+                    measured by --timeout. An idle process burns wall clock
+                    but no CPU, so the two catch different runaways. Applies
+                    per process, not to the whole tree: each child gets its
+                    own budget.
+  --strict-limits   refuse to run when a limit cannot be enforced here,
+                    instead of warning and continuing
+                    --memory, --cpu, and --nproc need cgroup v2, so they apply
+                    on Linux with a delegated cgroup and nowhere else; macOS
+                    has no per-process-tree equivalent for any of the three.
+                    The others are portable. bulle warns on stderr about any
+                    limit it cannot enforce, and bulle policy names the
+                    mechanism behind each one. Set a limit under
+                    [defaults.linux] to request it only where it works.
+
   -h, --help        show this help and exit
   -V, --version     show version information and exit
 

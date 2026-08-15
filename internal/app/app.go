@@ -290,6 +290,14 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 		}
 		return ExitOK
 	}
+	if code, ok := reportUnenforcedLimits(p, opts.Flags.StrictLimits, stderr); !ok {
+		if scratch != nil {
+			// Nothing ran, so the scratch is unchanged; remove it rather than
+			// leaving an empty clone behind.
+			removeScratch(scratch)
+		}
+		return code
+	}
 	saveLastRun(cli.NormalizeSeparator(args[1:]))
 	for _, note := range p.Notes {
 		fmt.Fprintf(stderr, "bulle: %s\n", note)
@@ -301,6 +309,7 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 	code := ExitOK
 	if err := supervisor.Run(p, supervisor.Options{
 		Timeout: p.Timeout,
+		Limits:  p.Limits,
 		Stdin:   os.Stdin,
 		Stdout:  os.Stdout,
 		Stderr:  os.Stderr,

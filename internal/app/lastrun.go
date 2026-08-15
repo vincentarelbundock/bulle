@@ -11,6 +11,7 @@ import (
 
 	"github.com/vincentarelbundock/bulle/internal/cli"
 	"github.com/vincentarelbundock/bulle/internal/config"
+	"github.com/vincentarelbundock/bulle/internal/limits"
 )
 
 // lastRun records the most recent real invocation so `bulle --last` can
@@ -137,6 +138,20 @@ func applyConfigDefaults(opts *cli.Options, defaults config.DefaultsSettings) er
 			return fmt.Errorf("invalid [defaults] timeout %q; use a Go duration such as 30s, 2m, or 1h30m", defaults.Timeout)
 		}
 		opts.Timeout = duration
+	}
+	// The [defaults] limits sit underneath the flags, and the platform-scoped
+	// block sits between them: a limit written only under [defaults.macos] is
+	// simply not requested on Linux, and so is never reported as unenforced.
+	resolved, err := limits.Parse(defaults.LimitSpec(runtime.GOOS).Merge(opts.Flags.LimitSpec()))
+	if err != nil {
+		// cli.Parse already validated the flags on their own, so a failure here
+		// can only come from a value the configuration contributed. Say so:
+		// the message names a flag, and the user needs to know where to look.
+		return fmt.Errorf("%w (from the [defaults] limits of the user configuration)", err)
+	}
+	opts.Limits = resolved
+	if !opts.Flags.StrictLimits && defaults.StrictLimits != nil {
+		opts.Flags.StrictLimits = *defaults.StrictLimits
 	}
 	opts.Env = prependList(defaults.Env, opts.Env)
 	opts.ReadOnly = prependList(defaults.ReadOnly, opts.ReadOnly)
