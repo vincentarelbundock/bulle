@@ -98,7 +98,7 @@ func TestRunPreparedPolicyDoesNotShadowWorkspacePath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	code := Run([]string{"bulle", "policy", preparedPolicyRunnerCommand, "--rox", filepath.Dir(truePath), "--", truePath}, &stdout, &stderr)
+	code := Run([]string{"bulle", "show", preparedPolicyRunnerCommand, "--rox", filepath.Dir(truePath), "--", truePath}, &stdout, &stderr)
 
 	if code != ExitOK {
 		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitOK, stderr.String())
@@ -179,7 +179,7 @@ func TestRunDefaultsWorkspacePathToCurrentDirectory(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"bulle", "policy", "--json", "--profile", "tool", "--", "echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "show", "--json", "tool", "--", "echo", "hi"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -206,7 +206,7 @@ func TestRunAddExecWithoutProjectGrantsCurrentDirectory(t *testing.T) {
 		}
 	}()
 
-	code := Run([]string{"bulle", "policy", "--json", "--add-exec", "--", "/bin/echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "show", "--json", "--", "/bin/echo", "hi"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -479,15 +479,12 @@ func TestRunExplainsBareCommandWithoutPolicyPATH(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"bulle", "--", "ls"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--", "definitely-not-installed-bulle-test-command"}, &stdout, &stderr)
 
 	if code != ExitNotFound {
 		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitNotFound, stderr.String())
 	}
 	if !bytes.Contains(stderr.Bytes(), []byte("policy PATH")) {
-		t.Fatalf("stderr = %s", stderr.String())
-	}
-	if !bytes.Contains(stderr.Bytes(), []byte("--env PATH")) {
 		t.Fatalf("stderr = %s", stderr.String())
 	}
 }
@@ -505,7 +502,7 @@ func TestRunFindsBareCommandFromExplicitExecutableRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	code := Run([]string{"bulle", "policy", "--rox", binDir, "--", "bulle-test-tool"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "show", "--rox", binDir, "--", "bulle-test-tool"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -526,7 +523,7 @@ func TestRunExplainsDefaultAppNotFoundBeforeSandbox(t *testing.T) {
 default_app = "definitely-not-installed-bulle-test-command"
 `)
 
-	code := Run([]string{"bulle", "--config", tmp, "--profile", "missing", tmp}, &stdout, &stderr)
+	code := Run([]string{"bulle", "--config", tmp, "missing", tmp}, &stdout, &stderr)
 
 	if code != ExitNotFound {
 		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitNotFound, stderr.String())
@@ -547,7 +544,7 @@ func TestRunUsesDefaultAppFromConfig(t *testing.T) {
 rox = ["/bin"]
 `)
 
-	code := Run([]string{"bulle", "policy", "--json", "--config", tmp, tmp}, &stdout, &stderr)
+	code := Run([]string{"bulle", "show", "--json", "--config", tmp, "default", tmp}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -565,7 +562,7 @@ func TestRunUsesDefaultAppFromProfile(t *testing.T) {
 default_app = "echo profile"
 `)
 
-	code := Run([]string{"bulle", "policy", "--json", "--config", tmp, "--profile", "agent", tmp}, &stdout, &stderr)
+	code := Run([]string{"bulle", "show", "--json", "--config", tmp, "agent", tmp}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -583,7 +580,7 @@ func TestRunParsesQuotedDefaultApp(t *testing.T) {
 rox = ["/bin"]
 `)
 
-	code := Run([]string{"bulle", "policy", "--json", "--config", tmp, tmp}, &stdout, &stderr)
+	code := Run([]string{"bulle", "show", "--json", "--config", tmp, "default", tmp}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -600,7 +597,7 @@ func TestRunRejectsInvalidDefaultApp(t *testing.T) {
 	writeConfigProfile(t, tmp, "default", `default_app = "echo 'unterminated"
 `)
 
-	code := Run([]string{"bulle", "policy", "--json", "--config", tmp, tmp}, &stdout, &stderr)
+	code := Run([]string{"bulle", "show", "--json", "--config", tmp, "default", tmp}, &stdout, &stderr)
 
 	if code != ExitConfigError {
 		t.Fatalf("exit code = %d, want %d; stdout = %s; stderr = %s", code, ExitConfigError, stdout.String(), stderr.String())
@@ -619,12 +616,12 @@ func TestRunIgnoresProjectConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	code := Run([]string{"bulle", tmp}, &stdout, &stderr)
+	code := Run([]string{"bulle", "default", tmp}, &stdout, &stderr)
 
 	if code != ExitConfigError {
 		t.Fatalf("exit code = %d, want %d; stdout = %s; stderr = %s", code, ExitConfigError, stdout.String(), stderr.String())
 	}
-	if !bytes.Contains(stderr.Bytes(), []byte("no command supplied")) {
+	if !bytes.Contains(stderr.Bytes(), []byte("has no default app")) {
 		t.Fatalf("stderr = %s", stderr.String())
 	}
 	if bytes.Contains(stdout.Bytes(), []byte("from-project-config")) || bytes.Contains(stderr.Bytes(), []byte("from-project-config")) {
@@ -637,7 +634,7 @@ func TestRunPolicyJSONPrintsResolvedPolicy(t *testing.T) {
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
 
-	code := Run([]string{"bulle", "policy", "--json", "--profile", "tool", tmp, "--", "echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "show", "--json", "tool", tmp, "--", "echo", "hi"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -661,7 +658,7 @@ func TestRunPolicyJSONIncludesTimeoutWhenConfigured(t *testing.T) {
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
 
-	code := Run([]string{"bulle", "policy", "--json", "--timeout", "30s", "--profile", "tool", tmp, "--", "echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "show", "--json", "--timeout", "30s", "tool", tmp, "--", "echo", "hi"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -676,7 +673,7 @@ func TestRunPolicyJSONOmitsTimeoutWhenUnset(t *testing.T) {
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
 
-	code := Run([]string{"bulle", "policy", "--json", "--profile", "tool", tmp, "--", "echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "show", "--json", "tool", tmp, "--", "echo", "hi"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -691,7 +688,7 @@ func TestRunPolicySummaryIncludesTimeoutWhenConfigured(t *testing.T) {
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
 
-	code := Run([]string{"bulle", "policy", "--timeout", "250ms", "--profile", "tool", tmp, "--", "echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "show", "--timeout", "250ms", "tool", tmp, "--", "echo", "hi"}, &stdout, &stderr)
 
 	if code != ExitOK {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -708,8 +705,8 @@ func TestRunPolicyPrintsHumanReadableSummaryByDefault(t *testing.T) {
 
 	code := Run([]string{
 		"bulle",
-		"policy",
-		"--profile", "tool",
+		"show",
+		"tool",
 		"--env", "BULLE_TEST_SECRET=super-secret-value",
 		tmp,
 		"--", "/bin/echo", "hi",
@@ -835,7 +832,7 @@ func TestRunPolicyIncludesOfflineProfileOverlay(t *testing.T) {
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
 
-	code := Run([]string{"bulle", "policy", "--json", "--profile", "tool,offline", tmp, "--", "echo", "hi"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "show", "--json", "tool,offline", tmp, "--", "echo", "hi"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -860,7 +857,7 @@ func TestRunPolicyIncludesLinuxLibraryDepsWhenAddLibsIsSet(t *testing.T) {
 		t.Skip("/usr/bin/true has no discoverable ELF dependencies")
 	}
 
-	code := Run([]string{"bulle", "policy", "--json", "--add-exec", "--add-libs", tmp, "--", "/usr/bin/true"}, &stdout, &stderr)
+	code := Run([]string{"bulle", "show", "--json", tmp, "--", "/usr/bin/true"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())

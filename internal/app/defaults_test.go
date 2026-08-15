@@ -9,20 +9,6 @@ import (
 	"github.com/vincentarelbundock/bulle/internal/config"
 )
 
-func TestMergeLastRunArgs(t *testing.T) {
-	got := mergeLastRunArgs([]string{"--profile", "claude", "."}, []string{"--last", "--ro", "/x"})
-	want := []string{"--profile", "claude", ".", "--ro", "/x"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("merged = %#v, want %#v", got, want)
-	}
-	// Extra flags must land before the stored command separator.
-	got = mergeLastRunArgs([]string{"-p", "demo", "--", "git", "--version"}, []string{"--last", "--env", "HELLO=1"})
-	want = []string{"-p", "demo", "--env", "HELLO=1", "--", "git", "--version"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("merged = %#v, want %#v", got, want)
-	}
-}
-
 func TestRetryHintLine(t *testing.T) {
 	hints := []string{
 		"denied: read /home/u/.gitconfig — add --ro ~/.gitconfig",
@@ -31,7 +17,7 @@ func TestRetryHintLine(t *testing.T) {
 		"denied: read /home/u/.gitconfig — add --ro ~/.gitconfig",
 	}
 	got := retryHintLine(hints)
-	want := "bulle: retry with these grants: bulle rerun --ro ~/.gitconfig --rox /opt/x"
+	want := "bulle: retry with these grants added: --ro ~/.gitconfig --rox /opt/x"
 	if got != want {
 		t.Fatalf("retry = %q, want %q", got, want)
 	}
@@ -60,7 +46,7 @@ func TestApplyConfigDefaults(t *testing.T) {
 		t.Fatalf("opts lists = env %#v ro %#v", opts.Env, opts.ReadOnly)
 	}
 
-	explicit := cli.Options{Flags: cli.Flags{Profile: "codex", Timeout: "5s", Env: []string{"PATH"}}, Timeout: 5 * time.Second}
+	explicit := cli.Options{Profile: "codex", Flags: cli.Flags{Timeout: "5s", Env: []string{"PATH"}}, Timeout: 5 * time.Second}
 	if err := applyConfigDefaults(&explicit, defaults); err != nil {
 		t.Fatalf("applyConfigDefaults: %v", err)
 	}

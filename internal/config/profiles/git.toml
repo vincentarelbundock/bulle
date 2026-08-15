@@ -1,6 +1,7 @@
 title = "Git"
 description = "git binary, user configuration, and global ignores"
 inherits = ["tool", "terminal"]
+default_app = "git"
 # pkg: additionally grants the package tree so git's libexec/git-core
 # subcommand binaries (git-maintenance, git-remote-https) are executable; on
 # system installs it skips and the platform defaults cover libexec instead.

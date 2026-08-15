@@ -15,6 +15,7 @@ import (
 	"github.com/vincentarelbundock/bulle/internal/backends"
 	"github.com/vincentarelbundock/bulle/internal/cli"
 	"github.com/vincentarelbundock/bulle/internal/config"
+	"github.com/vincentarelbundock/bulle/internal/didyoumean"
 	"github.com/vincentarelbundock/bulle/internal/policy"
 	"github.com/vincentarelbundock/bulle/internal/supervisor"
 )
@@ -69,7 +70,7 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 			}
 		}
 	}
-	return runMain(args, "", stdout, stderr, nil)
+	return runMain(args, "", stdout, stderr, newRecorder())
 }
 
 // extractPolicyFormat pulls --json out of `bulle policy` arguments; the rest
@@ -132,7 +133,32 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 			return ExitConfigError
 		}
 	}
+	if err := validateProfiles(opts, global); err != nil {
+		fmt.Fprintln(stderr, err)
+		return ExitConfigError
+	}
 	explicitCommand := len(opts.Command) > 0
+	if explicitCommand {
+		// A command given explicitly after -- always gets its own binary
+		// granted: `bulle -- pandoc doc.md` must work without the binary
+		// being granted by hand.
+		opts.AddExec = true
+		if opts.Profile == "" {
+			// A bare command whose name is some profile's default_app is
+			// almost certainly meant to run under that profile.
+			matches := profilesMatchingCommand(global, opts.Command[0])
+			if len(matches) == 1 {
+				opts.Profile = matches[0]
+				fmt.Fprintf(stderr, "bulle: using profile %q because its default_app runs %q; name a profile before -- to choose explicitly\n", matches[0], opts.Command[0])
+			} else if len(matches) > 1 {
+				fmt.Fprintf(stderr, "bulle: profiles %s all declare a default_app running %q; running under the default profile — name one before -- to choose\n", strings.Join(matches, ", "), opts.Command[0])
+			}
+		}
+		// Library discovery scans the granted executable trees, which a
+		// profile can make enormous; with no profile selected the sandbox is
+		// minimal and the scan is what makes an arbitrary command runnable.
+		opts.AddLibs = opts.Profile == ""
+	}
 	if len(opts.Command) == 0 {
 		defaultApp, err := defaultAppForRun(opts, global)
 		if err != nil {
@@ -158,8 +184,11 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 			fmt.Fprint(stdout, cli.Usage())
 			return ExitOK
 		}
-		fmt.Fprintln(stderr, "bulle: no command supplied and no default_app configured")
-		fmt.Fprintln(stderr, "pass a command after -- (e.g. bulle . -- claude) or set default_app in your config")
+		if opts.Profile != "" {
+			fmt.Fprintf(stderr, "bulle: profile %q has no default app; add a command after -- (e.g. bulle %s -- ./script.sh)\n", opts.Profile, opts.Profile)
+		} else {
+			fmt.Fprintln(stderr, "bulle: nothing to run: name a profile with a default app, or pass a command after --")
+		}
 		return ExitConfigError
 	}
 	// The scratch is created before policy.Resolve so $WORKSPACE and the
@@ -202,34 +231,8 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 		return ExitBackendMissing
 	}
 	prepared, err := backends.PreparePolicy(p)
-	// Rescue-only profile inference: when the user gave a command but no
-	// profile and discovery fails under the default profile, a profile whose
-	// default_app runs that same command is almost certainly what they meant.
-	// Runs that would succeed are never affected, and ambiguity refuses to
-	// guess because selecting a profile changes what the sandbox grants.
-	var ambiguousProfiles []string
-	if err != nil && opts.Profile == "" && explicitCommand {
-		matches := profilesMatchingCommand(global, opts.Command[0])
-		if len(matches) == 1 {
-			retry := opts
-			retry.Profile = matches[0]
-			if rescued, rerr := resolveAndPrepare(retry, global, env, home, tmp); rerr == nil {
-				if rescued.ShimDir != "" {
-					shimDirs = append(shimDirs, rescued.ShimDir)
-				}
-				fmt.Fprintf(stderr, "bulle: selected profile %q because its default_app runs %q and the default profile cannot; pass --profile to choose explicitly\n", matches[0], opts.Command[0])
-				opts.Profile = matches[0]
-				prepared, err = rescued, nil
-			}
-		} else if len(matches) > 1 {
-			ambiguousProfiles = matches
-		}
-	}
 	if err != nil {
 		fmt.Fprintln(stderr, err)
-		if len(ambiguousProfiles) > 0 {
-			fmt.Fprintf(stderr, "profiles %s all declare a default_app running %q; choose one with --profile\n", strings.Join(ambiguousProfiles, ", "), opts.Command[0])
-		}
 		if scratch != nil {
 			// Nothing ran, so the scratch is unchanged; remove it rather than
 			// leaving an empty clone behind on every failed policy resolution.
@@ -271,7 +274,6 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 		}
 		return code
 	}
-	saveLastRun(cli.NormalizeSeparator(args[1:]))
 	for _, note := range p.Notes {
 		fmt.Fprintf(stderr, "bulle: %s\n", note)
 	}
@@ -280,6 +282,7 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 	// process survives the sandboxed command and can report on its failure.
 	probe := startDenialProbe(p)
 	code := ExitOK
+	failed := false
 	if err := supervisor.Run(p, supervisor.Options{
 		Timeout: p.Timeout,
 		Limits:  p.Limits,
@@ -288,23 +291,72 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 		Stderr:  os.Stderr,
 	}); err != nil {
 		code = exitCodeForSupervisorError(err, stderr)
-		if rec == nil {
+		failed = true
+	}
+	// The recorder reads the same denials the hints are built from, against
+	// the policy that was actually in effect for this run. It observes
+	// successes too: a run can be denied an optional access and still exit
+	// zero, and that grant belongs in the profile.
+	learnAgain := false
+	if rec != nil {
+		rec.beginRound()
+		rec.observe(p, probe)
+		if rec.lastAdded > 0 && stdinIsTerminal() {
+			learnAgain = promptLearnedGrants(opts, global, rec, scratch != nil, stdout, stderr)
+		} else if failed {
 			printDenialHints(probe, scratch, home, stderr)
 		}
-	}
-	// Recording reads the same denials the hints are built from, against the
-	// policy that was actually in effect for this run. It runs on success too:
-	// a run can be denied an optional access and still exit zero, and that
-	// grant belongs in the profile.
-	if rec != nil {
-		rec.observe(p, probe)
+	} else if failed {
+		printDenialHints(probe, scratch, home, stderr)
 	}
 	// The review gate runs on every exit path — success, command failure,
 	// and timeout alike — and never changes the exit code.
 	if scratch != nil {
 		reviewScratch(scratch, opts.ScratchKeep, stdout, stderr)
 	}
+	if learnAgain {
+		return runMain(args, "", stdout, stderr, rec)
+	}
 	return code
+}
+
+// validateProfiles rejects unknown profile names before anything runs, with a
+// suggestion for a near miss and a pointer at the two likeliest grammar slips:
+// a directory in the profile slot, and a command name without the -- that a
+// command requires.
+func validateProfiles(opts cli.Options, global config.Config) error {
+	if opts.Profile == "" {
+		return nil
+	}
+	for _, part := range strings.Split(opts.Profile, ",") {
+		name := strings.TrimSpace(part)
+		if name == "" {
+			return fmt.Errorf("bulle: profile list contains an empty name")
+		}
+		if _, ok := global.Profiles[name]; ok {
+			continue
+		}
+		if info, err := os.Stat(name); err == nil && info.IsDir() {
+			return fmt.Errorf("bulle: %q is a directory, not a profile; the workspace comes second, as in: bulle default %s", name, name)
+		}
+		msg := fmt.Sprintf("bulle: unknown profile %q", name)
+		if suggestion := didyoumean.Closest(name, profileNameList(global)); suggestion != "" {
+			msg += fmt.Sprintf(" (did you mean %s?)", suggestion)
+		}
+		if _, err := exec.LookPath(name); err == nil {
+			msg += fmt.Sprintf("; to run the command %q, put it after the separator: bulle -- %s", name, name)
+		}
+		return fmt.Errorf("%s", msg)
+	}
+	return nil
+}
+
+func profileNameList(global config.Config) []string {
+	names := make([]string, 0, len(global.Profiles))
+	for name := range global.Profiles {
+		names = append(names, name)
+	}
+	return names
 }
 
 // printDenialHints reports sandbox denials logged by the kernel during a

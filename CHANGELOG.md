@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+#### A new, first-principles CLI grammar (breaking)
+
+- **One sentence explains every invocation: everything before `--` is
+  policy; everything after `--` is the command.** The run grammar is now
+  `bulle <profile>[,profile...] [dir] [-- command [args...]]`. The profile is
+  the first positional (`bulle claude`, `bulle claude,offline ~/repos/x`);
+  the `-p/--profile` flag is gone. The workspace directory is strictly the
+  second positional, and a command only ever starts after an explicit `--` —
+  the directory-sniffing separator inference (and its stderr announcement)
+  is deleted. Errors teach the grammar: a directory in the profile slot, a
+  command name without `--`, and a support profile with no default app each
+  get a message naming the correct spelling.
+- **`bulle -- cmd` just works.** A command given explicitly after `--`
+  always gets its own binary granted (and, when no profile is selected, its
+  runtime libraries discovered too), so `bulle -- pandoc doc.md` runs under
+  the minimal default sandbox with nothing granted by hand. The `--add-exec`
+  and `--add-libs` flags are gone. Profile inference is now standard rather
+  than rescue-only: a bare command matching exactly one profile's
+  `default_app` selects that profile (announced); an ambiguous match runs
+  under the default profile and names the candidates.
+- **Denied runs end with an offer to save the fix.** On a terminal, a run
+  that hit sandbox denials ends by listing the grants that would allow them
+  and offering to save them to the profile — `[s]ave and run again`,
+  `[w]rite and quit`, or `[n]o`. Saves write a bulle-managed file under
+  `<config>/profiles/<name>.toml` (generalized entries, every one optional,
+  merged into the same-named profile at load time; hand-written files are
+  never rewritten). A run with no profile offers to *create* a profile named
+  after the command, with its `default_app` set — that is how profiles are
+  born. Non-interactive runs keep the printed denial hints.
+- **Fewer subcommands.** `policy`, `resolvers`, `profiles list`, and
+  `config` are folded into one inspection command: `bulle show
+  [policy|profiles|resolvers|config]` (bare `show` prints the policy;
+  `--json` still applies). `record` is gone — the save prompt subsumes it
+  interactively, one reviewed round at a time. `rerun` is gone — shell
+  history plus the save prompt cover it, and the last-run state file is no
+  longer written. What remains: `scratch`, `show`, `profiles install`,
+  `completion`, `help`, `version`.
+- **Help is short and layered.** The front help screen is ~45 lines: the
+  grammar, the four grant flags, `--env`, and the subcommands. The advanced
+  material moved to `bulle help grants|env|limits|config`, and the profile
+  listing to `bulle show profiles`. Completion now offers profiles and
+  subcommands together in the first position.
+- **The git profile has `default_app = "git"`**, so `bulle git` runs git and
+  a bare app-less profile invocation is rarer.
+
 ### Added
 
 #### Shell completions
@@ -45,6 +92,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arguments — show help and exit 0 instead of a terse error. Bare `rerun`,
   `resolvers`, `policy`, and `scratch` keep their meaningful behavior, and
   `bulle .` (a workspace with no command) keeps its explicit error.
+
+#### Friendlier errors and `bulle config`
+
+- **Misspelled profile names get a suggestion.** `--profile claud` now says
+  `did you mean "claude"?` (drawn from every profile in scope, user-installed
+  ones included); with no near miss, the error points at
+  `bulle profiles list`.
+- **Flag errors point at the flag, not the whole help.** A rejected flag
+  value shows that flag's own syntax line (`usage: --memory SIZE ...`)
+  instead of referring to the 200-line help; unknown flags keep kong's
+  suggestion or fall back to one of ours.
+- **`bulle rerun` with nothing recorded explains itself**, naming the
+  last-run file and that every completed run creates it.
+- **`bulle config` reports the configuration in effect.** It prints the
+  configuration root, whether `config.toml` and `profiles/` were found and
+  load cleanly, and the built-in profile count. Runs deliberately ignore a
+  missing `config.toml`, so this is where a mistyped directory or a broken
+  file becomes visible; a load error exits non-zero.
 
 ### Changed
 

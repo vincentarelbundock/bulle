@@ -9,9 +9,18 @@ import (
 type Options struct {
 	Flags
 
+	// Profile is the first positional: a profile name, or comma-separated
+	// profiles merged left to right.
+	Profile     string
 	ProjectPath string
-	Command     []string
-	Timeout     time.Duration
+
+	// AddExec and AddLibs are no longer flags: the app turns them on whenever
+	// the command was given explicitly after --, so an arbitrary command works
+	// without its binary being granted by hand.
+	AddExec bool
+	AddLibs bool
+	Command []string
+	Timeout time.Duration
 
 	// Limits is the parsed resource-limit request, after the flags and the
 	// [defaults] block have been merged.

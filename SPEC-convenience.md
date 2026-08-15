@@ -2,9 +2,9 @@
 
 Proposals to improve the day-to-day convenience of bulle, from a codebase
 survey (2026-08-15). Ordered by payoff per effort. Completed items are
-removed as they land (shell completions and per-subcommand help shipped, with
-the flag/subcommand tables that drive them shared for reuse — see "Shared
-plumbing").
+removed as they land (shell completions, per-subcommand help, and friendlier
+errors + `bulle config` shipped, with the flag/subcommand tables that drive
+them shared for reuse — see "Shared plumbing").
 
 ## High payoff
 
@@ -33,20 +33,6 @@ confirmation.
   implicitly at run time, and only for the selected profile.
 
 ## Medium payoff
-
-### 6. Friendlier errors
-
-- Misspelled profile names get no suggestion despite `ProfileNames` being
-  available — add a did-you-mean.
-- Every flag-parse failure is wrapped as `"%s (run 'bulle --help')"`
-  (`internal/cli/parse.go:172-174`); point at the specific flag's syntax
-  instead.
-- `rerun: no previous invocation recorded` (`app.go:93`) should say what
-  creates the record and where it lives.
-- `loadConfig` silently ignores a missing `config.toml` (`app.go:401-405`),
-  so a typo'd directory is invisible. Add `bulle config` (or `policy
-  --config-path`) printing which config files were loaded and where one would
-  be created.
 
 ### 7. `record --install NAME`
 
@@ -81,5 +67,6 @@ The completion work left behind two drift-proof tables: flag specs derived by
 reflection from the `Flags` struct (`internal/cli/flagspec.go`) and the
 subcommand table shared with dispatch (`internal/app/commands.go`), plus
 per-subcommand help topics (`internal/cli/help.go`, sync-tested against the
-table). Item 6 (per-flag error messages) should build on those rather than
-adding parallel listings.
+table), and a small `internal/didyoumean` package for typo suggestions.
+Future error-message work should build on those rather than adding parallel
+listings.

@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/vincentarelbundock/bulle/internal/cli"
@@ -25,23 +24,17 @@ type subcommand struct {
 func subcommands() []subcommand {
 	subs := []subcommand{
 		{cli.CommandSpec{Name: "scratch", Verbs: []string{"list", "diff", "pull", "wipe", "shell"}}, runScratchDispatch, false},
-		{cli.CommandSpec{Name: "record", Extra: []cli.FlagSpec{
-			{Name: "out", Short: "o", TakesValue: true, Complete: "file", Help: "Write the recorded profile to FILE instead of stdout."},
-			{Name: "max-rounds", TakesValue: true, Help: "Stop after N recording rounds (default 10)."},
-		}}, runRecordDispatch, true},
-		{cli.CommandSpec{Name: "profiles", Verbs: []string{"list", "install"}}, runProfilesDispatch, true},
-		{cli.CommandSpec{Name: "resolvers"}, runResolversDispatch, false},
-		{cli.CommandSpec{Name: "policy", Extra: []cli.FlagSpec{
+		{cli.CommandSpec{Name: "show", Verbs: []string{"policy", "profiles", "resolvers", "config"}, Extra: []cli.FlagSpec{
 			{Name: "json", Help: "Print the resolved policy as JSON."},
-			{Name: "summary", Help: "Print the resolved policy as a summary (default)."},
-		}}, runPolicyDispatch, false},
-		{cli.CommandSpec{Name: "rerun"}, runRerunDispatch, false},
+		}}, runShowDispatch, false},
+		{cli.CommandSpec{Name: "profiles", Verbs: []string{"list", "install"}}, runProfilesDispatch, true},
 		{cli.CommandSpec{Name: "completion", Verbs: []string{"bash", "zsh", "fish"}}, runCompletionDispatch, true},
 		{cli.CommandSpec{Name: "help"}, runHelpDispatch, false},
 		{cli.CommandSpec{Name: "version"}, runVersionDispatch, false},
 		{cli.CommandSpec{Name: "__complete", Hidden: true}, runCompleteDispatch, false},
 	}
-	// `bulle help <topic>` completes the other subcommand names as verbs.
+	// `bulle help <topic>` completes the other subcommand names and the extra
+	// topics as verbs.
 	for i := range subs {
 		if subs[i].Name == "help" {
 			for _, sub := range subs {
@@ -49,6 +42,7 @@ func subcommands() []subcommand {
 					subs[i].Verbs = append(subs[i].Verbs, sub.Name)
 				}
 			}
+			subs[i].Verbs = append(subs[i].Verbs, cli.HelpTopics()...)
 		}
 	}
 	return subs
@@ -97,55 +91,51 @@ func runScratchDispatch(argv0 string, rest []string, stdout, stderr io.Writer) i
 	}
 	if isRun {
 		runArgs := append([]string{argv0, "--scratch"}, rest...)
-		return runMain(runArgs, "", stdout, stderr, nil)
+		return runMain(runArgs, "", stdout, stderr, newRecorder())
 	}
 	return runScratchCommand(rest, stdout, stderr)
 }
 
-func runRecordDispatch(argv0 string, rest []string, stdout, stderr io.Writer) int {
-	return runRecordCommand(argv0, rest, stdout, stderr)
+// runShowDispatch handles `bulle show [what]`: inspection without running
+// anything. Bare show and `show policy` resolve and print the policy the same
+// arguments would run under; the other verbs report on this machine's
+// configuration.
+func runShowDispatch(argv0 string, rest []string, stdout, stderr io.Writer) int {
+	what := "policy"
+	if len(rest) > 0 {
+		switch rest[0] {
+		case "policy", "profiles", "resolvers", "config":
+			what, rest = rest[0], rest[1:]
+		}
+	}
+	switch what {
+	case "profiles":
+		if len(rest) > 0 {
+			fmt.Fprintln(stderr, "usage: bulle show profiles")
+			return ExitConfigError
+		}
+		return runProfilesCommand([]string{"list"}, stdout, stderr)
+	case "resolvers":
+		if len(rest) > 0 {
+			fmt.Fprintln(stderr, "usage: bulle show resolvers")
+			return ExitConfigError
+		}
+		writeResolverListing(parentEnv(), stdout)
+		return ExitOK
+	case "config":
+		return runConfigCommand(rest, stdout, stderr)
+	default:
+		runArgs, format, err := extractPolicyFormat(rest)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return ExitConfigError
+		}
+		return runMain(append([]string{argv0}, runArgs...), format, stdout, stderr, nil)
+	}
 }
 
 func runProfilesDispatch(_ string, rest []string, stdout, stderr io.Writer) int {
 	return runProfilesCommand(rest, stdout, stderr)
-}
-
-func runResolversDispatch(_ string, rest []string, stdout, stderr io.Writer) int {
-	if len(rest) > 0 {
-		fmt.Fprintln(stderr, "usage: bulle resolvers")
-		return ExitConfigError
-	}
-	writeResolverListing(parentEnv(), stdout)
-	return ExitOK
-}
-
-func runPolicyDispatch(argv0 string, rest []string, stdout, stderr io.Writer) int {
-	runArgs, format, err := extractPolicyFormat(rest)
-	if err != nil {
-		fmt.Fprintln(stderr, err)
-		return ExitConfigError
-	}
-	return runMain(append([]string{argv0}, runArgs...), format, stdout, stderr, nil)
-}
-
-func runRerunDispatch(argv0 string, rest []string, stdout, stderr io.Writer) int {
-	stored, err := loadLastRun()
-	if err != nil {
-		fmt.Fprintln(stderr, "bulle: rerun: no previous invocation recorded")
-		return ExitConfigError
-	}
-	merged := mergeLastRunArgs(stored.Args, rest)
-	if stored.Dir != "" {
-		if cwd, err := os.Getwd(); err == nil && cwd != stored.Dir {
-			if err := os.Chdir(stored.Dir); err != nil {
-				fmt.Fprintf(stderr, "bulle: rerun: cannot return to %s: %v\n", stored.Dir, err)
-				return ExitConfigError
-			}
-			fmt.Fprintf(stderr, "bulle: rerun: running from %s\n", stored.Dir)
-		}
-	}
-	fmt.Fprintf(stderr, "bulle: repeating: bulle %s\n", strings.Join(merged, " "))
-	return runMain(append([]string{argv0}, merged...), "", stdout, stderr, nil)
 }
 
 func runCompletionDispatch(_ string, rest []string, stdout, stderr io.Writer) int {

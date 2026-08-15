@@ -9,10 +9,11 @@ import (
 // inference in splitCommand read the parser's own definition and cannot drift
 // from it.
 type FlagSpec struct {
-	Name       string // long name, without dashes
-	Short      string // single-letter form, without dash
-	TakesValue bool   // consumes the following argument when not --flag=value
-	Help       string
+	Name        string // long name, without dashes
+	Short       string // single-letter form, without dash
+	TakesValue  bool   // consumes the following argument when not --flag=value
+	Help        string
+	Placeholder string // value placeholder shown in help, e.g. PATH
 	// Complete names what the flag's value completes to: "profile" for
 	// profile names, "file" to delegate to the shell's file completion, or
 	// empty for values with no candidates.
@@ -45,11 +46,12 @@ func flagSpecsOf(t reflect.Type) []FlagSpec {
 			continue
 		}
 		specs = append(specs, FlagSpec{
-			Name:       name,
-			Short:      field.Tag.Get("short"),
-			TakesValue: field.Type.Kind() != reflect.Bool,
-			Help:       field.Tag.Get("help"),
-			Complete:   field.Tag.Get("complete"),
+			Name:        name,
+			Short:       field.Tag.Get("short"),
+			TakesValue:  field.Type.Kind() != reflect.Bool,
+			Help:        field.Tag.Get("help"),
+			Placeholder: field.Tag.Get("placeholder"),
+			Complete:    field.Tag.Get("complete"),
 		})
 	}
 	return specs

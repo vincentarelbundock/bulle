@@ -9,14 +9,17 @@ import (
 	"github.com/vincentarelbundock/bulle/internal/config"
 )
 
-func TestParseRunWithProjectCommandAndFlags(t *testing.T) {
+func TestParseRunWithProfileWorkspaceCommandAndFlags(t *testing.T) {
 	opts, err := Parse([]string{
-		"bulle", "--profile", "secrets", ".", "--rw", ".", "--ro", "~/.cache/uv,/tmp/cache",
-		"--env", "PATH", "--env", "OPENAI_API_KEY", "--add-exec", "--add-libs",
+		"bulle", "secrets", ".", "--rw", ".", "--ro", "~/.cache/uv,/tmp/cache",
+		"--env", "PATH", "--env", "OPENAI_API_KEY",
 		"--", "codex", "--model", "gpt-5",
 	})
 	if err != nil {
 		t.Fatalf("Parse returned error: %v", err)
+	}
+	if opts.Profile != "secrets" {
+		t.Fatalf("Profile = %q, want secrets", opts.Profile)
 	}
 	if opts.ProjectPath != "." {
 		t.Fatalf("ProjectPath = %q, want .", opts.ProjectPath)
@@ -30,9 +33,6 @@ func TestParseRunWithProjectCommandAndFlags(t *testing.T) {
 	if len(opts.Env) != 2 || opts.Env[1] != "OPENAI_API_KEY" {
 		t.Fatalf("Env = %#v", opts.Env)
 	}
-	if !opts.AddExec || !opts.AddLibs {
-		t.Fatalf("AddExec = %v, AddLibs = %v", opts.AddExec, opts.AddLibs)
-	}
 	if opts.NoWorkspace {
 		t.Fatalf("NoWorkspace = true, want false")
 	}
@@ -41,10 +41,12 @@ func TestParseRunWithProjectCommandAndFlags(t *testing.T) {
 	}
 }
 
-func TestParseRejectsRemovedVerbFlags(t *testing.T) {
-	// These verbs are subcommands now; the flags are gone entirely.
-	for _, arg := range []string{"--policy", "--policy=json", "--last", "--list-profiles", "--list-resolvers", "--install-profiles"} {
-		if _, err := Parse([]string{"bulle", arg}); err == nil {
+func TestParseRejectsRemovedFlags(t *testing.T) {
+	// Former flags whose jobs moved elsewhere: profiles are the first
+	// positional, executable discovery is automatic for explicit commands,
+	// and the verbs are subcommands.
+	for _, arg := range []string{"--profile", "--profile=claude", "-p", "--add-exec", "--add-libs", "--policy", "--last"} {
+		if _, err := Parse([]string{"bulle", arg, "--", "true"}); err == nil {
 			t.Fatalf("Parse(%q) succeeded, want unknown-flag error", arg)
 		}
 	}
@@ -110,25 +112,25 @@ func TestParseRejectsNoNetworkFlag(t *testing.T) {
 	}
 }
 
-func TestParseProfileForms(t *testing.T) {
-	for _, args := range [][]string{
-		{"bulle", "-p", "codex", "."},
-		{"bulle", "--profile=codex", "."},
-		{"bulle", "--profile", "codex,offline", "."},
+func TestParseProfilePositional(t *testing.T) {
+	for _, tt := range []struct {
+		args        []string
+		wantProfile string
+		wantPath    string
+	}{
+		{[]string{"bulle", "codex"}, "codex", "."},
+		{[]string{"bulle", "codex", "."}, "codex", "."},
+		{[]string{"bulle", "codex,offline", "/tmp"}, "codex,offline", "/tmp"},
 	} {
-		opts, err := Parse(args)
+		opts, err := Parse(tt.args)
 		if err != nil {
-			t.Fatalf("Parse(%#v) returned error: %v", args, err)
+			t.Fatalf("Parse(%#v) returned error: %v", tt.args, err)
 		}
-		wantProfile := "codex"
-		if strings.Contains(args[1], ",") || len(args) > 2 && strings.Contains(args[2], ",") {
-			wantProfile = "codex,offline"
+		if opts.Profile != tt.wantProfile {
+			t.Fatalf("Parse(%#v) Profile = %q, want %q", tt.args, opts.Profile, tt.wantProfile)
 		}
-		if opts.Profile != wantProfile {
-			t.Fatalf("Parse(%#v) Profile = %q, want %q", args, opts.Profile, wantProfile)
-		}
-		if opts.ProjectPath != "." {
-			t.Fatalf("Parse(%#v) ProjectPath = %q, want .", args, opts.ProjectPath)
+		if opts.ProjectPath != tt.wantPath {
+			t.Fatalf("Parse(%#v) ProjectPath = %q, want %q", tt.args, opts.ProjectPath, tt.wantPath)
 		}
 	}
 }
@@ -136,8 +138,8 @@ func TestParseProfileForms(t *testing.T) {
 func TestParseDefaultsProjectPathToCurrentDirectory(t *testing.T) {
 	for _, args := range [][]string{
 		{"bulle"},
-		{"bulle", "--profile", "codex"},
-		{"bulle", "--profile", "codex", "--", "bash"},
+		{"bulle", "codex"},
+		{"bulle", "codex", "--", "bash"},
 	} {
 		opts, err := Parse(args)
 		if err != nil {
@@ -168,62 +170,64 @@ func TestProfileNamesSortsAlphabetically(t *testing.T) {
 	}
 }
 
-func TestUsageShowsProfileShortFlag(t *testing.T) {
-	if !strings.Contains(Usage(), "-p, --profile NAME") {
-		t.Fatalf("Usage() does not show profile short flag:\n%s", Usage())
-	}
-	if !strings.Contains(Usage(), "bulle [flags] [workspace]") {
-		t.Fatalf("Usage() does not show optional workspace:\n%s", Usage())
-	}
-	if !strings.Contains(Usage(), "--no-workspace") {
-		t.Fatalf("Usage() does not show --no-workspace:\n%s", Usage())
-	}
-	if strings.Contains(Usage(), "--no-network") {
-		t.Fatalf("Usage() still shows --no-network:\n%s", Usage())
-	}
-	if !strings.Contains(Usage(), "profiles list") {
-		t.Fatalf("Usage() does not show profiles list subcommand:\n%s", Usage())
-	}
-	if !strings.Contains(Usage(), "profiles install SOURCE") {
-		t.Fatalf("Usage() does not show profiles install subcommand:\n%s", Usage())
-	}
-	if !strings.Contains(Usage(), "--timeout DURATION") {
-		t.Fatalf("Usage() does not show --timeout:\n%s", Usage())
-	}
-	if !strings.Contains(Usage(), "Go duration") {
-		t.Fatalf("Usage() does not explain Go duration syntax:\n%s", Usage())
-	}
-	if !strings.Contains(Usage(), "exit 124") {
-		t.Fatalf("Usage() does not document timeout exit code:\n%s", Usage())
-	}
-	for _, example := range []string{
-		"bulle profiles install agent.toml",
-		"bulle profiles install github:vincentarelbundock/bulle/custom_profiles",
+func TestUsageShowsTheGrammarAndPointers(t *testing.T) {
+	usage := Usage()
+	for _, want := range []string{
+		"bulle <profile>[,profile...] [dir] [-- command [args...]]",
+		"Everything before -- is policy; everything after -- is the command.",
+		"--ro PATH",
+		"--env NAME[=VALUE]",
+		"bulle scratch",
+		"bulle show",
+		"bulle profiles install SOURCE",
+		"bulle completion bash|zsh|fish",
+		"bulle help [grants|env|limits|config]",
 	} {
-		if !strings.Contains(Usage(), example) {
-			t.Fatalf("Usage() does not show install-profile example %q:\n%s", example, Usage())
+		if !strings.Contains(usage, want) {
+			t.Fatalf("Usage() missing %q:\n%s", want, usage)
 		}
 	}
-	if !strings.Contains(Usage(), "--json (summary otherwise)") {
-		t.Fatalf("Usage() does not show policy formats:\n%s", Usage())
+	for _, gone := range []string{"--profile", "--add-exec", "--add-libs", "rerun", "record", "--no-network"} {
+		if strings.Contains(usage, gone) {
+			t.Fatalf("Usage() still mentions %q:\n%s", gone, usage)
+		}
 	}
-	if !strings.Contains(Usage(), "macOS uses configured runtime roots") {
-		t.Fatalf("Usage() does not explain macOS --add-libs behavior:\n%s", Usage())
+}
+
+func TestHelpTopicsCoverAdvancedMaterial(t *testing.T) {
+	for topic, want := range map[string]string{
+		"grants": "which:NAME",
+		"env":    "--env-file PATH",
+		"limits": "--timeout DURATION",
+		"config": "profiles/*.toml",
+	} {
+		text, ok := CommandHelp(topic)
+		if !ok {
+			t.Fatalf("help topic %q missing", topic)
+		}
+		if !strings.Contains(text, want) {
+			t.Fatalf("help topic %q missing %q:\n%s", topic, want, text)
+		}
 	}
-	for _, profile := range []string{"tool", "network", "offline", "macos-dns", "macos-certs", "keychain", "claude", "codex", "pi", "opencode"} {
-		if !strings.Contains(Usage(), profile) {
-			t.Fatalf("Usage() does not show built-in profile %q:\n%s", profile, Usage())
+	topics := HelpTopics()
+	if !reflect.DeepEqual(topics, []string{"config", "env", "grants", "limits"}) {
+		t.Fatalf("HelpTopics = %#v", topics)
+	}
+}
+
+func TestProfileListingShowsBuiltins(t *testing.T) {
+	listing := ProfileListing(config.DefaultConfig())
+	for _, profile := range []string{"tool", "network", "offline", "claude", "codex"} {
+		if !strings.Contains(listing, profile) {
+			t.Fatalf("ProfileListing missing built-in profile %q:\n%s", profile, listing)
 		}
 	}
 }
 
 func TestReferenceTypstIncludesFullHelp(t *testing.T) {
 	page := ReferenceTypst()
-	if !strings.Contains(page, "bulle runs local coding agents inside a controlled workspace.") {
+	if !strings.Contains(page, "bulle runs coding agents and other dangerous tools inside a sandbox.") {
 		t.Fatalf("ReferenceTypst does not include full Usage() text:\n%s", page)
-	}
-	if !strings.Contains(page, "Examples:") {
-		t.Fatalf("ReferenceTypst does not include examples from Usage():\n%s", page)
 	}
 	if !strings.Contains(page, "<website-metadata>") {
 		t.Fatalf("ReferenceTypst does not carry Calepin page metadata:\n%s", page)

@@ -9,12 +9,10 @@ import (
 
 var testCommands = []CommandSpec{
 	{Name: "scratch", Verbs: []string{"list", "diff", "pull", "wipe", "shell"}},
-	{Name: "record", Extra: []FlagSpec{
-		{Name: "out", Short: "o", TakesValue: true, Complete: "file"},
-		{Name: "max-rounds", TakesValue: true},
+	{Name: "show", Verbs: []string{"policy", "profiles", "resolvers", "config"}, Extra: []FlagSpec{
+		{Name: "json"},
 	}},
 	{Name: "profiles", Verbs: []string{"list", "install"}},
-	{Name: "policy"},
 	{Name: "__complete", Hidden: true},
 }
 
@@ -41,8 +39,8 @@ func TestGlobalFlagsDeriveFromStruct(t *testing.T) {
 	for _, f := range flags {
 		byName[f.Name] = f
 	}
-	if f := byName["profile"]; f.Short != "p" || !f.TakesValue || f.Complete != "profile" {
-		t.Fatalf("profile spec wrong: %+v", f)
+	if _, ok := byName["profile"]; ok {
+		t.Fatalf("--profile is gone; the profile is the first positional")
 	}
 	if f := byName["scratch"]; f.TakesValue {
 		t.Fatalf("--scratch must not take a value: %+v", f)
@@ -52,70 +50,53 @@ func TestGlobalFlagsDeriveFromStruct(t *testing.T) {
 	}
 }
 
-func TestValueFlagsDerived(t *testing.T) {
-	// The inference map must mirror the Flags struct exactly.
-	for _, f := range GlobalFlags() {
-		if valueFlags["--"+f.Name] != f.TakesValue {
-			t.Errorf("valueFlags[--%s] = %v, struct says %v", f.Name, valueFlags["--"+f.Name], f.TakesValue)
-		}
-		if f.Short != "" && f.TakesValue && !valueFlags["-"+f.Short] {
-			t.Errorf("short -%s missing from valueFlags", f.Short)
-		}
-	}
-}
-
-func TestCompleteSubcommands(t *testing.T) {
+func TestCompleteFirstWordOffersCommandsAndProfiles(t *testing.T) {
 	cfg := config.DefaultConfig()
 	got, directive := Complete(cfg, testCommands, []string{""})
-	if !contains(names(got), "scratch") || !contains(names(got), "policy") {
+	if !contains(names(got), "scratch") || !contains(names(got), "show") {
 		t.Fatalf("first-word completion missing subcommands: %v", got)
+	}
+	if !contains(names(got), "claude") || !contains(names(got), "offline") {
+		t.Fatalf("first-word completion missing profiles: %v", got)
 	}
 	if contains(names(got), "__complete") {
 		t.Fatalf("hidden command leaked into completion: %v", got)
 	}
-	if directive != DirectiveDefault {
-		t.Fatalf("directive = %d, want default (workspace dirs complete too)", directive)
+	if directive != DirectiveNoFile {
+		t.Fatalf("directive = %d, want nofile (position 1 is never a file)", directive)
+	}
+	// Comma-separated merges complete the last segment, keeping the head.
+	got, _ = Complete(cfg, testCommands, []string{"claude,off"})
+	if !contains(names(got), "claude,offline") {
+		t.Fatalf("comma merge completion wrong: %v", got)
+	}
+}
+
+func TestCompleteSecondPositionalIsADirectory(t *testing.T) {
+	cfg := config.DefaultConfig()
+	got, directive := Complete(cfg, testCommands, []string{"claude", ""})
+	if len(got) != 0 || directive != DirectiveDefault {
+		t.Fatalf("workspace slot = %v, %d; want shell file completion", got, directive)
 	}
 }
 
 func TestCompleteFlagNames(t *testing.T) {
 	cfg := config.DefaultConfig()
-	got, directive := Complete(cfg, testCommands, []string{"--pro"})
-	if !contains(names(got), "--profile") {
-		t.Fatalf("--pro did not complete to --profile: %v", got)
+	got, directive := Complete(cfg, testCommands, []string{"--r"})
+	if !contains(names(got), "--ro") || !contains(names(got), "--rwx") {
+		t.Fatalf("--r did not complete grant flags: %v", got)
 	}
 	if directive != DirectiveNoFile {
 		t.Fatalf("directive = %d, want nofile", directive)
 	}
 	// Subcommand-specific flags appear only under their subcommand.
-	got, _ = Complete(cfg, testCommands, []string{"record", "--max"})
-	if !contains(names(got), "--max-rounds") {
-		t.Fatalf("record --max did not complete: %v", got)
+	got, _ = Complete(cfg, testCommands, []string{"show", "--js"})
+	if !contains(names(got), "--json") {
+		t.Fatalf("show --js did not complete: %v", got)
 	}
-	got, _ = Complete(cfg, testCommands, []string{"--max"})
-	if contains(names(got), "--max-rounds") {
-		t.Fatalf("--max-rounds leaked outside record: %v", got)
-	}
-}
-
-func TestCompleteProfileValues(t *testing.T) {
-	cfg := config.DefaultConfig()
-	got, directive := Complete(cfg, testCommands, []string{"--profile", ""})
-	if !contains(names(got), "claude") {
-		t.Fatalf("profile value completion missing claude: %v", got)
-	}
-	if directive != DirectiveNoFile {
-		t.Fatalf("directive = %d, want nofile", directive)
-	}
-	// Comma-separated merges complete the last segment, keeping the head.
-	got, _ = Complete(cfg, testCommands, []string{"--profile", "claude,off"})
-	if !contains(names(got), "claude,offline") {
-		t.Fatalf("comma merge completion wrong: %v", got)
-	}
-	// --profile=partial keeps the flag prefix.
-	got, _ = Complete(cfg, testCommands, []string{"--profile=cla"})
-	if !contains(names(got), "--profile=claude") {
-		t.Fatalf("--profile= completion wrong: %v", got)
+	got, _ = Complete(cfg, testCommands, []string{"--js"})
+	if contains(names(got), "--json") {
+		t.Fatalf("--json leaked outside show: %v", got)
 	}
 }
 
@@ -124,6 +105,11 @@ func TestCompleteVerbsAndSeparator(t *testing.T) {
 	got, _ := Complete(cfg, testCommands, []string{"scratch", "di"})
 	if !contains(names(got), "diff") {
 		t.Fatalf("scratch verb completion missing diff: %v", got)
+	}
+	// scratch also starts runs, so the profile slot completes there too.
+	got, _ = Complete(cfg, testCommands, []string{"scratch", "cla"})
+	if !contains(names(got), "claude") {
+		t.Fatalf("scratch profile completion missing claude: %v", got)
 	}
 	// After a chosen verb, no more verbs.
 	got, _ = Complete(cfg, testCommands, []string{"scratch", "diff", ""})

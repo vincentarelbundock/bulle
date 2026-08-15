@@ -94,6 +94,11 @@ func Complete(cfg config.Config, commands []CommandSpec, words []string) ([]stri
 				out = append(out, c.Name)
 			}
 		}
+		// The first positional is a profile (or comma-separated profiles);
+		// complete the segment after the last comma.
+		names, _ := completeProfileSegment(cfg, cur, "")
+		out = append(out, names...)
+		return out, DirectiveNoFile
 	}
 	if sub != nil && len(sub.Verbs) > 0 && !verbChosen(*sub, prior[1:]) {
 		for _, verb := range sub.Verbs {
@@ -101,10 +106,33 @@ func Complete(cfg config.Config, commands []CommandSpec, words []string) ([]stri
 				out = append(out, verb)
 			}
 		}
+		// scratch and show also accept a run's grammar, so the profile slot
+		// completes there too.
+		if sub.Name == "scratch" || sub.Name == "show" {
+			names, _ := completeProfileSegment(cfg, cur, "")
+			out = append(out, names...)
+			return out, DirectiveNoFile
+		}
 	}
-	// A positional may also be a workspace directory or the start of the
-	// sandboxed command, so the shell's file completion stays on.
+	// Later positionals are the workspace directory or the sandboxed command,
+	// so the shell's file completion stays on.
 	return out, DirectiveDefault
+}
+
+// completeProfileSegment completes a profile name inside a comma-separated
+// merge list, keeping what came before the last comma.
+func completeProfileSegment(cfg config.Config, cur string, prefix string) ([]string, Directive) {
+	head := ""
+	if i := strings.LastIndex(cur, ","); i >= 0 {
+		head, cur = cur[:i+1], cur[i+1:]
+	}
+	var out []string
+	for _, name := range ProfileNames(cfg) {
+		if strings.HasPrefix(name, cur) {
+			out = append(out, prefix+head+name+"\t"+profileDescription(name, cfg))
+		}
+	}
+	return out, DirectiveNoFile
 }
 
 func verbChosen(sub CommandSpec, rest []string) bool {
@@ -121,19 +149,7 @@ func verbChosen(sub CommandSpec, rest []string) bool {
 func completeValue(cfg config.Config, f *FlagSpec, cur string, prefix string) ([]string, Directive) {
 	switch f.Complete {
 	case "profile":
-		// --profile accepts comma-separated merges; complete the segment
-		// after the last comma, keeping what came before.
-		head := ""
-		if i := strings.LastIndex(cur, ","); i >= 0 {
-			head, cur = cur[:i+1], cur[i+1:]
-		}
-		var out []string
-		for _, name := range ProfileNames(cfg) {
-			if strings.HasPrefix(name, cur) {
-				out = append(out, prefix+head+name+"\t"+profileDescription(name, cfg))
-			}
-		}
-		return out, DirectiveNoFile
+		return completeProfileSegment(cfg, cur, prefix)
 	case "file":
 		return nil, DirectiveDefault
 	default:

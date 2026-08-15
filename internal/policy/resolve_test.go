@@ -70,7 +70,7 @@ func TestResolveNetworkCapabilityFromConfigAndCLI(t *testing.T) {
 
 	cfg.Profiles["default"] = config.Profile{Settings: config.Settings{Allow: []string{"network"}}}
 	cfg.Profiles["offline"] = config.Profile{Settings: config.Settings{Deny: []string{"network"}}}
-	got, err = Resolve(Inputs{Options: cli.Options{ProjectPath: project, Flags: cli.Flags{Profile: "default,offline"}}, Global: cfg, ParentEnv: map[string]string{}, Home: root, Tmp: root})
+	got, err = Resolve(Inputs{Options: cli.Options{ProjectPath: project, Profile: "default,offline"}, Global: cfg, ParentEnv: map[string]string{}, Home: root, Tmp: root})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
@@ -300,7 +300,7 @@ func TestResolveAddExecWithoutExplicitProjectGrantsCurrentProject(t *testing.T) 
 		Options: cli.Options{
 			ProjectPath: project,
 			Command:     []string{"ls"},
-			Flags:       cli.Flags{AddExec: true},
+			AddExec:     true,
 		},
 		Global:    config.DefaultConfig(),
 		ParentEnv: map[string]string{"HOME": root, "PATH": "/bin"},
@@ -333,7 +333,7 @@ func TestResolveToolProfileIncludesToolAndPlatformDefaults(t *testing.T) {
 	}
 
 	got, err := Resolve(Inputs{
-		Options: cli.Options{ProjectPath: project, Command: []string{"bash"}, Flags: cli.Flags{Profile: "tool"}},
+		Options: cli.Options{ProjectPath: project, Command: []string{"bash"}, Profile: "tool"},
 		Global:  config.DefaultConfig(),
 		ParentEnv: map[string]string{
 			"HOME":    root,
@@ -433,7 +433,7 @@ func TestResolveCodexProfileOnLinuxDoesNotRequireMacOSPreferences(t *testing.T) 
 	}
 
 	_, err := Resolve(Inputs{
-		Options:   cli.Options{ProjectPath: project, Command: []string{"bash"}, Flags: cli.Flags{Profile: "codex"}},
+		Options:   cli.Options{ProjectPath: project, Command: []string{"bash"}, Profile: "codex"},
 		Global:    config.DefaultConfig(),
 		ParentEnv: map[string]string{"HOME": root, "PATH": "/usr/bin"},
 		Home:      root,
@@ -456,7 +456,7 @@ func TestResolveExplicitAgentProfileGrantsAgentState(t *testing.T) {
 	}
 
 	got, err := Resolve(Inputs{
-		Options:   cli.Options{ProjectPath: project, Command: []string{"bash"}, Flags: cli.Flags{Profile: "codex"}},
+		Options:   cli.Options{ProjectPath: project, Command: []string{"bash"}, Profile: "codex"},
 		Global:    config.DefaultConfig(),
 		ParentEnv: map[string]string{"HOME": root, "PATH": "/usr/bin"},
 		Home:      root,
@@ -509,7 +509,7 @@ func TestResolveClaudeProfileDoesNotFollowUnlistedConfigSymlinkTargets(t *testin
 	}
 
 	got, err := Resolve(Inputs{
-		Options:   cli.Options{ProjectPath: project, Command: []string{"claude"}, Flags: cli.Flags{Profile: "claude"}},
+		Options:   cli.Options{ProjectPath: project, Command: []string{"claude"}, Profile: "claude"},
 		Global:    config.DefaultConfig(),
 		ParentEnv: map[string]string{"HOME": root, "PATH": "/usr/bin"},
 		Home:      root,
@@ -559,7 +559,7 @@ func TestResolveClaudeProfileDoesNotGrantCodexMachLookup(t *testing.T) {
 	}
 
 	got, err := Resolve(Inputs{
-		Options:   cli.Options{ProjectPath: project, Command: []string{"claude"}, Flags: cli.Flags{Profile: "claude"}},
+		Options:   cli.Options{ProjectPath: project, Command: []string{"claude"}, Profile: "claude"},
 		Global:    config.DefaultConfig(),
 		ParentEnv: map[string]string{"HOME": root, "PATH": "/usr/bin"},
 		Home:      root,
@@ -611,7 +611,7 @@ func TestResolveBuiltInAgentProfiles(t *testing.T) {
 	for _, name := range []string{"codex", "claude", "opencode", "pi"} {
 		t.Run(name, func(t *testing.T) {
 			got, err := Resolve(Inputs{
-				Options: cli.Options{ProjectPath: project, Command: []string{"agent"}, Flags: cli.Flags{Profile: name}},
+				Options: cli.Options{ProjectPath: project, Command: []string{"agent"}, Profile: name},
 				Global:  config.DefaultConfig(),
 				ParentEnv: map[string]string{
 					"HOME":                   root,
@@ -660,7 +660,7 @@ func TestResolveOfflineProfileListDropsNetworkMachLookupBundle(t *testing.T) {
 	}
 
 	got, err := Resolve(Inputs{
-		Options:   cli.Options{ProjectPath: project, Command: []string{"agent"}, Flags: cli.Flags{Profile: "tool,offline"}},
+		Options:   cli.Options{ProjectPath: project, Command: []string{"agent"}, Profile: "tool,offline"},
 		Global:    config.DefaultConfig(),
 		ParentEnv: map[string]string{"PATH": "/usr/bin"},
 		Home:      root,
@@ -706,7 +706,7 @@ func TestResolveOfflineProfileDropsNetworkMachLookupBundleButKeepsKeychain(t *te
 	cfg.Profiles["codex-offline"] = config.Profile{Inherits: config.Inherits("codex", "offline")}
 
 	got, err := Resolve(Inputs{
-		Options:   cli.Options{ProjectPath: project, Command: []string{"agent"}, Flags: cli.Flags{Profile: "codex-offline"}},
+		Options:   cli.Options{ProjectPath: project, Command: []string{"agent"}, Profile: "codex-offline"},
 		Global:    cfg,
 		ParentEnv: map[string]string{"HOME": root, "PATH": "/usr/bin", "USER": "vincent", "SHELL": "/bin/zsh"},
 		Home:      root,
@@ -779,7 +779,7 @@ func TestResolveDefersPATHSanitizationForAddExecCommandLookup(t *testing.T) {
 	}
 
 	got, err := Resolve(Inputs{
-		Options:   cli.Options{ProjectPath: project, Command: []string{"tool"}, Flags: cli.Flags{AddExec: true}},
+		Options:   cli.Options{ProjectPath: project, Command: []string{"tool"}, AddExec: true},
 		Global:    cfg,
 		ParentEnv: map[string]string{"PATH": binDir},
 		Home:      root,
@@ -885,7 +885,8 @@ func TestResolvePassesExplicitSecretEnvWithoutDenyList(t *testing.T) {
 		Options: cli.Options{
 			ProjectPath: project,
 			Command:     []string{"codex"},
-			Flags:       cli.Flags{Profile: "tool", Env: []string{"OPENAI_API_KEY"}},
+			Profile:     "tool",
+			Flags:       cli.Flags{Env: []string{"OPENAI_API_KEY"}},
 		},
 		Global: config.DefaultConfig(),
 		ParentEnv: map[string]string{
@@ -921,7 +922,7 @@ func TestResolveAddExecDoesNotIncludeMacOSRuntimeRootsWithoutToolDefaults(t *tes
 		Options: cli.Options{
 			ProjectPath: project,
 			Command:     []string{"tool"},
-			Flags:       cli.Flags{AddExec: true},
+			AddExec:     true,
 		},
 		Global:    config.DefaultConfig(),
 		ParentEnv: map[string]string{"HOME": root, "PATH": "/usr/bin"},
@@ -956,7 +957,7 @@ func TestResolveAddLibsIncludesMacOSRuntimeRootsWithoutToolDefaults(t *testing.T
 		Options: cli.Options{
 			ProjectPath: project,
 			Command:     []string{"tool"},
-			Flags:       cli.Flags{AddLibs: true},
+			AddLibs:     true,
 		},
 		Global:    config.DefaultConfig(),
 		ParentEnv: map[string]string{"HOME": root, "PATH": "/usr/bin"},

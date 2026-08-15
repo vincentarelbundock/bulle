@@ -20,12 +20,12 @@ func TestShouldPrintProfileSummary(t *testing.T) {
 	}{
 		{
 			name: "explicit profile normal run",
-			opts: cli.Options{Flags: cli.Flags{Profile: "tool"}},
+			opts: cli.Options{Profile: "tool"},
 			want: true,
 		},
 		{
 			name: "explicit profile policy output",
-			opts: cli.Options{Flags: cli.Flags{Profile: "tool"}, Policy: true},
+			opts: cli.Options{Profile: "tool", Policy: true},
 			want: false,
 		},
 		{
@@ -226,7 +226,7 @@ func TestGroupSiblingPathsDeduplicatesNames(t *testing.T) {
 }
 
 func TestPreRunSessionPasteIncludesProfileSummaryWithoutKeychainWarning(t *testing.T) {
-	opts := cli.Options{Flags: cli.Flags{Profile: "claude"}}
+	opts := cli.Options{Profile: "claude"}
 	p := policy.Policy{
 		Backend:     policy.BackendMacOSSeatbelt,
 		ProjectPath: "/tmp/project",

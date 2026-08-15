@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 )
@@ -16,34 +17,23 @@ func runForTest(t *testing.T, args ...string) (string, string, int) {
 	return stdout.String(), stderr.String(), code
 }
 
-func TestCompleteEndpointListsSubcommands(t *testing.T) {
+func TestCompleteEndpointListsSubcommandsAndProfiles(t *testing.T) {
 	stdout, _, code := runForTest(t, "__complete", "--", "")
 	if code != ExitOK {
 		t.Fatalf("exit %d, stdout %q", code, stdout)
 	}
-	for _, want := range []string{"scratch", "record", "profiles", "policy", "rerun", "completion"} {
+	for _, want := range []string{"scratch", "show", "profiles", "completion", "claude", "offline"} {
 		if !containsLine(stdout, want) {
 			t.Errorf("missing %q in: %s", want, stdout)
 		}
 	}
-	if containsLine(stdout, "__complete") {
-		t.Errorf("hidden command leaked: %s", stdout)
-	}
-	if !strings.HasSuffix(strings.TrimRight(stdout, "\n"), ":0") {
-		t.Errorf("missing default directive: %q", stdout)
-	}
-}
-
-func TestCompleteEndpointProfiles(t *testing.T) {
-	stdout, _, code := runForTest(t, "__complete", "--", "--profile", "")
-	if code != ExitOK {
-		t.Fatalf("exit %d", code)
-	}
-	if !containsLine(stdout, "claude") {
-		t.Errorf("profile completion missing claude: %s", stdout)
+	for _, gone := range []string{"__complete", "record", "rerun", "policy", "resolvers"} {
+		if containsLine(stdout, gone) {
+			t.Errorf("%q leaked into completion: %s", gone, stdout)
+		}
 	}
 	if !strings.HasSuffix(strings.TrimRight(stdout, "\n"), ":4") {
-		t.Errorf("profile values should suppress file completion: %q", stdout)
+		t.Errorf("first word should suppress file completion: %q", stdout)
 	}
 }
 
@@ -81,19 +71,31 @@ func TestSubcommandHelp(t *testing.T) {
 	if code != ExitOK || !strings.Contains(stdout, "disposable") {
 		t.Errorf("scratch --help: exit %d", code)
 	}
-	stdout, _, code = runForTest(t, "policy", "-h")
+	stdout, _, code = runForTest(t, "show", "-h")
 	if code != ExitOK || !strings.Contains(stdout, "--json") {
-		t.Errorf("policy -h: exit %d, stdout %q", code, stdout)
+		t.Errorf("show -h: exit %d, stdout %q", code, stdout)
 	}
-	for _, args := range [][]string{{"profiles"}, {"record"}} {
-		stdout, _, code = runForTest(t, args...)
-		if code != ExitOK || !strings.Contains(stdout, "Usage:") {
-			t.Errorf("bare %v: exit %d, stdout %q", args, code, stdout)
-		}
+	stdout, _, code = runForTest(t, "profiles")
+	if code != ExitOK || !strings.Contains(stdout, "Usage:") {
+		t.Errorf("bare profiles: exit %d, stdout %q", code, stdout)
 	}
 	_, stderr, code := runForTest(t, "help", "bogus")
 	if code != ExitConfigError || !strings.Contains(stderr, "topics:") {
 		t.Errorf("help bogus: exit %d, stderr %q", code, stderr)
+	}
+}
+
+func TestHelpTopicsDispatch(t *testing.T) {
+	for topic, want := range map[string]string{
+		"grants": "which:NAME",
+		"env":    "--env-file",
+		"limits": "--timeout",
+		"config": "profiles/",
+	} {
+		stdout, _, code := runForTest(t, "help", topic)
+		if code != ExitOK || !strings.Contains(stdout, want) {
+			t.Errorf("help %s: exit %d, stdout %q", topic, code, stdout)
+		}
 	}
 }
 
@@ -102,18 +104,38 @@ func TestBareBulleShowsHelp(t *testing.T) {
 	// bare invocation into a real sandboxed run.
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	stdout, _, code := runForTest(t)
-	if code != ExitOK || !strings.Contains(stdout, "bulle runs local coding agents") {
+	if code != ExitOK || !strings.Contains(stdout, "bulle runs coding agents") {
 		t.Errorf("bare bulle: exit %d, stdout %q", code, stdout)
 	}
-	// A workspace argument without a command keeps the explicit error.
+}
+
+func TestDirectoryInProfileSlotIsExplained(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	_, stderr, code := runForTest(t, ".")
-	if code != ExitConfigError || !strings.Contains(stderr, "no command supplied") {
+	if code != ExitConfigError || !strings.Contains(stderr, "is a directory, not a profile") {
 		t.Errorf("bulle .: exit %d, stderr %q", code, stderr)
 	}
 }
 
+func TestCommandInProfileSlotIsExplained(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	// A name that is on PATH but is not a profile gets pointed at the -- form.
+	_, stderr, code := runForTest(t, "ls")
+	if code != ExitConfigError || !strings.Contains(stderr, "bulle -- ls") {
+		t.Errorf("bulle ls: exit %d, stderr %q", code, stderr)
+	}
+}
+
+func TestSupportProfileWithoutCommandIsExplained(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	_, stderr, code := runForTest(t, "network")
+	if code != ExitConfigError || !strings.Contains(stderr, "has no default app") {
+		t.Errorf("bulle network: exit %d, stderr %q", code, stderr)
+	}
+}
+
 func TestWantsHelpStopsAtSeparator(t *testing.T) {
-	if !wantsHelp([]string{"--profile", "go", "--help"}) {
+	if !wantsHelp([]string{"tool", "--help"}) {
 		t.Error("--help before -- not detected")
 	}
 	if wantsHelp([]string{"--", "tool", "--help"}) {
@@ -123,7 +145,7 @@ func TestWantsHelpStopsAtSeparator(t *testing.T) {
 
 func TestHelpAndVersionDispatch(t *testing.T) {
 	stdout, _, code := runForTest(t, "help")
-	if code != ExitOK || !strings.Contains(stdout, "bulle runs local coding agents") {
+	if code != ExitOK || !strings.Contains(stdout, "bulle runs coding agents") {
 		t.Errorf("help: exit %d", code)
 	}
 	if !strings.Contains(stdout, "bulle completion bash|zsh|fish") {
@@ -143,4 +165,58 @@ func containsLine(output, want string) bool {
 		}
 	}
 	return false
+}
+
+func TestShowProfilesListsBuiltins(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	stdout, _, code := runForTest(t, "show", "profiles")
+	if code != ExitOK {
+		t.Fatalf("exit %d, stdout %q", code, stdout)
+	}
+	for _, want := range []string{"claude", "offline", "tool"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("show profiles missing %q: %s", want, stdout)
+		}
+	}
+}
+
+func TestShowResolversLists(t *testing.T) {
+	stdout, _, code := runForTest(t, "show", "resolvers")
+	if code != ExitOK || stdout == "" {
+		t.Errorf("show resolvers: exit %d, stdout %q", code, stdout)
+	}
+}
+
+func TestShowConfigReportsStatus(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	stdout, _, code := runForTest(t, "show", "config")
+	if code != ExitOK {
+		t.Fatalf("exit %d, stdout %q", code, stdout)
+	}
+	for _, want := range []string{"configuration root:", "config.toml: not found", "profiles/:   not found", "built-in profiles:"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("missing %q in: %s", want, stdout)
+		}
+	}
+	// A broken config.toml becomes visible here, unlike during runs.
+	root := dir + "/bulle"
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(root+"/config.toml", []byte("not toml ["), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout, _, code = runForTest(t, "show", "config")
+	if code != ExitConfigError || !strings.Contains(stdout, "config.toml: ERROR") {
+		t.Errorf("broken config: exit %d, stdout %q", code, stdout)
+	}
+}
+
+func TestProfileTypoSuggestion(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	_, stderr, code := runForTest(t, "show", "claud")
+	if code == ExitOK || !strings.Contains(stderr, `did you mean claude?`) {
+		t.Errorf("typo'd profile: exit %d, stderr %q", code, stderr)
+	}
 }

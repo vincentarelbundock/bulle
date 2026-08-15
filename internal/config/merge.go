@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/vincentarelbundock/bulle/internal/didyoumean"
 	"github.com/vincentarelbundock/bulle/internal/paths"
 )
 
@@ -79,7 +80,14 @@ func (c Config) resolveProfile(name string, seen map[string]bool) (Profile, erro
 	}
 	p, ok := c.Profiles[name]
 	if !ok {
-		return Profile{}, fmt.Errorf("profile %s not found", name)
+		names := make([]string, 0, len(c.Profiles))
+		for profileName := range c.Profiles {
+			names = append(names, profileName)
+		}
+		if suggestion := didyoumean.Closest(name, names); suggestion != "" {
+			return Profile{}, fmt.Errorf("profile %s not found (did you mean %q?)", name, suggestion)
+		}
+		return Profile{}, fmt.Errorf("profile %s not found; run 'bulle profiles list' to see what is available", name)
 	}
 
 	seen[name] = true

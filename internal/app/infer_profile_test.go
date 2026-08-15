@@ -60,18 +60,18 @@ func writeInferProfileFixture(t *testing.T, profiles map[string]string) (configR
 	return configRoot, script
 }
 
-func TestRunInfersProfileFromCommandWhenDiscoveryFails(t *testing.T) {
+func TestRunInfersProfileFromCommand(t *testing.T) {
 	configRoot, script := writeInferProfileFixture(t, map[string]string{
 		"codexish": "default_app = \"%SCRIPT%\"\nrox = [\"%BIN%\", \"/bin\", \"/usr/bin\", \"/nix/store\"]\n",
 	})
 	var stdout, stderr bytes.Buffer
 	code := Run([]string{
-		"bulle", "policy", "--config", configRoot, t.TempDir(), "--", script,
+		"bulle", "show", "--config", configRoot, "--", script,
 	}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), `selected profile "codexish"`) {
+	if !strings.Contains(stderr.String(), `using profile "codexish"`) {
 		t.Fatalf("stderr missing inference announcement: %s", stderr.String())
 	}
 	if !strings.Contains(stdout.String(), `bulle profile "codexish" permissions:`) {
@@ -85,13 +85,16 @@ func TestRunDoesNotInferProfileWhenExplicitProfileGiven(t *testing.T) {
 	})
 	var stdout, stderr bytes.Buffer
 	code := Run([]string{
-		"bulle", "policy", "--config", configRoot, "--profile", "default", t.TempDir(), "--", script,
+		"bulle", "show", "--config", configRoot, "default", t.TempDir(), "--", script,
 	}, &stdout, &stderr)
-	if code == 0 {
-		t.Fatalf("expected failure under explicit default profile, stdout = %s", stdout.String())
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
 	}
-	if strings.Contains(stderr.String(), "selected profile") {
-		t.Fatalf("inference fired despite explicit --profile: %s", stderr.String())
+	if strings.Contains(stderr.String(), "using profile") {
+		t.Fatalf("inference fired despite an explicit profile: %s", stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `bulle profile "default" permissions:`) {
+		t.Fatalf("stdout summary not for the explicit profile: %s", stdout.String())
 	}
 }
 
@@ -101,16 +104,17 @@ func TestRunRefusesToInferAmbiguousProfiles(t *testing.T) {
 		"codexish2": "default_app = \"%SCRIPT%\"\nrox = [\"%BIN%\", \"/bin\", \"/usr/bin\", \"/nix/store\"]\n",
 	})
 	var stdout, stderr bytes.Buffer
+	// Ambiguity is announced and the run proceeds under the default profile.
 	code := Run([]string{
-		"bulle", "policy", "--config", configRoot, t.TempDir(), "--", script,
+		"bulle", "show", "--config", configRoot, "--", script,
 	}, &stdout, &stderr)
-	if code == 0 {
-		t.Fatalf("expected failure on ambiguous profiles, stdout = %s", stdout.String())
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "codexish, codexish2") || !strings.Contains(stderr.String(), "choose one with --profile") {
-		t.Fatalf("stderr missing ambiguity hint: %s", stderr.String())
+	if !strings.Contains(stderr.String(), "codexish, codexish2") || !strings.Contains(stderr.String(), "name one before --") {
+		t.Fatalf("stderr missing ambiguity note: %s", stderr.String())
 	}
-	if strings.Contains(stderr.String(), "selected profile") {
-		t.Fatalf("inference fired despite ambiguity: %s", stderr.String())
+	if strings.Contains(stderr.String(), "using profile \"") {
+		t.Fatalf("inference chose a profile despite ambiguity: %s", stderr.String())
 	}
 }

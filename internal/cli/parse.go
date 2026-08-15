@@ -3,12 +3,12 @@ package cli
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/alecthomas/kong"
 
+	"github.com/vincentarelbundock/bulle/internal/didyoumean"
 	"github.com/vincentarelbundock/bulle/internal/limits"
 )
 
@@ -29,10 +29,7 @@ func Parse(args []string) (Options, error) {
 			return opts, nil
 		}
 	}
-	cliArgs, command, note := splitCommand(args[1:])
-	if note != "" {
-		opts.Notes = append(opts.Notes, note)
-	}
+	cliArgs, command := splitCommand(args[1:])
 	cliArgs = normalizeTimeoutValue(cliArgs)
 	if err := rejectScratchValue(cliArgs); err != nil {
 		return opts, err
@@ -42,6 +39,7 @@ func Parse(args []string) (Options, error) {
 		return opts, err
 	}
 	opts.Flags = parsed.Flags
+	opts.Profile = parsed.Profile
 	timeout, err := parseTimeout(parsed.Timeout)
 	if err != nil {
 		return opts, err
@@ -64,12 +62,12 @@ func Parse(args []string) (Options, error) {
 type runCLI struct {
 	Flags
 
+	Profile     string `arg:"" optional:"" name:"profile" help:"Named profile, or comma-separated profiles merged left to right."`
 	ProjectPath string `arg:"" optional:"" name:"workspace" help:"Workspace directory to run from and grant read-write access."`
 }
 
 type Flags struct {
-	Profile string `name:"profile" short:"p" placeholder:"NAME" complete:"profile" help:"Named profile, or comma-separated profiles merged left to right."`
-	Config  string `name:"config" placeholder:"PATH" complete:"file" help:"Path to a configuration directory."`
+	Config string `name:"config" placeholder:"PATH" complete:"file" help:"Path to a configuration directory."`
 
 	ReadOnly      []string `name:"ro" placeholder:"PATH" complete:"file" help:"Grant read-only access."`
 	ReadOnlyExec  []string `name:"rox" placeholder:"PATH" complete:"file" help:"Grant read-only access plus execute."`
@@ -89,8 +87,6 @@ type Flags struct {
 
 	NoDefaults bool `name:"no-defaults" help:"Ignore the [defaults] block of the user configuration."`
 
-	AddExec     bool   `name:"add-exec" help:"Add the resolved command executable to the sandbox."`
-	AddLibs     bool   `name:"add-libs" help:"Add runtime library access for executables."`
 	NoWorkspace bool   `name:"no-workspace" help:"Do not automatically grant the workspace read-write access."`
 	Timeout     string `name:"timeout" placeholder:"DURATION" help:"Kill the sandboxed command if it runs longer than DURATION, using Go duration syntax such as 30s, 2m, or 1h30m; 0 disables."`
 
@@ -160,9 +156,50 @@ func parseKong(grammar any, args []string) error {
 	}
 	_, err = parser.Parse(args)
 	if err != nil {
-		return fmt.Errorf("%s (run 'bulle --help')", err)
+		return decorateParseError(err)
 	}
 	return nil
+}
+
+// decorateParseError turns kong's terse parse failures into messages that
+// point at the specific flag: a suggestion for a misspelled flag name, or the
+// flag's own syntax line when its value was rejected — instead of referring
+// every error to the full help text.
+func decorateParseError(err error) error {
+	msg := err.Error()
+	flags := GlobalFlags()
+	if name, ok := strings.CutPrefix(msg, "unknown flag "); ok {
+		// kong suggests near misses itself; keep its message when it did.
+		if strings.Contains(msg, "did you mean") {
+			return err
+		}
+		name, _, _ = strings.Cut(name, ",")
+		names := make([]string, 0, len(flags))
+		for _, f := range flags {
+			names = append(names, "--"+f.Name)
+		}
+		if suggestion := didyoumean.Closest(name, names); suggestion != "" {
+			return fmt.Errorf("%s (did you mean %s?)", msg, suggestion)
+		}
+		return fmt.Errorf("%s (run 'bulle --help' for the flag list)", msg)
+	}
+	// Attribute the error to the longest flag name the message mentions, so
+	// "--rox" is not mistaken for "--ro".
+	var match *FlagSpec
+	for i := range flags {
+		f := &flags[i]
+		if strings.Contains(msg, "--"+f.Name) && (match == nil || len(f.Name) > len(match.Name)) {
+			match = f
+		}
+	}
+	if match != nil {
+		usage := "--" + match.Name
+		if match.Placeholder != "" {
+			usage += " " + match.Placeholder
+		}
+		return fmt.Errorf("%s\nusage: %s\n  %s", msg, usage, match.Help)
+	}
+	return fmt.Errorf("%s (run 'bulle --help')", msg)
 }
 
 func parseTimeout(value string) (time.Duration, error) {
@@ -177,64 +214,22 @@ func parseTimeout(value string) (time.Duration, error) {
 }
 
 // NormalizeSeparator returns the argument list (without the program name)
-// with an explicit "--" before the command, applying the same split used by
-// Parse. Recording invocations in this form lets later flags be inserted
-// before the command unambiguously.
+// unchanged apart from copying: the grammar requires an explicit "--" before
+// any command, so there is nothing to normalize. Kept as the seam scratch
+// metadata records invocations through.
 func NormalizeSeparator(args []string) []string {
-	cliArgs, command, _ := splitCommand(args)
-	if len(command) == 0 {
-		return cliArgs
-	}
-	return append(append(cliArgs, "--"), command...)
+	return append([]string{}, args...)
 }
 
-// valueFlags are flags that consume the following argument when not written
-// in --flag=value form, so the separator inference below does not mistake
-// their values for positionals. Derived from the Flags struct so adding a
-// flag there keeps inference (and completion) correct automatically.
-var valueFlags = func() map[string]bool {
-	m := map[string]bool{}
-	for _, f := range GlobalFlags() {
-		if !f.TakesValue {
-			continue
-		}
-		m["--"+f.Name] = true
-		if f.Short != "" {
-			m["-"+f.Short] = true
-		}
-	}
-	return m
-}()
-
-// splitCommand separates bulle's own arguments from the sandboxed command.
-// An explicit "--" always wins. Without one, the first positional that is an
-// existing directory reads as the workspace (ambiguity resolves toward the
-// workspace), and the first positional after that — or a first positional
-// that is not an existing directory — starts the command. The returned note
-// announces an inferred command split.
-func splitCommand(args []string) ([]string, []string, string) {
+// splitCommand separates bulle's own arguments from the sandboxed command at
+// the explicit "--". Everything before it is policy; everything after it is
+// the command. There is no inference: a run without "--" has no command and
+// falls back to the profile's default_app.
+func splitCommand(args []string) ([]string, []string) {
 	for i, arg := range args {
 		if arg == "--" {
-			return append([]string{}, args[:i]...), append([]string{}, args[i+1:]...), ""
+			return append([]string{}, args[:i]...), append([]string{}, args[i+1:]...)
 		}
 	}
-	sawWorkspace := false
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if strings.HasPrefix(arg, "-") {
-			if valueFlags[arg] && i+1 < len(args) {
-				i++
-			}
-			continue
-		}
-		if !sawWorkspace {
-			if info, err := os.Stat(arg); err == nil && info.IsDir() {
-				sawWorkspace = true
-				continue
-			}
-		}
-		note := fmt.Sprintf("bulle: treating %q as the start of the command; use -- to separate the command explicitly", arg)
-		return append([]string{}, args[:i]...), append([]string{}, args[i:]...), note
-	}
-	return append([]string{}, args...), nil, ""
+	return append([]string{}, args...), nil
 }
