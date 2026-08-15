@@ -245,6 +245,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Denial hints collapse per-process `/proc` entries into one suggestion.** A
+  denied `/proc/1234/cgroup` used to produce a hint naming that path, which was
+  useless twice over: the pid belongs to a process that has already exited, and
+  a tool that reads `/proc/self/...` in each of its children produced one hint
+  per child, spending the ten-hint display budget on a single underlying grant.
+  Such denials now report `/proc`, matching the grant that actually covers them
+  — `/proc/self` does not, because it resolves at grant time to the granting
+  process rather than the child that hit the denial, which is why the `quarto`
+  profile already grants `/proc` whole. Note that this grant lets the sandboxed
+  command read other same-uid processes' `/proc` entries; the recorded profile
+  entry says so, and the hint is a suggestion you review before applying.
 - **Verbs are subcommands now; the verb-flags are gone.** `bulle policy`
   (with `--json`) replaces `--policy`/`--policy=json`, `bulle rerun` replaces
   `--last`, `bulle profiles list` replaces `--list-profiles`,
