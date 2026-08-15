@@ -1,6 +1,7 @@
 # Local build artifacts
 /bulle
 /completions/
+/man/
 /dist/
 /build/
 /.worktrees

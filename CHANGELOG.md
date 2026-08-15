@@ -56,6 +56,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Man page
+
+- **`bulle __man` prints a bulle.1 man page**, assembled from the same
+  strings the terminal help prints — the front usage screen, the subcommand
+  help, and the help topics — so it cannot drift from the CLI, and a test
+  asserts every section appears. Release archives ship `man/bulle.1`
+  (goreleaser runs `scripts/generate-man.sh`), `make install` places it
+  under `$(PREFIX)/share/man/man1`, and the Homebrew formula writes it by
+  asking the built binary.
+
 #### Shell completions
 
 - **`bulle completion bash|zsh|fish` prints a completion script.** The

@@ -32,6 +32,7 @@ func subcommands() []subcommand {
 		{cli.CommandSpec{Name: "help"}, runHelpDispatch, false},
 		{cli.CommandSpec{Name: "version"}, runVersionDispatch, false},
 		{cli.CommandSpec{Name: "__complete", Hidden: true}, runCompleteDispatch, false},
+		{cli.CommandSpec{Name: "__man", Hidden: true}, runManDispatch, false},
 	}
 	// `bulle help <topic>` completes the other subcommand names and the extra
 	// topics as verbs.
@@ -169,6 +170,14 @@ func runHelpDispatch(_ string, rest []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stderr, "bulle: no help topic %q; topics: %s\n", rest[0], strings.Join(topics, ", "))
 	return ExitConfigError
+}
+
+// runManDispatch prints the bulle.1 man page. Hidden: it exists for the
+// release pipeline and packagers (`bulle __man > bulle.1`), assembled from
+// the same strings the terminal help prints.
+func runManDispatch(_ string, _ []string, stdout, _ io.Writer) int {
+	fmt.Fprint(stdout, cli.ManPage(Version))
+	return ExitOK
 }
 
 func runVersionDispatch(_ string, _ []string, stdout, _ io.Writer) int {

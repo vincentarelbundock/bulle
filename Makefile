@@ -1,4 +1,4 @@
-.PHONY: help build completions install test vet check website serve clean bump
+.PHONY: help build completions man install test vet check website serve clean bump
 
 .DEFAULT_GOAL := help
 
@@ -21,7 +21,10 @@ build: ## Compile the bulle binary
 completions: ## Generate shell completion scripts into completions/
 	./scripts/generate-completions.sh
 
-install: build completions ## Install bulle and completions to $(DESTDIR)$(PREFIX)
+man: ## Generate the man page into man/
+	./scripts/generate-man.sh
+
+install: build completions man ## Install bulle, completions, and man page to $(DESTDIR)$(PREFIX)
 	install -d "$(DESTDIR)$(PREFIX)/bin"
 	install -m 755 $(BIN) "$(DESTDIR)$(PREFIX)/bin/$(BIN)"
 	install -d "$(DESTDIR)$(PREFIX)/share/bash-completion/completions"
@@ -30,6 +33,8 @@ install: build completions ## Install bulle and completions to $(DESTDIR)$(PREFI
 	install -m 644 completions/_bulle "$(DESTDIR)$(PREFIX)/share/zsh/site-functions/_bulle"
 	install -d "$(DESTDIR)$(PREFIX)/share/fish/vendor_completions.d"
 	install -m 644 completions/bulle.fish "$(DESTDIR)$(PREFIX)/share/fish/vendor_completions.d/bulle.fish"
+	install -d "$(DESTDIR)$(PREFIX)/share/man/man1"
+	install -m 644 man/bulle.1 "$(DESTDIR)$(PREFIX)/share/man/man1/bulle.1"
 
 test: ## Run all tests
 	go test ./...
@@ -82,3 +87,4 @@ bump: ## Release VERSION=x.y.z: update VERSION file, commit, and tag
 clean: ## Remove build artifacts
 	rm -f $(BIN)
 	rm -rf completions
+	rm -rf man

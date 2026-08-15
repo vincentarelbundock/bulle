@@ -55,6 +55,7 @@ class Bulle < Formula
     ldflags = "-s -w -X github.com/vincentarelbundock/bulle/internal/app.Version=#{version}"
     system "go", "build", "-ldflags", ldflags, "-o", bin/"bulle", "./cmd/bulle"
     generate_completions_from_executable(bin/"bulle", "completion")
+    (man1/"bulle.1").write Utils.safe_popen_read(bin/"bulle", "__man")
   end
 
   test do
