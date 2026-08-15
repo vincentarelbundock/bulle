@@ -89,17 +89,42 @@ func hintForDenial(d landlockDenial, home string) string {
 		}
 		return fmt.Sprintf("denied: %s — network access is restricted by the sandbox policy%s", verb, detail)
 	}
-	if d.Path == "" {
+	g, ok := grantForDenial(d)
+	if !ok {
 		return ""
 	}
-	suggest := grantSuggestionPath(d.Path)
-	if suggest != d.Path {
+	if g.Path != d.Path {
 		// Naming the package root in both halves lets hint deduplication
 		// collapse every denial inside the same store item into one line, so
 		// the 10-hint display cap is spent on distinct grants.
-		return fmt.Sprintf("denied: %s files in %s — add %s %s", verb, suggest, flag, abbreviateHome(suggest, home))
+		return fmt.Sprintf("denied: %s files in %s — add %s %s", verb, g.Path, g.Flag, abbreviateHome(g.Path, home))
 	}
-	return fmt.Sprintf("denied: %s %s — add %s %s", verb, d.Path, flag, abbreviateHome(d.Path, home))
+	return fmt.Sprintf("denied: %s %s — add %s %s", verb, d.Path, g.Flag, abbreviateHome(d.Path, home))
+}
+
+// A grant is the policy entry that would allow a denied access: the flag
+// naming the access level, and the path to grant. The path is the one worth
+// granting rather than the one denied — inside a package store it is the
+// package root — but it is otherwise verbatim, with no $HOME abbreviation and
+// no variable substitution, both of which are presentation concerns.
+//
+// This is the machine-readable half of a denial hint. hintForDenial formats it
+// for a human to copy; profile authoring consumes it directly.
+type grant struct {
+	Flag string
+	Path string
+}
+
+// grantForDenial maps a Landlock denial record to the grant that would allow
+// it. It reports false for records that name no grantable path: network
+// denials, which the policy governs as a whole rather than per-address, and
+// records the kernel emitted without a path.
+func grantForDenial(d landlockDenial) (grant, bool) {
+	_, flag := classifyBlockers(d.Blockers)
+	if flag == "" || d.Path == "" {
+		return grant{}, false
+	}
+	return grant{Flag: flag, Path: grantSuggestionPath(d.Path)}, true
 }
 
 // storeGrantRoots are per-package installer trees where the natural grant is
@@ -231,24 +256,44 @@ func hintForSeatbeltDenial(d seatbeltDenial, home string) string {
 		return fmt.Sprintf("denied: %s%s (%s) — network access is restricted by the sandbox policy",
 			strings.ReplaceAll(strings.TrimPrefix(d.Operation, "network-"), "-", " "), target, d.Process)
 	}
-	if d.Path == "" || d.Path == "<private>" || !strings.HasPrefix(d.Path, "/") {
+	verb, _ := classifySeatbeltOperation(d.Operation)
+	g, ok := grantForSeatbeltDenial(d)
+	if !ok {
 		return ""
 	}
-	var verb, flag string
+	if g.Path != d.Path {
+		return fmt.Sprintf("denied: %s files in %s (%s) — add %s %s", verb, g.Path, d.Process, g.Flag, abbreviateHome(g.Path, home))
+	}
+	return fmt.Sprintf("denied: %s %s (%s) — add %s %s", verb, d.Path, d.Process, g.Flag, abbreviateHome(d.Path, home))
+}
+
+// classifySeatbeltOperation maps a sandbox operation name to a human verb and
+// the grant flag that would allow it, mirroring classifyBlockers on Linux.
+func classifySeatbeltOperation(operation string) (verb string, flag string) {
 	switch {
-	case strings.HasPrefix(d.Operation, "process-exec"):
-		verb, flag = "execute", "--rox"
-	case strings.HasPrefix(d.Operation, "file-write"):
-		verb, flag = "write", "--rw"
-	case strings.HasPrefix(d.Operation, "file-read"):
-		verb, flag = "read", "--ro"
-	default:
-		return ""
+	case strings.HasPrefix(operation, "process-exec"):
+		return "execute", "--rox"
+	case strings.HasPrefix(operation, "file-write"):
+		return "write", "--rw"
+	case strings.HasPrefix(operation, "file-read"):
+		return "read", "--ro"
 	}
-	if suggest := grantSuggestionPath(d.Path); suggest != d.Path {
-		return fmt.Sprintf("denied: %s files in %s (%s) — add %s %s", verb, suggest, d.Process, flag, abbreviateHome(suggest, home))
+	return "", ""
+}
+
+// grantForSeatbeltDenial maps a Seatbelt violation to the grant that would
+// allow it. It reports false for violations that name no grantable path:
+// network operations, paths the log redacted to <private>, and non-file
+// operations whose target is not a path at all.
+func grantForSeatbeltDenial(d seatbeltDenial) (grant, bool) {
+	if d.Path == "" || d.Path == "<private>" || !strings.HasPrefix(d.Path, "/") {
+		return grant{}, false
 	}
-	return fmt.Sprintf("denied: %s %s (%s) — add %s %s", verb, d.Path, d.Process, flag, abbreviateHome(d.Path, home))
+	_, flag := classifySeatbeltOperation(d.Operation)
+	if flag == "" {
+		return grant{}, false
+	}
+	return grant{Flag: flag, Path: grantSuggestionPath(d.Path)}, true
 }
 
 func abbreviateHome(path string, home string) string {
