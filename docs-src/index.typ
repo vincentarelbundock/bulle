@@ -27,6 +27,8 @@ bulle /path/to/project -- claude
 Sandboxes are not limited to agents. You can use `bulle` to run any command with custom permissions. See the #link("#quick-start")[Quick start] section below, #link("permissions.html")[Permissions] for the grants you write by hand, and the #link("cli-reference.html")[CLI reference] for every flag.
 
 #calepin.elements.callout(kind: "warning", title: none)[
+  This software was written for my personal use. You are free to use it, but the license makes no guarantees.
+
   `bulle` is still experimental. Please report bugs, comments, and feature requests #link("https://github.com/vincentarelbundock/bulle")[on GitHub].
 ]
 
@@ -45,7 +47,6 @@ Sandboxes are not limited to agents. You can use `bulle` to run any command with
 #calepin.elements.callout(kind: "warning", title: [`bulle` is not sufficient when])[
   - the command needs network access but should not send readable code to a specific service;
   - the command itself needs secrets or paths you cannot afford to leak;
-  - you need CPU, memory, disk, or time limits;
   - you are running code from hostile parties and need a separate machine boundary, not just local OS rules.
 ]
 
