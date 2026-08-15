@@ -24,20 +24,21 @@ func TestRunDefinesTimeoutExitCode(t *testing.T) {
 	}
 }
 
-func TestRunReturnsUsageErrorWhenCommandMissing(t *testing.T) {
+func TestRunBareInvocationShowsHelp(t *testing.T) {
+	// A completely bare `bulle` with nothing to run prints help; the usage
+	// error is kept for invocations that named a workspace or flags (covered
+	// by TestBareBulleShowsHelp in commands_test.go).
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
 	code := Run([]string{"bulle"}, &stdout, &stderr)
 
-	if code != 2 {
-		t.Fatalf("exit code = %d, want 2", code)
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
-	if stderr.String() == "" {
-		t.Fatalf("stderr is empty")
-	}
-	if !bytes.Contains(stderr.Bytes(), []byte("no command supplied")) {
-		t.Fatalf("stderr = %s", stderr.String())
+	if !bytes.Contains(stdout.Bytes(), []byte("Usage:")) {
+		t.Fatalf("stdout = %s", stdout.String())
 	}
 }
 

@@ -1,4 +1,4 @@
-.PHONY: help build install test vet check website serve clean bump
+.PHONY: help build completions install test vet check website serve clean bump
 
 .DEFAULT_GOAL := help
 
@@ -18,9 +18,18 @@ help: ## Show this help
 build: ## Compile the bulle binary
 	go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/bulle
 
-install: build ## Install bulle to $(DESTDIR)$(PREFIX)/bin
+completions: ## Generate shell completion scripts into completions/
+	./scripts/generate-completions.sh
+
+install: build completions ## Install bulle and completions to $(DESTDIR)$(PREFIX)
 	install -d "$(DESTDIR)$(PREFIX)/bin"
 	install -m 755 $(BIN) "$(DESTDIR)$(PREFIX)/bin/$(BIN)"
+	install -d "$(DESTDIR)$(PREFIX)/share/bash-completion/completions"
+	install -m 644 completions/bulle.bash "$(DESTDIR)$(PREFIX)/share/bash-completion/completions/$(BIN)"
+	install -d "$(DESTDIR)$(PREFIX)/share/zsh/site-functions"
+	install -m 644 completions/_bulle "$(DESTDIR)$(PREFIX)/share/zsh/site-functions/_bulle"
+	install -d "$(DESTDIR)$(PREFIX)/share/fish/vendor_completions.d"
+	install -m 644 completions/bulle.fish "$(DESTDIR)$(PREFIX)/share/fish/vendor_completions.d/bulle.fish"
 
 test: ## Run all tests
 	go test ./...
@@ -72,3 +81,4 @@ bump: ## Release VERSION=x.y.z: update VERSION file, commit, and tag
 
 clean: ## Remove build artifacts
 	rm -f $(BIN)
+	rm -rf completions

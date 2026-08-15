@@ -9,6 +9,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Shell completions
+
+- **`bulle completion bash|zsh|fish` prints a completion script.** The
+  scripts are thin shims: at completion time they call `bulle __complete` on
+  the installed binary, which answers with subcommand names, verbs, flags,
+  and `--profile` values — including profiles installed later under
+  `~/.config/bulle/profiles/`, and comma-separated profile merges. Because
+  the binary answers, an installed script never goes stale.
+- **Completions ship with releases.** Release archives include generated
+  `completions/` files (goreleaser runs `scripts/generate-completions.sh`, so
+  the archived scripts are exactly what that version's binary prints), the
+  Homebrew formula installs them via `generate_completions_from_executable`,
+  and `make install` places them under `$(PREFIX)/share` for bash, zsh, and
+  fish. Because the shims query the binary at completion time, an installed
+  script keeps working across upgrades either way.
+- **Completion cannot drift from the CLI.** Flag completion is derived by
+  reflection from the same `Flags` struct the parser reads, and subcommand
+  completion reads the same table `Run` dispatches from. The hand-maintained
+  `valueFlags` map behind `--` separator inference is now derived from that
+  struct too, closing a long-standing trap where a new value-taking flag
+  silently broke command-boundary inference.
+
+#### Per-subcommand help
+
+- **Every subcommand answers `--help`.** `bulle scratch --help`, `bulle
+  record -h`, and the rest print focused help for that subcommand instead of
+  a one-line usage error; `bulle help <subcommand>` prints the same text, and
+  `bulle help <TAB>` completes the topic names. A `--help` after the `--`
+  separator still belongs to the sandboxed command. A test asserts every
+  dispatched subcommand has a help topic, so the two cannot drift.
+- **Bare invocations that have nothing to do print help.** `bulle` alone
+  (when no configured default_app gives it something to run), and bare
+  `record`, `profiles`, and `completion` — which cannot mean anything without
+  arguments — show help and exit 0 instead of a terse error. Bare `rerun`,
+  `resolvers`, `policy`, and `scratch` keep their meaningful behavior, and
+  `bulle .` (a workspace with no command) keeps its explicit error.
+
+### Changed
+
+- Subcommand dispatch moved from a literal switch to a declared table
+  (`internal/app/commands.go`) shared with completion; `bulle help` and
+  `bulle version` dispatch through it as well, with unchanged behavior.
+
 #### Profile recording
 
 - **`bulle record` drafts a profile from a real run.** `bulle record --profile

@@ -68,16 +68,16 @@ type runCLI struct {
 }
 
 type Flags struct {
-	Profile string `name:"profile" short:"p" placeholder:"NAME" help:"Named profile, or comma-separated profiles merged left to right."`
-	Config  string `name:"config" placeholder:"PATH" help:"Path to a configuration directory."`
+	Profile string `name:"profile" short:"p" placeholder:"NAME" complete:"profile" help:"Named profile, or comma-separated profiles merged left to right."`
+	Config  string `name:"config" placeholder:"PATH" complete:"file" help:"Path to a configuration directory."`
 
-	ReadOnly      []string `name:"ro" placeholder:"PATH" help:"Grant read-only access."`
-	ReadOnlyExec  []string `name:"rox" placeholder:"PATH" help:"Grant read-only access plus execute."`
-	ReadWrite     []string `name:"rw" placeholder:"PATH" help:"Grant read-write access."`
-	ReadWriteExec []string `name:"rwx" placeholder:"PATH" help:"Grant read-write access plus execute."`
+	ReadOnly      []string `name:"ro" placeholder:"PATH" complete:"file" help:"Grant read-only access."`
+	ReadOnlyExec  []string `name:"rox" placeholder:"PATH" complete:"file" help:"Grant read-only access plus execute."`
+	ReadWrite     []string `name:"rw" placeholder:"PATH" complete:"file" help:"Grant read-write access."`
+	ReadWriteExec []string `name:"rwx" placeholder:"PATH" complete:"file" help:"Grant read-write access plus execute."`
 
 	Env          []string `name:"env" sep:"none" placeholder:"NAME[=VALUE]" help:"Pass NAME (or a NAME glob such as 'GIT_*') from the current environment, or set NAME=VALUE."`
-	EnvFile      []string `name:"env-file" sep:"none" placeholder:"PATH" help:"Load NAME=VALUE environment entries from a dotenv-style file."`
+	EnvFile      []string `name:"env-file" sep:"none" placeholder:"PATH" complete:"file" help:"Load NAME=VALUE environment entries from a dotenv-style file."`
 	EnvAllExcept []string `name:"env-all-except" placeholder:"NAME,..." help:"Pass the whole parent environment except the named variables."`
 	Var          []string `name:"var" sep:"none" placeholder:"NAME=VALUE" help:"Define a custom path variable usable in path grants as $NAME."`
 
@@ -190,16 +190,21 @@ func NormalizeSeparator(args []string) []string {
 
 // valueFlags are flags that consume the following argument when not written
 // in --flag=value form, so the separator inference below does not mistake
-// their values for positionals.
-var valueFlags = map[string]bool{
-	"--profile": true, "-p": true,
-	"--config": true,
-	"--ro":     true, "--rox": true, "--rw": true, "--rwx": true,
-	"--env": true, "--env-file": true, "--env-all-except": true,
-	"--var": true, "--timeout": true,
-	"--memory": true, "--cpu": true, "--nproc": true,
-	"--nofile": true, "--fsize": true, "--cpu-time": true,
-}
+// their values for positionals. Derived from the Flags struct so adding a
+// flag there keeps inference (and completion) correct automatically.
+var valueFlags = func() map[string]bool {
+	m := map[string]bool{}
+	for _, f := range GlobalFlags() {
+		if !f.TakesValue {
+			continue
+		}
+		m["--"+f.Name] = true
+		if f.Short != "" {
+			m["-"+f.Short] = true
+		}
+	}
+	return m
+}()
 
 // splitCommand separates bulle's own arguments from the sandboxed command.
 // An explicit "--" always wins. Without one, the first positional that is an

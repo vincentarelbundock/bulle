@@ -23,7 +23,10 @@ Usage:
   bulle profiles list|install SOURCE
   bulle resolvers
   bulle record --profile NAME [--out FILE] [--max-rounds N] -- command [args...]
-  bulle help | version
+  bulle completion bash|zsh|fish
+  bulle help [subcommand] | version
+
+Every subcommand also answers --help with its own focused help.
 
 The workspace is the command's working directory and writable area. If omitted,
 it defaults to the current directory. Use --no-workspace to run without the
@@ -77,6 +80,13 @@ Subcommands:
   record            run a command repeatedly, widening the sandbox by what it
                     was denied each time, and print a profile of the additions
                     (see below)
+  completion        print a shell completion script for bash, zsh, or fish;
+                    completions ask the installed binary at completion time,
+                    so subcommands, flags, and profile names (including ones
+                    you install later) never go stale
+                      bash: source <(bulle completion bash)   in ~/.bashrc
+                      zsh:  source <(bulle completion zsh)    in ~/.zshrc
+                      fish: bulle completion fish > ~/.config/fish/completions/bulle.fish
 
 Configuration:
   --config PATH     path to a configuration directory

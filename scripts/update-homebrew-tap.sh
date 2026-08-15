@@ -54,6 +54,7 @@ class Bulle < Formula
     ENV["CGO_ENABLED"] = "0"
     ldflags = "-s -w -X github.com/vincentarelbundock/bulle/internal/app.Version=#{version}"
     system "go", "build", "-ldflags", ldflags, "-o", bin/"bulle", "./cmd/bulle"
+    generate_completions_from_executable(bin/"bulle", "completion")
   end
 
   test do

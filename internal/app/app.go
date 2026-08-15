@@ -53,58 +53,20 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	// Subcommands are dispatched by the first argument, before run parsing,
 	// so command inference never tries to execute a verb in a sandbox. Any
 	// other first argument is a run: the wrapper invocation stays bare.
+	// Dispatch reads the subcommand table in commands.go — the same table
+	// shell completion answers from.
 	if len(args) > 1 {
-		switch args[1] {
-		case "scratch":
-			// `bulle scratch` covers the whole lifecycle: the review verbs
-			// resume a kept scratch, and anything else creates one, so the
-			// subcommand is not limited to scratches that already exist.
-			isRun, err := scratchArgsStartRun(args[2:])
-			if err != nil {
-				fmt.Fprintf(stderr, "bulle: %v\n", err)
-				return ExitConfigError
-			}
-			if isRun {
-				runArgs := append([]string{args[0], "--scratch"}, args[2:]...)
-				return runMain(runArgs, "", stdout, stderr, nil)
-			}
-			return runScratchCommand(args[2:], stdout, stderr)
-		case "record":
-			return runRecordCommand(args[0], args[2:], stdout, stderr)
-		case "profiles":
-			return runProfilesCommand(args[2:], stdout, stderr)
-		case "resolvers":
-			if len(args) > 2 {
-				fmt.Fprintln(stderr, "usage: bulle resolvers")
-				return ExitConfigError
-			}
-			writeResolverListing(parentEnv(), stdout)
-			return ExitOK
-		case "policy":
-			runArgs, format, err := extractPolicyFormat(args[2:])
-			if err != nil {
-				fmt.Fprintln(stderr, err)
-				return ExitConfigError
-			}
-			return runMain(append([]string{args[0]}, runArgs...), format, stdout, stderr, nil)
-		case "rerun":
-			stored, err := loadLastRun()
-			if err != nil {
-				fmt.Fprintln(stderr, "bulle: rerun: no previous invocation recorded")
-				return ExitConfigError
-			}
-			merged := mergeLastRunArgs(stored.Args, args[2:])
-			if stored.Dir != "" {
-				if cwd, err := os.Getwd(); err == nil && cwd != stored.Dir {
-					if err := os.Chdir(stored.Dir); err != nil {
-						fmt.Fprintf(stderr, "bulle: rerun: cannot return to %s: %v\n", stored.Dir, err)
-						return ExitConfigError
-					}
-					fmt.Fprintf(stderr, "bulle: rerun: running from %s\n", stored.Dir)
+		for _, sub := range subcommands() {
+			if sub.Name == args[1] {
+				rest := args[2:]
+				// --help before the -- separator, or a bare invocation of a
+				// subcommand that needs arguments, prints that subcommand's
+				// help instead of a terse usage error.
+				if wantsHelp(rest) || (len(rest) == 0 && sub.helpWhenBare) {
+					return printCommandHelp(sub.Name, stdout)
 				}
+				return sub.run(args[0], rest, stdout, stderr)
 			}
-			fmt.Fprintf(stderr, "bulle: repeating: bulle %s\n", strings.Join(merged, " "))
-			return runMain(append([]string{args[0]}, merged...), "", stdout, stderr, nil)
 		}
 	}
 	return runMain(args, "", stdout, stderr, nil)
@@ -190,6 +152,12 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 	// without a command; command-dependent grants (add_exec, shebang
 	// discovery) are simply absent from the printed policy.
 	if len(opts.Command) == 0 && !opts.Policy {
+		// A completely bare `bulle` with nothing configured to run reads as
+		// a request for orientation, not a broken invocation.
+		if len(args) == 1 {
+			fmt.Fprint(stdout, cli.Usage())
+			return ExitOK
+		}
 		fmt.Fprintln(stderr, "bulle: no command supplied and no default_app configured")
 		fmt.Fprintln(stderr, "pass a command after -- (e.g. bulle . -- claude) or set default_app in your config")
 		return ExitConfigError
