@@ -109,7 +109,7 @@ func (probe denialProbe) hints() []string {
 
 // grants returns the same denials as the policy entries that would allow
 // them, for profile recording.
-func (probe denialProbe) grants() []grant {
+func (probe denialProbe) grants() []observedGrant {
 	return grantsForDenials(probe.records())
 }
 

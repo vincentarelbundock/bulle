@@ -62,15 +62,35 @@ func (probe denialProbe) records() []seatbeltDenial {
 
 // grants returns the same violations as the policy entries that would allow
 // them, for profile recording.
-func (probe denialProbe) grants() []grant {
+func (probe denialProbe) grants() []observedGrant {
 	return grantsForSeatbeltDenials(probe.records())
 }
 
 // recordingSupported reports whether this machine can record a profile.
-// Seatbelt violations are readable here, but the recording loop has not been
-// exercised against them: macOS denies many benign probes that the Linux path
-// never sees, and emitting those as grants would produce a profile far wider
-// than the run needs. Refusing is honest until that is worked through.
+//
+// The check is weaker than the Linux one, and deliberately so. There, a
+// deliberately triggered denial is confirmed to reach the log, because a kernel
+// can advertise audit support with auditing switched off. Here the kernel logs
+// sandbox violations unconditionally, so the failure that check defends
+// against does not exist; what remains is whether the log can be read at all,
+// which `log show` answers directly.
+//
+// Attribution is the honest limitation on macOS. The unified log reports
+// violations from every sandboxed process on the machine, and a violation
+// names a pid that has already exited by the time the log is read, so it
+// cannot be traced back to this run's process group. Rather than guess — a
+// filter by process name would drop real grants from a command's helpers —
+// recording keeps the process name on each entry and says so in the output.
 func recordingSupported() (string, bool) {
-	return "recording is not supported on macOS yet; only the Landlock backend is covered", false
+	if policy.RuntimeDefaultBackend() != policy.BackendMacOSSeatbelt {
+		return "recording needs the Seatbelt backend", false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), denialLogTimeout)
+	defer cancel()
+	if err := exec.CommandContext(ctx, "log", "show", "--style", "syslog",
+		"--last", "1m", "--predicate", `sender == "Sandbox"`).Run(); err != nil {
+		return "recording needs the unified log; `log show` failed here, so denials could not be read back" +
+			" and recording would produce an empty profile that looks like success", false
+	}
+	return "", true
 }

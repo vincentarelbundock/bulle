@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"sort"
 	"strconv"
@@ -28,12 +29,17 @@ const defaultRecordRounds = 10
 type recorder struct {
 	grants []grant
 	seen   map[grant]bool
+	// origins records which processes were denied each grant, where the
+	// platform reports one. It annotates the output rather than filtering it.
+	origins map[grant][]string
 	// lastAdded is how many grants the most recent round contributed. Zero
 	// after a round that ran is the loop's stop condition.
 	lastAdded int
 }
 
-func newRecorder() *recorder { return &recorder{seen: map[grant]bool{}} }
+func newRecorder() *recorder {
+	return &recorder{seen: map[grant]bool{}, origins: map[grant][]string{}}
+}
 
 // beginRound clears the per-round counter, so a round that returns before the
 // command ever runs — an invalid policy, a missing backend — reads as having
@@ -47,8 +53,13 @@ func (r *recorder) beginRound() { r.lastAdded = 0 }
 // no grant will fix.
 func (r *recorder) observe(p policy.Policy, probe denialProbe) int {
 	added := 0
-	for _, gr := range filterCoveredGrants(probe.grants(), p) {
-		if r.seen[gr] || isProbeArtifact(gr.Path) {
+	for _, observed := range filterCoveredGrants(probe.grants(), p) {
+		gr := observed.Grant
+		if isProbeArtifact(gr.Path) {
+			continue
+		}
+		r.noteOrigin(gr, observed.Origin)
+		if r.seen[gr] {
 			continue
 		}
 		r.seen[gr] = true
@@ -57,6 +68,21 @@ func (r *recorder) observe(p policy.Policy, probe denialProbe) int {
 	}
 	r.lastAdded = added
 	return added
+}
+
+// noteOrigin records a process that was denied a grant, keeping the list
+// deduplicated and ordered by first sighting. A grant can be hit by several
+// processes across rounds, and all of them are worth showing.
+func (r *recorder) noteOrigin(gr grant, origin string) {
+	if origin == "" {
+		return
+	}
+	for _, existing := range r.origins[gr] {
+		if existing == origin {
+			return
+		}
+	}
+	r.origins[gr] = append(r.origins[gr], origin)
 }
 
 // probeDirPrefix names the temporary directories the denial-logging probe
@@ -242,7 +268,9 @@ func buildRecordedProfile(opts recordOptions, rec *recorder, outcome recordOutco
 	g := newGeneralizer(recordVars(), policy.ListResolvers(os.Getenv("PATH"), parentEnv()), exec.LookPath)
 	entries := make([]recordedEntry, 0, len(rec.grants))
 	for _, gr := range rec.grants {
-		entries = append(entries, g.generalize(gr))
+		entry := g.generalize(gr)
+		entry.Comment = appendOrigins(entry.Comment, rec.origins[gr])
+		entries = append(entries, entry)
 	}
 	entries = promoteDirectories(mergeEntries(entries))
 
@@ -255,6 +283,12 @@ func buildRecordedProfile(opts recordOptions, rec *recorder, outcome recordOutco
 	b.WriteString("# aborts the operation that hit it, so anything the command did not reach\n")
 	b.WriteString("# is missing here — optional features, error paths, and anything behind a\n")
 	b.WriteString("# flag this run did not pass. Review every entry before installing it.\n")
+	if runtime.GOOS == "darwin" {
+		b.WriteString("#\n# macOS reports sandbox violations from every sandboxed process on the\n")
+		b.WriteString("# machine, and a violation names a pid that has already exited, so an\n")
+		b.WriteString("# entry cannot be proven to belong to this command. Each one names the\n")
+		b.WriteString("# process it was denied to; delete the ones that are not yours.\n")
+	}
 	if outcome.capped {
 		b.WriteString("#\n# INCOMPLETE: recording stopped at the round cap with the command still\n")
 		b.WriteString("# failing. Re-run with a higher --max-rounds.\n")
@@ -275,6 +309,20 @@ func buildRecordedProfile(opts recordOptions, rec *recorder, outcome recordOutco
 		writeRecordedList(&b, list, entries)
 	}
 	return b.String()
+}
+
+// appendOrigins adds the denied processes to an entry's comment. On macOS this
+// is what lets a reviewer tell an entry the command needed from one some
+// unrelated sandboxed process happened to trigger during the same window.
+func appendOrigins(comment string, origins []string) string {
+	if len(origins) == 0 {
+		return comment
+	}
+	note := "denied to " + strings.Join(origins, ", ")
+	if comment == "" {
+		return note
+	}
+	return comment + " (" + note + ")"
 }
 
 func writeRecordedList(b *strings.Builder, list string, entries []recordedEntry) {

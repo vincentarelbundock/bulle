@@ -16,10 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   what the sandbox denied, adds those grants, and runs again until nothing new
   is denied. It prints a profile inheriting from the base that contains only
   the additions, so recording against `claude` does not restate everything
-  `tool`, `terminal`, `git`, and `node` already grant. Linux only, for now:
-  macOS logs Seatbelt violations too, but denies many benign probes the
-  Landlock path never sees, and emitting those as grants would produce a
-  profile far wider than the run needs.
+  `tool`, `terminal`, `git`, and `node` already grant.
+- **Honest attribution on macOS.** Recording works on both platforms, but they
+  can promise different things. A Landlock denial is recorded against the
+  sandbox domain, so on Linux every denial belongs to the run being observed.
+  The macOS unified log reports violations from every sandboxed process on the
+  machine, and a violation names a pid that has already exited, so it cannot be
+  traced back to this run's process group. bulle does not guess: filtering by
+  process name would look tidier and would silently drop real grants, since a
+  command's helpers have different names than the command. Instead each entry
+  names the process it was denied to, and the profile header says entries may
+  not all be yours.
 - **Recorded entries are written to travel.** Paths are rewritten into the
   spelling a hand-written profile would use — `go:modcache` rather than one
   machine's module cache, `$CONFIG/...` rather than `$HOME/.config/...`,

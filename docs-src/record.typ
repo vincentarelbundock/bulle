@@ -74,9 +74,8 @@ untouched:
 bulle record --profile tool --out draft.toml -- --no-network -- mytool build
 ```
 
-Recording is Linux only. macOS logs Seatbelt violations too, but denies many
-benign probes that the Landlock path never sees; emitting those as grants would
-produce a profile far wider than the run needs.
+Recording works on Linux and macOS, with one difference in what the output can
+promise --- see #link(<attribution>)[Attribution on macOS].
 
 == How recording stops
 
@@ -126,6 +125,37 @@ What recording will *not* do is grant a variable root. A denial on `$HOME`,
 files directly inside such a root never collapse upward into it. Those are the
 trees a sandbox exists to withhold, so widening to them is a decision for you,
 not for a tool.
+
+= Attribution on macOS <attribution>
+
+On Linux, a Landlock denial is recorded against the sandbox domain, so every
+denial `bulle` reads back belongs to the run it is observing.
+
+macOS gives less. The unified log records sandbox violations from _every_
+sandboxed process on the machine, and a violation names a pid that has already
+exited by the time the log is read --- so it cannot be traced back to this
+run's process group. A recording made while Spotlight or some other sandboxed
+daemon happens to be denied something may contain that denial too.
+
+`bulle` does not guess. Filtering by process name would look tidier and would
+silently drop real grants, because a command's helper processes have different
+names than the command. Instead, every recorded entry names the process it was
+denied to:
+
+```toml
+ro = [
+  # denied to mytool
+  "?$CONFIG/mytool/settings.yaml",
+  # denied to mdworker_shared
+  "?/Library/Spotlight",
+]
+```
+
+The second entry is not yours. Delete it. The emitted profile carries this
+warning in its header, so it stays with the file.
+
+Recording on a quiet machine produces less of this. Recording while a backup,
+an indexer, or an App Store update is running produces more.
 
 = Why a base profile is required <why-a-base>
 

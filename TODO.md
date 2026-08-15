@@ -18,10 +18,13 @@
   - Iteration replaced the planned `fanotify`/`ptrace` observation: each round runs under a sandbox no wider than the base plus what it has already been denied, so recording never needs the elevated grant that tracing would.
   - Entries are generalized to `which:`, tool resolvers, and directory variables; clusters collapse to directory grants; variable roots are never granted.
 
-- [ ] Extend record mode to macOS.
-  - Seatbelt violations are already parsed, and `grantForSeatbeltDenial` maps them to entries.
-  - The blocker is noise: macOS denies many benign probes the Landlock path never sees, so a recorded profile would be far wider than the run needs. Needs a filter before it can be honest.
-  - Consider `(trace)` with `sandbox-simplify` as an alternative source.
+- [x] Extend record mode to macOS.
+  - The feared blocker (benign startup probes) turned out to be handled already: those paths are in `tool.toml`, so the coverage filter drops them.
+  - The real limitation is attribution, and it is structural. The unified log reports violations from every sandboxed process, and a violation names an exited pid, so it cannot be tied to the run's process group. Recording annotates each entry with the denied process rather than guessing — filtering by name would drop a command's helpers.
+  - **Unverified on real hardware.** Written and cross-compiled on Linux; needs a run on a Mac before the macOS path is trusted.
+
+- [ ] Consider `(trace)` with `sandbox-simplify` as a second macOS source.
+  - Would give per-run attribution the unified log cannot, at the cost of a separate mechanism and output format.
 
 - [ ] Consider zero-to-profile recording (no `--profile`).
   - Deferred deliberately: the recording grant is widest and the output least trustworthy with no base to diff against.

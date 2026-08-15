@@ -76,7 +76,7 @@ Subcommands:
   resolvers         list path resolvers and what they resolve to here
   record            run a command repeatedly, widening the sandbox by what it
                     was denied each time, and print a profile of the additions
-                    (Linux only; see below)
+                    (see below)
 
 Configuration:
   --config PATH     path to a configuration directory
@@ -112,7 +112,7 @@ Disposable workspaces:
                     resume the review of a kept scratch later; id may be a
                     unique prefix, and is optional when unambiguous
 
-Profile recording (Linux only):
+Profile recording:
   bulle record --profile NAME -- command [args...]
                     run the command under NAME, collect what the sandbox
                     denied, add those grants, and run again until nothing new
@@ -126,6 +126,11 @@ Profile recording (Linux only):
                     these grants — not that they are sufficient. A denial
                     aborts the operation that hit it, so anything the command
                     did not reach is missing. Review before installing.
+
+                    On macOS the unified log reports violations from every
+                    sandboxed process, and a violation names a pid that has
+                    already exited, so entries may not all be yours. Each one
+                    names the process it was denied to.
 
 Output and safety:
   --timeout DURATION

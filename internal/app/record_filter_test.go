@@ -68,17 +68,20 @@ func TestCoveredByPolicyFollowsSymlinksToTheGrantedPath(t *testing.T) {
 
 func TestFilterCoveredGrantsKeepsOnlyWhatIsMissing(t *testing.T) {
 	p := policy.Policy{ReadOnly: []string{"/etc/ssl"}}
-	grants := []grant{
-		{Flag: "--ro", Path: "/etc/ssl/certs/ca.crt"},
-		{Flag: "--ro", Path: "/home/user/.gitconfig"},
-		{Flag: "--rox", Path: "/etc/ssl/weird"},
+	grants := []observedGrant{
+		{Grant: grant{Flag: "--ro", Path: "/etc/ssl/certs/ca.crt"}},
+		{Grant: grant{Flag: "--ro", Path: "/home/user/.gitconfig"}},
+		{Grant: grant{Flag: "--rox", Path: "/etc/ssl/weird"}, Origin: "curl"},
 	}
 	kept := filterCoveredGrants(grants, p)
 	if len(kept) != 2 {
 		t.Fatalf("kept = %+v, want the two uncovered grants", kept)
 	}
-	if kept[0].Path != "/home/user/.gitconfig" || kept[1].Path != "/etc/ssl/weird" {
+	if kept[0].Grant.Path != "/home/user/.gitconfig" || kept[1].Grant.Path != "/etc/ssl/weird" {
 		t.Errorf("kept = %+v, want original order preserved", kept)
+	}
+	if kept[1].Origin != "curl" {
+		t.Errorf("origin = %q, want it carried through the filter", kept[1].Origin)
 	}
 }
 
@@ -100,8 +103,28 @@ func TestGrantsForDenialsDeduplicatesAndSkipsUngrantable(t *testing.T) {
 		t.Fatalf("grants = %+v, want %+v", grants, want)
 	}
 	for i := range want {
-		if grants[i] != want[i] {
-			t.Errorf("grants[%d] = %+v, want %+v", i, grants[i], want[i])
+		if grants[i].Grant != want[i] {
+			t.Errorf("grants[%d] = %+v, want %+v", i, grants[i].Grant, want[i])
 		}
+		// Landlock records name a security domain, not a process.
+		if grants[i].Origin != "" {
+			t.Errorf("grants[%d] origin = %q, want empty on Linux", i, grants[i].Origin)
+		}
+	}
+}
+
+func TestGrantsForSeatbeltDenialsKeepTheProcessName(t *testing.T) {
+	// macOS reports violations from every sandboxed process on the machine, so
+	// who was denied is the reviewer's only way to spot an unrelated entry.
+	grants := grantsForSeatbeltDenials([]seatbeltDenial{
+		{Process: "mytool", Operation: "file-read-data", Path: "/etc/a"},
+		{Process: "mdworker", Operation: "file-read-data", Path: "/etc/b"},
+		{Process: "mytool", Operation: "network-outbound", Path: "*:443"},
+	})
+	if len(grants) != 2 {
+		t.Fatalf("grants = %+v, want the two grantable paths", grants)
+	}
+	if grants[0].Origin != "mytool" || grants[1].Origin != "mdworker" {
+		t.Errorf("origins = %q, %q, want mytool, mdworker", grants[0].Origin, grants[1].Origin)
 	}
 }

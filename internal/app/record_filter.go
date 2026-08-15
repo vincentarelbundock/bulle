@@ -55,46 +55,64 @@ func pathWithinRoots(path string, roots []string) bool {
 // order. Filtering happens on absolute paths, before generalization, so a
 // covered denial never reaches the rewriting layer and never widens a grant to
 // a resolver directory on the strength of an access that was already allowed.
-func filterCoveredGrants(grants []grant, p policy.Policy) []grant {
-	out := make([]grant, 0, len(grants))
+func filterCoveredGrants(grants []observedGrant, p policy.Policy) []observedGrant {
+	out := make([]observedGrant, 0, len(grants))
 	for _, gr := range grants {
-		if coveredByPolicy(gr, p) {
+		if coveredByPolicy(gr.Grant, p) {
 			continue
 		}
 		out = append(out, gr)
 	}
 	return out
+}
+
+// An observedGrant is a grant together with what the platform could say about
+// who was denied.
+//
+// Origin is the process name on macOS and empty on Linux, because the two
+// kernels report different things: a Landlock audit record names the security
+// domain, while a Seatbelt violation names the process. It is not used to
+// filter — a guess about which processes belong to the run would drop real
+// grants — but it is worth recording, since macOS reports violations from
+// every sandboxed process on the machine during the window, and a reviewer who
+// can see that an entry came from some unrelated daemon can delete it.
+type observedGrant struct {
+	Grant  grant
+	Origin string
 }
 
 // grantsForDenials maps denial records to grants, dropping the records that
 // name nothing grantable and collapsing exact duplicates. Order is the order
 // the denials arrived, so the earliest occurrence of a repeated path wins and
 // the result reads as a trace of the run.
-func grantsForDenials(denials []landlockDenial) []grant {
+func grantsForDenials(denials []landlockDenial) []observedGrant {
 	seen := map[grant]bool{}
-	out := []grant{}
+	out := []observedGrant{}
 	for _, d := range denials {
 		gr, ok := grantForDenial(d)
 		if !ok || seen[gr] {
 			continue
 		}
 		seen[gr] = true
-		out = append(out, gr)
+		// Landlock audit records identify the domain, not the process.
+		out = append(out, observedGrant{Grant: gr})
 	}
 	return out
 }
 
-// grantsForSeatbeltDenials is the macOS counterpart of grantsForDenials.
-func grantsForSeatbeltDenials(denials []seatbeltDenial) []grant {
+// grantsForSeatbeltDenials is the macOS counterpart of grantsForDenials. It
+// keeps the process name, which the violation record supplies and Landlock has
+// no equivalent of.
+func grantsForSeatbeltDenials(denials []seatbeltDenial) []observedGrant {
 	seen := map[grant]bool{}
-	out := []grant{}
+	out := []observedGrant{}
 	for _, d := range denials {
 		gr, ok := grantForSeatbeltDenial(d)
 		if !ok || seen[gr] {
 			continue
 		}
 		seen[gr] = true
-		out = append(out, gr)
+		out = append(out, observedGrant{Grant: gr, Origin: d.Process})
 	}
 	return out
 }

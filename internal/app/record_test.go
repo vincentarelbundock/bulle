@@ -149,3 +149,29 @@ func TestBuildRecordedProfileReportsWhatTheRunProves(t *testing.T) {
 		}
 	}
 }
+
+func TestAppendOrigins(t *testing.T) {
+	if got := appendOrigins("", nil); got != "" {
+		t.Errorf("no origins produced %q, want empty", got)
+	}
+	if got := appendOrigins("", []string{"mytool"}); got != "denied to mytool" {
+		t.Errorf("got %q", got)
+	}
+	if got := appendOrigins("for /x/y", []string{"mytool", "helper"}); got != "for /x/y (denied to mytool, helper)" {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestRecorderDeduplicatesGrantsButAccumulatesOrigins(t *testing.T) {
+	// The same path denied to several processes is one grant, but every
+	// process that hit it is worth showing.
+	rec := newRecorder()
+	gr := grant{Flag: "--ro", Path: "/etc/a"}
+	rec.noteOrigin(gr, "mytool")
+	rec.noteOrigin(gr, "helper")
+	rec.noteOrigin(gr, "mytool")
+	rec.noteOrigin(gr, "")
+	if got := rec.origins[gr]; len(got) != 2 || got[0] != "mytool" || got[1] != "helper" {
+		t.Errorf("origins = %v, want [mytool helper]", got)
+	}
+}
