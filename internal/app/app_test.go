@@ -15,6 +15,7 @@ import (
 
 	"github.com/vincentarelbundock/bulle/internal/elfdeps"
 	"github.com/vincentarelbundock/bulle/internal/exitcode"
+	bpaths "github.com/vincentarelbundock/bulle/internal/paths"
 	"github.com/vincentarelbundock/bulle/internal/policy"
 	"github.com/vincentarelbundock/bulle/internal/supervisor"
 )
@@ -467,12 +468,12 @@ func TestEnsureRuntimeDirsRejectsSymlinkedRoot(t *testing.T) {
 
 func TestRuntimeTempRootIsUserSpecific(t *testing.T) {
 	base := t.TempDir()
-	got := runtimeTempRoot(base)
+	got := bpaths.RuntimeTempRoot(base)
 	if filepath.Dir(got) != base {
-		t.Fatalf("runtimeTempRoot(%q) = %q, want child of base", base, got)
+		t.Fatalf("bpaths.RuntimeTempRoot(%q) = %q, want child of base", base, got)
 	}
 	if !bytes.Contains([]byte(filepath.Base(got)), []byte("bulle-")) {
-		t.Fatalf("runtimeTempRoot(%q) = %q, want user-specific bulle directory", base, got)
+		t.Fatalf("bpaths.RuntimeTempRoot(%q) = %q, want user-specific bulle directory", base, got)
 	}
 }
 

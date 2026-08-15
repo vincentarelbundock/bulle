@@ -7,6 +7,7 @@ import (
 
 	"github.com/vincentarelbundock/bulle/internal/cli"
 	"github.com/vincentarelbundock/bulle/internal/config"
+	benv "github.com/vincentarelbundock/bulle/internal/env"
 	"github.com/vincentarelbundock/bulle/internal/exitcode"
 )
 
@@ -122,7 +123,7 @@ func runShowDispatch(argv0 string, rest []string, stdout, stderr io.Writer) int 
 			fmt.Fprintln(stderr, "usage: bulle show resolvers")
 			return exitcode.ConfigError
 		}
-		writeResolverListing(parentEnv(), stdout)
+		writeResolverListing(benv.Parent(), stdout)
 		return exitcode.OK
 	case "config":
 		return runConfigCommand(rest, stdout, stderr)

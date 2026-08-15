@@ -14,6 +14,7 @@ import (
 
 	"github.com/vincentarelbundock/bulle/internal/cli"
 	"github.com/vincentarelbundock/bulle/internal/config"
+	benv "github.com/vincentarelbundock/bulle/internal/env"
 	"github.com/vincentarelbundock/bulle/internal/policy"
 )
 
@@ -120,7 +121,7 @@ type learnedFile struct {
 func saveLearnedGrants(opts cli.Options, global config.Config, name string, create bool, grants []grant) (string, error) {
 	root := opts.Config
 	if root == "" {
-		root = defaultConfigRoot()
+		root = config.DefaultRoot()
 	}
 	if root == "" {
 		return "", fmt.Errorf("could not determine the configuration directory")
@@ -147,7 +148,7 @@ func saveLearnedGrants(opts cli.Options, global config.Config, name string, crea
 		}
 	}
 
-	g := newGeneralizer(recordVars(), policy.ListResolvers(os.Getenv("PATH"), parentEnv()), exec.LookPath)
+	g := newGeneralizer(recordVars(), policy.ListResolvers(os.Getenv("PATH"), benv.Parent()), exec.LookPath)
 	entries := make([]recordedEntry, 0, len(grants))
 	for _, gr := range grants {
 		entries = append(entries, g.generalize(gr))

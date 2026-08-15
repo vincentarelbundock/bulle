@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/google/shlex"
@@ -16,7 +15,9 @@ import (
 	"github.com/vincentarelbundock/bulle/internal/cli"
 	"github.com/vincentarelbundock/bulle/internal/config"
 	"github.com/vincentarelbundock/bulle/internal/didyoumean"
+	benv "github.com/vincentarelbundock/bulle/internal/env"
 	"github.com/vincentarelbundock/bulle/internal/exitcode"
+	bpaths "github.com/vincentarelbundock/bulle/internal/paths"
 	"github.com/vincentarelbundock/bulle/internal/policy"
 	"github.com/vincentarelbundock/bulle/internal/supervisor"
 )
@@ -106,7 +107,7 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 		fmt.Fprintln(stderr, err)
 		return exitcode.ConfigError
 	}
-	tmp := runtimeTempRoot(os.TempDir())
+	tmp := bpaths.RuntimeTempRoot(os.TempDir())
 	if err := ensureRuntimeDirs(tmp); err != nil {
 		fmt.Fprintln(stderr, err)
 		return exitcode.ConfigError
@@ -206,7 +207,7 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 			os.RemoveAll(dir)
 		}
 	}()
-	env := parentEnv()
+	env := benv.Parent()
 	p, err := policy.Resolve(policy.Inputs{Options: opts, Global: global, ParentEnv: env, Home: home, Tmp: tmp})
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -400,7 +401,7 @@ func loadConfig(opts cli.Options) (config.Config, error) {
 	root := opts.Config
 	explicit := root != ""
 	if root == "" {
-		root = defaultConfigRoot()
+		root = config.DefaultRoot()
 	}
 	if root == "" {
 		return global, nil
@@ -436,25 +437,6 @@ func policySummaryProfileName(opts cli.Options) string {
 	return "default"
 }
 
-func defaultConfigRoot() string {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "bulle")
-}
-
-func parentEnv() map[string]string {
-	env := map[string]string{}
-	for _, item := range os.Environ() {
-		key, value, ok := strings.Cut(item, "=")
-		if ok {
-			env[key] = value
-		}
-	}
-	return env
-}
-
 func isCommandExitError(err error) bool {
 	var exitErr *exec.ExitError
 	return errors.As(err, &exitErr)
@@ -484,10 +466,6 @@ func exitCodeForSupervisorError(err error, stderr io.Writer) int {
 	}
 	fmt.Fprintln(stderr, err)
 	return exitcode.SandboxSetup
-}
-
-func runtimeTempRoot(base string) string {
-	return filepath.Join(base, "bulle-"+strconv.Itoa(os.Getuid()))
 }
 
 func ensureRuntimeDirs(tmp string) error {

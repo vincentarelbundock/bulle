@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	benv "github.com/vincentarelbundock/bulle/internal/env"
+	bpaths "github.com/vincentarelbundock/bulle/internal/paths"
 	"github.com/vincentarelbundock/bulle/internal/policy"
 )
 
@@ -129,7 +131,7 @@ func isProbeArtifact(path string) bool {
 // the two from drifting apart.
 func recordVars() map[string]string {
 	home, _ := os.UserHomeDir()
-	tmp := runtimeTempRoot(os.TempDir())
+	tmp := bpaths.RuntimeTempRoot(os.TempDir())
 	cwd, _ := os.Getwd()
-	return policy.RecordingVars(cwd, home, tmp, parentEnv())
+	return policy.RecordingVars(cwd, home, tmp, benv.Parent())
 }

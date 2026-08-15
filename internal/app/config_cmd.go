@@ -18,7 +18,7 @@ func runConfigCommand(rest []string, stdout, stderr io.Writer) int {
 	root := ""
 	switch {
 	case len(rest) == 0:
-		root = defaultConfigRoot()
+		root = config.DefaultRoot()
 	case len(rest) == 2 && rest[0] == "--config":
 		root = rest[1]
 	default:

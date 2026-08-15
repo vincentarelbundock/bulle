@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/vincentarelbundock/bulle/internal/cli"
+	"github.com/vincentarelbundock/bulle/internal/config"
 	"github.com/vincentarelbundock/bulle/internal/exitcode"
 )
 
@@ -43,7 +44,7 @@ func runProfilesCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		root := configRoot
 		if root == "" {
-			root = defaultConfigRoot()
+			root = config.DefaultRoot()
 		}
 		if root == "" {
 			fmt.Fprintln(stderr, "could not determine user config directory")
