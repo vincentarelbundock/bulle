@@ -138,3 +138,39 @@ func TestGrantForSeatbeltDenialReportsFlagAndCollapsedPath(t *testing.T) {
 		})
 	}
 }
+
+func TestGrantSuggestionPathCollapsesPerProcessProcEntries(t *testing.T) {
+	cases := map[string]string{
+		// The pid differs for every process, so the denied path is never the
+		// path to grant.
+		"/proc/1234/cgroup":       "/proc",
+		"/proc/1/status":          "/proc",
+		"/proc/1234":              "/proc",
+		"/proc/self/maps":         "/proc/self/maps",
+		"/proc/stat":              "/proc/stat",
+		"/proc/sys/vm/swappiness": "/proc/sys/vm/swappiness",
+		"/proc":                   "/proc",
+	}
+	for path, want := range cases {
+		if got := grantSuggestionPath(path); got != want {
+			t.Errorf("grantSuggestionPath(%q) = %q, want %q", path, got, want)
+		}
+	}
+}
+
+func TestDenialHintsCollapsePerProcessProcEntries(t *testing.T) {
+	// Without collapsing, a tool that reads /proc/<pid>/... in each of its
+	// children produces one hint per child and a recording never converges.
+	lines := []string{
+		`audit: type=1423 audit(1.0:1): domain=1 blockers=fs.read_file path="/proc/111/cgroup" dev="proc" ino=1`,
+		`audit: type=1423 audit(1.0:2): domain=1 blockers=fs.read_file path="/proc/222/cgroup" dev="proc" ino=2`,
+		`audit: type=1423 audit(1.0:3): domain=1 blockers=fs.read_file path="/proc/333/status" dev="proc" ino=3`,
+	}
+	hints := denialHints(parseLandlockDenials(lines, 0), "/home/user")
+	if len(hints) != 1 {
+		t.Fatalf("hints = %v, want one collapsed /proc grant", hints)
+	}
+	if !strings.Contains(hints[0], "--ro /proc") {
+		t.Fatalf("hint = %q, want a /proc grant", hints[0])
+	}
+}

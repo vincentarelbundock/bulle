@@ -148,6 +148,9 @@ var storeGrantRoots = []struct {
 // granting: the enclosing package root inside a package store, the denied
 // path itself everywhere else.
 func grantSuggestionPath(path string) string {
+	if procGrantPath(path) {
+		return "/proc"
+	}
 	for _, root := range storeGrantRoots {
 		if !strings.HasPrefix(path, root.prefix) {
 			continue
@@ -159,6 +162,36 @@ func grantSuggestionPath(path string) string {
 		return "/" + strings.Join(parts[:root.components], "/")
 	}
 	return path
+}
+
+// procGrantPath reports whether a denied path is a per-process /proc entry
+// such as /proc/1234/cgroup.
+//
+// The kernel reports these with the pid resolved, and every process has a
+// different one, so the denied path is never the path to grant: it names a
+// process that has already exited. /proc/self does not cover it either, since
+// that resolves at grant time to the granting process rather than to the child
+// that hit the denial — which is why the quarto profile grants /proc whole and
+// documents the tradeoff.
+//
+// Collapsing to /proc is what lets a suggestion be followed once instead of
+// once per process, and what lets a recording converge at all: without it,
+// every round observes a new pid and looks like new information forever.
+func procGrantPath(path string) bool {
+	rest, ok := strings.CutPrefix(path, "/proc/")
+	if !ok {
+		return false
+	}
+	pid, _, _ := strings.Cut(rest, "/")
+	if pid == "" {
+		return false
+	}
+	for _, r := range pid {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // classifyBlockers maps a record's blockers to a human verb and the grant flag

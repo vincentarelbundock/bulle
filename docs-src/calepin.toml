@@ -49,7 +49,7 @@ depth = 3
 [sidebar]
 fold = true
 
-# Six pages is few enough that section headings would add nesting without
+# Seven pages is few enough that section headings would add nesting without
 # adding orientation; the per-page table of contents carries the detail.
 [[sidebar.section]]
 
@@ -67,6 +67,9 @@ fold = true
 
   [[sidebar.section.item]]
   target = "denial-diagnostics.typ"
+
+  [[sidebar.section.item]]
+  target = "record.typ"
 
   [[sidebar.section.item]]
   target = "cli-reference.typ"

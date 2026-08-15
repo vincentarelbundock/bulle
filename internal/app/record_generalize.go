@@ -157,6 +157,16 @@ func (g *generalizer) generalize(gr grant) recordedEntry {
 	path := filepath.Clean(gr.Path)
 	entry := recordedEntry{List: list, Denied: path}
 
+	if path == "/proc" {
+		// Collapsed from a per-process entry. This grants more than the denial
+		// asked for and cannot be narrowed — see procGrantPath — so the entry
+		// carries the tradeoff rather than leaving a reviewer to infer it.
+		entry.Entry = path
+		entry.Comment = "a per-process /proc entry was denied; only a whole-/proc grant covers it," +
+			" since the pid differs for every child. This lets the sandboxed command read" +
+			" other same-uid processes' /proc entries."
+		return entry
+	}
 	if name, ok := g.commandName(path, list); ok {
 		entry.Entry = "which:" + name
 		entry.Comment = "resolved from PATH; " + path + " here"

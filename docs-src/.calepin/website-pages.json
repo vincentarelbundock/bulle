@@ -65,6 +65,19 @@
     "translations": {}
   },
   {
+    "href": "record.html",
+    "language": null,
+    "meta": {
+      "description": "Draft a profile for a new tool by running it under observation: bulle collects what the sandbox denied, adds those grants, and runs again until nothing new is denied.",
+      "title": "Recording Profiles"
+    },
+    "path": "record.typ",
+    "pdf": null,
+    "title": "Recording Profiles",
+    "translation_key": "record",
+    "translations": {}
+  },
+  {
     "href": "scratch.html",
     "language": null,
     "meta": {

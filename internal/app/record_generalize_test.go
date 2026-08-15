@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	bpaths "github.com/vincentarelbundock/bulle/internal/paths"
@@ -240,5 +241,17 @@ func TestPromoteDirectoriesDoesNotWidenDirectoryGrants(t *testing.T) {
 	})
 	if len(entries) != 4 {
 		t.Fatalf("entries = %+v, want directory and resolver entries untouched", entries)
+	}
+}
+
+func TestGeneralizeExplainsAWholeProcGrant(t *testing.T) {
+	g := newTestGeneralizer(noLookPath)
+	got := g.generalize(grant{Flag: "--ro", Path: "/proc"})
+	if got.Entry != "/proc" {
+		t.Fatalf("entry = %q, want /proc", got.Entry)
+	}
+	// The widening is unavoidable but must not be silent.
+	if !strings.Contains(got.Comment, "same-uid") {
+		t.Errorf("comment does not state the tradeoff: %q", got.Comment)
 	}
 }
