@@ -16,20 +16,9 @@ import (
 	"github.com/vincentarelbundock/bulle/internal/cli"
 	"github.com/vincentarelbundock/bulle/internal/config"
 	"github.com/vincentarelbundock/bulle/internal/didyoumean"
+	"github.com/vincentarelbundock/bulle/internal/exitcode"
 	"github.com/vincentarelbundock/bulle/internal/policy"
 	"github.com/vincentarelbundock/bulle/internal/supervisor"
-)
-
-const (
-	ExitOK               = 0
-	ExitCommandFailed    = 1
-	ExitConfigError      = 2
-	ExitBackendMissing   = 3
-	ExitPolicyValidation = 4
-	ExitSandboxSetup     = 5
-	ExitTimedOut         = 124
-	ExitNotExecutable    = 126
-	ExitNotFound         = 127
 )
 
 // Version is the bulle version, overridable at build time via
@@ -48,7 +37,7 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	// name as a sandboxed command.
 	if len(args) > 1 && args[1] == preparedPolicyRunnerCommand {
 		fmt.Fprintf(stderr, "bulle: %s is an internal invocation and cannot be used directly\n", preparedPolicyRunnerCommand)
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 
 	// Subcommands are dispatched by the first argument, before run parsing,
@@ -97,17 +86,17 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 	opts, err := cli.Parse(args)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 	opts.Policy = policyFormat != ""
 	opts.PolicyFormat = policyFormat
 	if opts.Help {
 		fmt.Fprint(stdout, cli.Usage())
-		return ExitOK
+		return exitcode.OK
 	}
 	if opts.Version {
 		fmt.Fprintf(stdout, "bulle %s\n", Version)
-		return ExitOK
+		return exitcode.OK
 	}
 	for _, note := range opts.Notes {
 		fmt.Fprintln(stderr, note)
@@ -115,27 +104,27 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 	home, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Fprintln(stderr, err)
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 	tmp := runtimeTempRoot(os.TempDir())
 	if err := ensureRuntimeDirs(tmp); err != nil {
 		fmt.Fprintln(stderr, err)
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 	global, err := loadConfig(opts)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 	if !opts.NoDefaults {
 		if err := applyConfigDefaults(&opts, global.Defaults); err != nil {
 			fmt.Fprintln(stderr, err)
-			return ExitConfigError
+			return exitcode.ConfigError
 		}
 	}
 	if err := validateProfiles(opts, global); err != nil {
 		fmt.Fprintln(stderr, err)
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 	explicitCommand := len(opts.Command) > 0
 	if explicitCommand {
@@ -163,13 +152,13 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 		defaultApp, err := defaultAppForRun(opts, global)
 		if err != nil {
 			fmt.Fprintln(stderr, err)
-			return ExitConfigError
+			return exitcode.ConfigError
 		}
 		if defaultApp != "" {
 			command, err := shlex.Split(defaultApp)
 			if err != nil {
 				fmt.Fprintf(stderr, "invalid default_app: %v\n", err)
-				return ExitConfigError
+				return exitcode.ConfigError
 			}
 			opts.Command = command
 		}
@@ -182,14 +171,14 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 		// a request for orientation, not a broken invocation.
 		if len(args) == 1 {
 			fmt.Fprint(stdout, cli.Usage())
-			return ExitOK
+			return exitcode.OK
 		}
 		if opts.Profile != "" {
 			fmt.Fprintf(stderr, "bulle: profile %q has no default app; add a command after -- (e.g. bulle %s -- ./script.sh)\n", opts.Profile, opts.Profile)
 		} else {
 			fmt.Fprintln(stderr, "bulle: nothing to run: name a profile with a default app, or pass a command after --")
 		}
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 	// The scratch is created before policy.Resolve so $WORKSPACE and the
 	// automatic read-write grant follow it; the origin path is never granted.
@@ -199,12 +188,12 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 	if opts.Scratch {
 		if opts.NoWorkspace {
 			fmt.Fprintln(stderr, "bulle: --scratch with --no-workspace is contradictory: a scratch exists to be the workspace")
-			return ExitConfigError
+			return exitcode.ConfigError
 		}
 		scratch, err = createScratch(opts.ProjectPath, global.Scratch.Dir, cli.NormalizeSeparator(args[1:]), stderr)
 		if err != nil {
 			fmt.Fprintf(stderr, "bulle: %v\n", err)
-			return ExitConfigError
+			return exitcode.ConfigError
 		}
 		opts.ProjectPath = scratch.Dir
 	}
@@ -221,14 +210,14 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 	p, err := policy.Resolve(policy.Inputs{Options: opts, Global: global, ParentEnv: env, Home: home, Tmp: tmp})
 	if err != nil {
 		fmt.Fprintln(stderr, err)
-		return ExitPolicyValidation
+		return exitcode.PolicyValidation
 	}
 	if p.ShimDir != "" {
 		shimDirs = append(shimDirs, p.ShimDir)
 	}
 	if _, err := backends.ForName(p.Backend); err != nil {
 		fmt.Fprintln(stderr, err)
-		return ExitBackendMissing
+		return exitcode.BackendMissing
 	}
 	prepared, err := backends.PreparePolicy(p)
 	if err != nil {
@@ -239,9 +228,9 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 			removeScratch(scratch)
 		}
 		if errors.Is(err, policy.ErrCommandNotFound) {
-			return ExitNotFound
+			return exitcode.NotFound
 		}
-		return ExitNotExecutable
+		return exitcode.NotExecutable
 	}
 	p = prepared
 	if opts.Policy {
@@ -258,13 +247,13 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 		case "json":
 			if err := json.NewEncoder(stdout).Encode(policy.NewView(p)); err != nil {
 				fmt.Fprintln(stderr, err)
-				return ExitCommandFailed
+				return exitcode.CommandFailed
 			}
 		default:
 			fmt.Fprintf(stderr, "invalid --policy value %q; use summary or json\n", opts.PolicyFormat)
-			return ExitConfigError
+			return exitcode.ConfigError
 		}
-		return ExitOK
+		return exitcode.OK
 	}
 	if code, ok := reportUnenforcedLimits(p, opts.Flags.StrictLimits, stderr); !ok {
 		if scratch != nil {
@@ -281,7 +270,7 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 	// All runs go through the supervisor (even without a timeout) so a parent
 	// process survives the sandboxed command and can report on its failure.
 	probe := startDenialProbe(p)
-	code := ExitOK
+	code := exitcode.OK
 	failed := false
 	if err := supervisor.Run(p, supervisor.Options{
 		Timeout: p.Timeout,
@@ -480,21 +469,21 @@ func exitCodeForSupervisorError(err error, stderr io.Writer) int {
 		if hasRestoreErr {
 			fmt.Fprintln(stderr, restoreErr)
 		}
-		return ExitTimedOut
+		return exitcode.TimedOut
 	}
 	if hasRestoreErr {
 		fmt.Fprintln(stderr, restoreErr)
-		return ExitSandboxSetup
+		return exitcode.SandboxSetup
 	}
 	var exitErr *supervisor.ExitError
 	if errors.As(err, &exitErr) {
 		if exitErr.Code > 0 {
 			return exitErr.Code
 		}
-		return ExitCommandFailed
+		return exitcode.CommandFailed
 	}
 	fmt.Fprintln(stderr, err)
-	return ExitSandboxSetup
+	return exitcode.SandboxSetup
 }
 
 func runtimeTempRoot(base string) string {

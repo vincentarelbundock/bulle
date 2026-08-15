@@ -14,13 +14,14 @@ import (
 	"time"
 
 	"github.com/vincentarelbundock/bulle/internal/elfdeps"
+	"github.com/vincentarelbundock/bulle/internal/exitcode"
 	"github.com/vincentarelbundock/bulle/internal/policy"
 	"github.com/vincentarelbundock/bulle/internal/supervisor"
 )
 
 func TestRunDefinesTimeoutExitCode(t *testing.T) {
-	if ExitTimedOut != 124 {
-		t.Fatalf("ExitTimedOut = %d, want 124", ExitTimedOut)
+	if exitcode.TimedOut != 124 {
+		t.Fatalf("exitcode.TimedOut = %d, want 124", exitcode.TimedOut)
 	}
 }
 
@@ -47,8 +48,8 @@ func TestRunPreparedPolicyRejectsMissingFD(t *testing.T) {
 
 	code := runPreparedPolicy([]string{"bulle", "__run-prepared-policy"}, &stderr)
 
-	if code != ExitSandboxSetup {
-		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitSandboxSetup, stderr.String())
+	if code != exitcode.SandboxSetup {
+		t.Fatalf("exit code = %d, want %d; stderr = %s", code, exitcode.SandboxSetup, stderr.String())
 	}
 	if !bytes.Contains(stderr.Bytes(), []byte("usage: bulle __run-prepared-policy --policy-fd FD")) {
 		t.Fatalf("stderr = %s", stderr.String())
@@ -61,8 +62,8 @@ func TestRunDoesNotTreatIncompletePreparedPolicyInvocationAsRunner(t *testing.T)
 
 	code := Run([]string{"bulle", "__run-prepared-policy", "--policy-fd"}, &stdout, &stderr)
 
-	if code != ExitConfigError {
-		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitConfigError, stderr.String())
+	if code != exitcode.ConfigError {
+		t.Fatalf("exit code = %d, want %d; stderr = %s", code, exitcode.ConfigError, stderr.String())
 	}
 	if bytes.Contains(stderr.Bytes(), []byte("usage: bulle __run-prepared-policy --policy-fd FD")) {
 		t.Fatalf("public CLI invocation was handled as hidden runner: %s", stderr.String())
@@ -100,8 +101,8 @@ func TestRunPreparedPolicyDoesNotShadowWorkspacePath(t *testing.T) {
 
 	code := Run([]string{"bulle", "show", preparedPolicyRunnerCommand, "--rox", filepath.Dir(truePath), "--", truePath}, &stdout, &stderr)
 
-	if code != ExitOK {
-		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitOK, stderr.String())
+	if code != exitcode.OK {
+		t.Fatalf("exit code = %d, want %d; stderr = %s", code, exitcode.OK, stderr.String())
 	}
 	if bytes.Contains(stderr.Bytes(), []byte("usage: bulle __run-prepared-policy --policy-fd FD")) {
 		t.Fatalf("workspace path was handled as hidden runner: %s", stderr.String())
@@ -117,8 +118,8 @@ func TestRunPreparedPolicyRejectsInvalidFD(t *testing.T) {
 
 	code := Run([]string{"bulle", "__run-prepared-policy", "--policy-fd", "not-a-number"}, &stdout, &stderr)
 
-	if code != ExitSandboxSetup {
-		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitSandboxSetup, stderr.String())
+	if code != exitcode.SandboxSetup {
+		t.Fatalf("exit code = %d, want %d; stderr = %s", code, exitcode.SandboxSetup, stderr.String())
 	}
 	if !bytes.Contains(stderr.Bytes(), []byte(`invalid policy fd "not-a-number"`)) {
 		t.Fatalf("stderr = %s", stderr.String())
@@ -141,7 +142,7 @@ func TestRunPreparedPolicyClosesFDBeforeBackend(t *testing.T) {
 			}
 			t.Fatalf("policy fd is still open when backend starts; err = %v", err)
 		}
-		return ExitOK
+		return exitcode.OK
 	}
 	defer func() {
 		runPreparedPolicyBackend = oldRunPreparedPolicyBackend
@@ -149,8 +150,8 @@ func TestRunPreparedPolicyClosesFDBeforeBackend(t *testing.T) {
 
 	code := Run([]string{"bulle", "__run-prepared-policy", "--policy-fd", strconv.Itoa(fd)}, &stdout, &stderr)
 
-	if code != ExitOK {
-		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitOK, stderr.String())
+	if code != exitcode.OK {
+		t.Fatalf("exit code = %d, want %d; stderr = %s", code, exitcode.OK, stderr.String())
 	}
 	if !called {
 		t.Fatal("backend was not called")
@@ -481,8 +482,8 @@ func TestRunExplainsBareCommandWithoutPolicyPATH(t *testing.T) {
 
 	code := Run([]string{"bulle", "--", "definitely-not-installed-bulle-test-command"}, &stdout, &stderr)
 
-	if code != ExitNotFound {
-		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitNotFound, stderr.String())
+	if code != exitcode.NotFound {
+		t.Fatalf("exit code = %d, want %d; stderr = %s", code, exitcode.NotFound, stderr.String())
 	}
 	if !bytes.Contains(stderr.Bytes(), []byte("policy PATH")) {
 		t.Fatalf("stderr = %s", stderr.String())
@@ -525,8 +526,8 @@ default_app = "definitely-not-installed-bulle-test-command"
 
 	code := Run([]string{"bulle", "--config", tmp, "missing", tmp}, &stdout, &stderr)
 
-	if code != ExitNotFound {
-		t.Fatalf("exit code = %d, want %d; stderr = %s", code, ExitNotFound, stderr.String())
+	if code != exitcode.NotFound {
+		t.Fatalf("exit code = %d, want %d; stderr = %s", code, exitcode.NotFound, stderr.String())
 	}
 	if !bytes.Contains(stderr.Bytes(), []byte("command not found before sandbox setup")) {
 		t.Fatalf("stderr = %s", stderr.String())
@@ -599,8 +600,8 @@ func TestRunRejectsInvalidDefaultApp(t *testing.T) {
 
 	code := Run([]string{"bulle", "show", "--json", "--config", tmp, "default", tmp}, &stdout, &stderr)
 
-	if code != ExitConfigError {
-		t.Fatalf("exit code = %d, want %d; stdout = %s; stderr = %s", code, ExitConfigError, stdout.String(), stderr.String())
+	if code != exitcode.ConfigError {
+		t.Fatalf("exit code = %d, want %d; stdout = %s; stderr = %s", code, exitcode.ConfigError, stdout.String(), stderr.String())
 	}
 	if !bytes.Contains(stderr.Bytes(), []byte("invalid default_app")) {
 		t.Fatalf("stderr = %s", stderr.String())
@@ -618,8 +619,8 @@ func TestRunIgnoresProjectConfig(t *testing.T) {
 
 	code := Run([]string{"bulle", "default", tmp}, &stdout, &stderr)
 
-	if code != ExitConfigError {
-		t.Fatalf("exit code = %d, want %d; stdout = %s; stderr = %s", code, ExitConfigError, stdout.String(), stderr.String())
+	if code != exitcode.ConfigError {
+		t.Fatalf("exit code = %d, want %d; stdout = %s; stderr = %s", code, exitcode.ConfigError, stdout.String(), stderr.String())
 	}
 	if !bytes.Contains(stderr.Bytes(), []byte("has no default app")) {
 		t.Fatalf("stderr = %s", stderr.String())
@@ -690,7 +691,7 @@ func TestRunPolicySummaryIncludesTimeoutWhenConfigured(t *testing.T) {
 
 	code := Run([]string{"bulle", "show", "--timeout", "250ms", "tool", tmp, "--", "echo", "hi"}, &stdout, &stderr)
 
-	if code != ExitOK {
+	if code != exitcode.OK {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
 	}
 	if !bytes.Contains(stdout.Bytes(), []byte("  timeout: 250ms\n")) {
@@ -743,8 +744,8 @@ func TestExitCodeForSupervisorTimeoutError(t *testing.T) {
 
 	code := exitCodeForSupervisorError(&supervisor.TimeoutError{Duration: 250 * time.Millisecond}, &stderr)
 
-	if code != ExitTimedOut {
-		t.Fatalf("exit code = %d, want %d", code, ExitTimedOut)
+	if code != exitcode.TimedOut {
+		t.Fatalf("exit code = %d, want %d", code, exitcode.TimedOut)
 	}
 	if !bytes.Contains(stderr.Bytes(), []byte("bulle: command timed out after 250ms\n")) {
 		t.Fatalf("stderr = %s", stderr.String())
@@ -760,8 +761,8 @@ func TestExitCodeForSupervisorTimeoutWithTerminalRestoreError(t *testing.T) {
 
 	code := exitCodeForSupervisorError(err, &stderr)
 
-	if code != ExitTimedOut {
-		t.Fatalf("exit code = %d, want %d", code, ExitTimedOut)
+	if code != exitcode.TimedOut {
+		t.Fatalf("exit code = %d, want %d", code, exitcode.TimedOut)
 	}
 	if !bytes.Contains(stderr.Bytes(), []byte("bulle: command timed out after 250ms\n")) {
 		t.Fatalf("stderr = %s", stderr.String())
@@ -789,8 +790,8 @@ func TestExitCodeForSupervisorZeroExitError(t *testing.T) {
 
 	code := exitCodeForSupervisorError(&supervisor.ExitError{Code: 0}, &stderr)
 
-	if code != ExitCommandFailed {
-		t.Fatalf("exit code = %d, want %d", code, ExitCommandFailed)
+	if code != exitcode.CommandFailed {
+		t.Fatalf("exit code = %d, want %d", code, exitcode.CommandFailed)
 	}
 	if stderr.String() != "" {
 		t.Fatalf("stderr = %s", stderr.String())
@@ -806,8 +807,8 @@ func TestExitCodeForSupervisorExitWithTerminalRestoreError(t *testing.T) {
 
 	code := exitCodeForSupervisorError(err, &stderr)
 
-	if code != ExitSandboxSetup {
-		t.Fatalf("exit code = %d, want %d", code, ExitSandboxSetup)
+	if code != exitcode.SandboxSetup {
+		t.Fatalf("exit code = %d, want %d", code, exitcode.SandboxSetup)
 	}
 	if !bytes.Contains(stderr.Bytes(), []byte("restore failed\n")) {
 		t.Fatalf("stderr = %s", stderr.String())
@@ -819,8 +820,8 @@ func TestExitCodeForSupervisorGenericError(t *testing.T) {
 
 	code := exitCodeForSupervisorError(errors.New("setup failed"), &stderr)
 
-	if code != ExitSandboxSetup {
-		t.Fatalf("exit code = %d, want %d", code, ExitSandboxSetup)
+	if code != exitcode.SandboxSetup {
+		t.Fatalf("exit code = %d, want %d", code, exitcode.SandboxSetup)
 	}
 	if !bytes.Contains(stderr.Bytes(), []byte("setup failed\n")) {
 		t.Fatalf("stderr = %s", stderr.String())

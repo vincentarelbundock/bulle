@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/vincentarelbundock/bulle/internal/config"
+	"github.com/vincentarelbundock/bulle/internal/exitcode"
 )
 
 // runConfigCommand reports which configuration files are in effect and where
@@ -22,14 +23,14 @@ func runConfigCommand(rest []string, stdout, stderr io.Writer) int {
 		root = rest[1]
 	default:
 		fmt.Fprintln(stderr, "usage: bulle config [--config PATH]")
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 	if root == "" {
 		fmt.Fprintln(stderr, "bulle: cannot determine the user configuration directory")
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 
-	exit := ExitOK
+	exit := exitcode.OK
 	fmt.Fprintf(stdout, "configuration root: %s\n", root)
 
 	configPath := filepath.Join(root, "config.toml")
@@ -39,7 +40,7 @@ func runConfigCommand(rest []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "  config.toml: not found; create it for machine-local settings ([defaults], [vars], [scratch])\n")
 	} else {
 		fmt.Fprintf(stdout, "  config.toml: ERROR: %v\n", err)
-		exit = ExitConfigError
+		exit = exitcode.ConfigError
 	}
 
 	profilesDir := filepath.Join(root, "profiles")
@@ -49,7 +50,7 @@ func runConfigCommand(rest []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "  profiles/:   not found; put profile TOML files there, or use 'bulle profiles install'\n")
 	} else {
 		fmt.Fprintf(stdout, "  profiles/:   ERROR: %v\n", err)
-		exit = ExitConfigError
+		exit = exitcode.ConfigError
 	}
 
 	builtin, err := config.LoadDefaultConfig()

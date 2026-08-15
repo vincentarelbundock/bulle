@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/vincentarelbundock/bulle/internal/exitcode"
 )
 
 // The dispatch table and the completion protocol are exercised through Run,
@@ -19,7 +21,7 @@ func runForTest(t *testing.T, args ...string) (string, string, int) {
 
 func TestCompleteEndpointListsSubcommandsAndProfiles(t *testing.T) {
 	stdout, _, code := runForTest(t, "__complete", "--", "")
-	if code != ExitOK {
+	if code != exitcode.OK {
 		t.Fatalf("exit %d, stdout %q", code, stdout)
 	}
 	for _, want := range []string{"scratch", "show", "profiles", "completion", "claude", "offline"} {
@@ -40,17 +42,17 @@ func TestCompleteEndpointListsSubcommandsAndProfiles(t *testing.T) {
 func TestCompletionScriptsPrint(t *testing.T) {
 	for _, shell := range []string{"bash", "zsh", "fish"} {
 		stdout, _, code := runForTest(t, "completion", shell)
-		if code != ExitOK || !strings.Contains(stdout, "__complete") {
+		if code != exitcode.OK || !strings.Contains(stdout, "__complete") {
 			t.Errorf("completion %s: exit %d, output %q", shell, code, stdout)
 		}
 	}
 	_, stderr, code := runForTest(t, "completion", "tcsh")
-	if code != ExitConfigError || !strings.Contains(stderr, "bash, zsh, or fish") {
+	if code != exitcode.ConfigError || !strings.Contains(stderr, "bash, zsh, or fish") {
 		t.Errorf("bad shell: exit %d, stderr %q", code, stderr)
 	}
 	// Bare invocation of an argument-requiring subcommand shows its help.
 	stdout, _, code := runForTest(t, "completion")
-	if code != ExitOK || !strings.Contains(stdout, "bulle completion bash|zsh|fish") {
+	if code != exitcode.OK || !strings.Contains(stdout, "bulle completion bash|zsh|fish") {
 		t.Errorf("bare completion: exit %d, stdout %q", code, stdout)
 	}
 }
@@ -63,24 +65,24 @@ func TestSubcommandHelp(t *testing.T) {
 			continue
 		}
 		stdout, _, code := runForTest(t, "help", sub.Name)
-		if code != ExitOK || !strings.Contains(stdout, "Usage:") {
+		if code != exitcode.OK || !strings.Contains(stdout, "Usage:") {
 			t.Errorf("help %s: exit %d, stdout %q", sub.Name, code, stdout)
 		}
 	}
 	stdout, _, code := runForTest(t, "scratch", "--help")
-	if code != ExitOK || !strings.Contains(stdout, "disposable") {
+	if code != exitcode.OK || !strings.Contains(stdout, "disposable") {
 		t.Errorf("scratch --help: exit %d", code)
 	}
 	stdout, _, code = runForTest(t, "show", "-h")
-	if code != ExitOK || !strings.Contains(stdout, "--json") {
+	if code != exitcode.OK || !strings.Contains(stdout, "--json") {
 		t.Errorf("show -h: exit %d, stdout %q", code, stdout)
 	}
 	stdout, _, code = runForTest(t, "profiles")
-	if code != ExitOK || !strings.Contains(stdout, "Usage:") {
+	if code != exitcode.OK || !strings.Contains(stdout, "Usage:") {
 		t.Errorf("bare profiles: exit %d, stdout %q", code, stdout)
 	}
 	_, stderr, code := runForTest(t, "help", "bogus")
-	if code != ExitConfigError || !strings.Contains(stderr, "topics:") {
+	if code != exitcode.ConfigError || !strings.Contains(stderr, "topics:") {
 		t.Errorf("help bogus: exit %d, stderr %q", code, stderr)
 	}
 }
@@ -93,7 +95,7 @@ func TestHelpTopicsDispatch(t *testing.T) {
 		"config": "profiles/",
 	} {
 		stdout, _, code := runForTest(t, "help", topic)
-		if code != ExitOK || !strings.Contains(stdout, want) {
+		if code != exitcode.OK || !strings.Contains(stdout, want) {
 			t.Errorf("help %s: exit %d, stdout %q", topic, code, stdout)
 		}
 	}
@@ -104,7 +106,7 @@ func TestBareBulleShowsHelp(t *testing.T) {
 	// bare invocation into a real sandboxed run.
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	stdout, _, code := runForTest(t)
-	if code != ExitOK || !strings.Contains(stdout, "bulle runs coding agents") {
+	if code != exitcode.OK || !strings.Contains(stdout, "bulle runs coding agents") {
 		t.Errorf("bare bulle: exit %d, stdout %q", code, stdout)
 	}
 }
@@ -112,7 +114,7 @@ func TestBareBulleShowsHelp(t *testing.T) {
 func TestDirectoryInProfileSlotIsExplained(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	_, stderr, code := runForTest(t, ".")
-	if code != ExitConfigError || !strings.Contains(stderr, "is a directory, not a profile") {
+	if code != exitcode.ConfigError || !strings.Contains(stderr, "is a directory, not a profile") {
 		t.Errorf("bulle .: exit %d, stderr %q", code, stderr)
 	}
 }
@@ -121,7 +123,7 @@ func TestCommandInProfileSlotIsExplained(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	// A name that is on PATH but is not a profile gets pointed at the -- form.
 	_, stderr, code := runForTest(t, "ls")
-	if code != ExitConfigError || !strings.Contains(stderr, "bulle -- ls") {
+	if code != exitcode.ConfigError || !strings.Contains(stderr, "bulle -- ls") {
 		t.Errorf("bulle ls: exit %d, stderr %q", code, stderr)
 	}
 }
@@ -129,7 +131,7 @@ func TestCommandInProfileSlotIsExplained(t *testing.T) {
 func TestSupportProfileWithoutCommandIsExplained(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	_, stderr, code := runForTest(t, "network")
-	if code != ExitConfigError || !strings.Contains(stderr, "has no default app") {
+	if code != exitcode.ConfigError || !strings.Contains(stderr, "has no default app") {
 		t.Errorf("bulle network: exit %d, stderr %q", code, stderr)
 	}
 }
@@ -145,14 +147,14 @@ func TestWantsHelpStopsAtSeparator(t *testing.T) {
 
 func TestHelpAndVersionDispatch(t *testing.T) {
 	stdout, _, code := runForTest(t, "help")
-	if code != ExitOK || !strings.Contains(stdout, "bulle runs coding agents") {
+	if code != exitcode.OK || !strings.Contains(stdout, "bulle runs coding agents") {
 		t.Errorf("help: exit %d", code)
 	}
 	if !strings.Contains(stdout, "bulle completion bash|zsh|fish") {
 		t.Errorf("help does not document completion")
 	}
 	stdout, _, code = runForTest(t, "version")
-	if code != ExitOK || !strings.HasPrefix(stdout, "bulle ") {
+	if code != exitcode.OK || !strings.HasPrefix(stdout, "bulle ") {
 		t.Errorf("version: exit %d, output %q", code, stdout)
 	}
 }
@@ -170,7 +172,7 @@ func containsLine(output, want string) bool {
 func TestShowProfilesListsBuiltins(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	stdout, _, code := runForTest(t, "show", "profiles")
-	if code != ExitOK {
+	if code != exitcode.OK {
 		t.Fatalf("exit %d, stdout %q", code, stdout)
 	}
 	for _, want := range []string{"claude", "offline", "tool"} {
@@ -182,7 +184,7 @@ func TestShowProfilesListsBuiltins(t *testing.T) {
 
 func TestShowResolversLists(t *testing.T) {
 	stdout, _, code := runForTest(t, "show", "resolvers")
-	if code != ExitOK || stdout == "" {
+	if code != exitcode.OK || stdout == "" {
 		t.Errorf("show resolvers: exit %d, stdout %q", code, stdout)
 	}
 }
@@ -191,7 +193,7 @@ func TestShowConfigReportsStatus(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	stdout, _, code := runForTest(t, "show", "config")
-	if code != ExitOK {
+	if code != exitcode.OK {
 		t.Fatalf("exit %d, stdout %q", code, stdout)
 	}
 	for _, want := range []string{"configuration root:", "config.toml: not found", "profiles/:   not found", "built-in profiles:"} {
@@ -208,7 +210,7 @@ func TestShowConfigReportsStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout, _, code = runForTest(t, "show", "config")
-	if code != ExitConfigError || !strings.Contains(stdout, "config.toml: ERROR") {
+	if code != exitcode.ConfigError || !strings.Contains(stdout, "config.toml: ERROR") {
 		t.Errorf("broken config: exit %d, stdout %q", code, stdout)
 	}
 }
@@ -216,7 +218,7 @@ func TestShowConfigReportsStatus(t *testing.T) {
 func TestProfileTypoSuggestion(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	_, stderr, code := runForTest(t, "show", "claud")
-	if code == ExitOK || !strings.Contains(stderr, `did you mean claude?`) {
+	if code == exitcode.OK || !strings.Contains(stderr, `did you mean claude?`) {
 		t.Errorf("typo'd profile: exit %d, stderr %q", code, stderr)
 	}
 }

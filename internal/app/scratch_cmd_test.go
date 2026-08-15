@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vincentarelbundock/bulle/internal/exitcode"
 )
 
 func TestListScratchesAndSelect(t *testing.T) {
@@ -67,7 +69,7 @@ func TestRunScratchCommandListAndPull(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if code := runScratchCommand([]string{"list"}, &stdout, &stderr); code != ExitOK {
+	if code := runScratchCommand([]string{"list"}, &stdout, &stderr); code != exitcode.OK {
 		t.Fatalf("list exit %d: %s", code, stderr.String())
 	}
 	if !strings.Contains(stdout.String(), s.ID) || !strings.Contains(stdout.String(), origin) {
@@ -77,7 +79,7 @@ func TestRunScratchCommandListAndPull(t *testing.T) {
 	// Dirty scratch: pull refuses and points at shell.
 	stdout.Reset()
 	stderr.Reset()
-	if code := runScratchCommand([]string{"pull", s.ID}, &stdout, &stderr); code == ExitOK {
+	if code := runScratchCommand([]string{"pull", s.ID}, &stdout, &stderr); code == exitcode.OK {
 		t.Fatal("pull of a dirty scratch must fail")
 	}
 	if !strings.Contains(stderr.String(), "uncommitted") {
@@ -89,7 +91,7 @@ func TestRunScratchCommandListAndPull(t *testing.T) {
 	gitT(t, s.Dir, "commit", "-q", "-m", "agent work")
 	stdout.Reset()
 	stderr.Reset()
-	if code := runScratchCommand([]string{"pull", s.ID}, &stdout, &stderr); code != ExitOK {
+	if code := runScratchCommand([]string{"pull", s.ID}, &stdout, &stderr); code != exitcode.OK {
 		t.Fatalf("pull exit %d: %s", code, stderr.String())
 	}
 	if _, err := os.Stat(filepath.Join(origin, "agent.txt")); err != nil {
@@ -100,7 +102,7 @@ func TestRunScratchCommandListAndPull(t *testing.T) {
 	}
 
 	stdout.Reset()
-	if code := runScratchCommand([]string{"list"}, &stdout, &stderr); code != ExitOK || !strings.Contains(stdout.String(), "no scratches") {
+	if code := runScratchCommand([]string{"list"}, &stdout, &stderr); code != exitcode.OK || !strings.Contains(stdout.String(), "no scratches") {
 		t.Fatalf("expected empty list, got %d: %s", code, stdout.String())
 	}
 }
@@ -114,7 +116,7 @@ func TestRunScratchCommandWipeNonInteractive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if code := runScratchCommand([]string{"wipe", s.ID}, &stdout, &stderr); code != ExitOK {
+	if code := runScratchCommand([]string{"wipe", s.ID}, &stdout, &stderr); code != exitcode.OK {
 		t.Fatalf("wipe exit %d: %s", code, stderr.String())
 	}
 	if _, err := os.Stat(s.Dir); !os.IsNotExist(err) {
@@ -127,10 +129,10 @@ func TestRunScratchCommandWipeNonInteractive(t *testing.T) {
 
 func TestRunScratchCommandUnknownVerb(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	if code := runScratchCommand([]string{"frobnicate"}, &stdout, &stderr); code != ExitConfigError {
+	if code := runScratchCommand([]string{"frobnicate"}, &stdout, &stderr); code != exitcode.ConfigError {
 		t.Fatalf("unknown verb exit %d", code)
 	}
-	if code := runScratchCommand(nil, &stdout, &stderr); code != ExitConfigError {
+	if code := runScratchCommand(nil, &stdout, &stderr); code != exitcode.ConfigError {
 		t.Fatalf("missing verb exit %d", code)
 	}
 }

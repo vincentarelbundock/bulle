@@ -13,6 +13,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/vincentarelbundock/bulle/internal/cli"
+	"github.com/vincentarelbundock/bulle/internal/exitcode"
 )
 
 // scratchMeta mirrors what writeScratchMeta records beside each scratch.
@@ -108,26 +109,26 @@ func runScratchCommand(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "usage: bulle scratch list|diff|pull|wipe|shell [id]")
 		fmt.Fprintln(stderr, "       bulle scratch [run flags] [workspace] [-- command [args...]]")
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 	verb := args[0]
 	root, err := scratchCommandRoot()
 	if err != nil {
 		fmt.Fprintf(stderr, "bulle: %v\n", err)
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 	scratches, err := listScratches(root)
 	if err != nil {
 		fmt.Fprintf(stderr, "bulle: %v\n", err)
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 	if verb == "list" {
 		if len(args) > 1 {
 			fmt.Fprintln(stderr, "usage: bulle scratch list")
-			return ExitConfigError
+			return exitcode.ConfigError
 		}
 		writeScratchList(scratches, stdout)
-		return ExitOK
+		return exitcode.OK
 	}
 	var id string
 	switch len(args) {
@@ -136,40 +137,40 @@ func runScratchCommand(args []string, stdout, stderr io.Writer) int {
 		id = args[1]
 	default:
 		fmt.Fprintf(stderr, "usage: bulle scratch %s [id]\n", verb)
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 	s, err := selectScratch(scratches, id)
 	if err != nil {
 		fmt.Fprintf(stderr, "bulle: %v\n", err)
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 	switch verb {
 	case "diff":
 		final, err := worktreeTree(s.Dir)
 		if err != nil {
 			fmt.Fprintf(stderr, "bulle: %v\n", err)
-			return ExitConfigError
+			return exitcode.ConfigError
 		}
 		pageScratchDiff(s, final, stderr)
-		return ExitOK
+		return exitcode.OK
 	case "pull":
 		if scratchIsDirty(s) {
 			fmt.Fprintf(stderr, "bulle: the scratch has uncommitted changes; pull only moves commits\n")
 			fmt.Fprintf(stderr, "commit them first (bulle scratch shell %s), or wipe the scratch\n", s.ID)
-			return ExitConfigError
+			return exitcode.ConfigError
 		}
 		if !pullScratch(s, stdout, stderr) {
-			return ExitCommandFailed
+			return exitcode.CommandFailed
 		}
-		return ExitOK
+		return exitcode.OK
 	case "wipe":
 		return wipeScratch(s, stdout, stderr)
 	case "shell":
 		openScratchShell(s, stdout, stderr)
-		return ExitOK
+		return exitcode.OK
 	default:
 		fmt.Fprintf(stderr, "bulle: unknown scratch command %q; use list, diff, pull, wipe, or shell\n", verb)
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 }
 
@@ -185,12 +186,12 @@ func wipeScratch(s *scratchState, stdout, stderr io.Writer) int {
 		answer, err := bufio.NewReader(os.Stdin).ReadString('\n')
 		if err != nil || strings.TrimSpace(answer) != "y" {
 			fmt.Fprintln(stdout, "not wiped")
-			return ExitOK
+			return exitcode.OK
 		}
 	}
 	removeScratch(s)
 	fmt.Fprintf(stdout, "wiped %s\n", s.Dir)
-	return ExitOK
+	return exitcode.OK
 }
 
 func writeScratchList(scratches []*scratchState, w io.Writer) {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/vincentarelbundock/bulle/internal/exitcode"
 	"github.com/vincentarelbundock/bulle/internal/limits"
 	"github.com/vincentarelbundock/bulle/internal/policy"
 )
@@ -19,14 +20,14 @@ import (
 func reportUnenforcedLimits(p policy.Policy, strict bool, stderr io.Writer) (int, bool) {
 	unenforced := limits.Unenforced(limits.Plan(p.Limits, limits.Current()))
 	if len(unenforced) == 0 {
-		return ExitOK, true
+		return exitcode.OK, true
 	}
 	for _, status := range unenforced {
 		fmt.Fprintf(stderr, "bulle: %s\n", status.Note())
 	}
 	if !strict {
-		return ExitOK, true
+		return exitcode.OK, true
 	}
 	fmt.Fprintln(stderr, "bulle: refusing to run because --strict-limits is set; drop the limit, scope it to the platform that enforces it, or clear --strict-limits")
-	return ExitConfigError, false
+	return exitcode.ConfigError, false
 }

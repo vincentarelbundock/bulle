@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/vincentarelbundock/bulle/internal/backends"
+	"github.com/vincentarelbundock/bulle/internal/exitcode"
 	"github.com/vincentarelbundock/bulle/internal/policy"
 )
 
@@ -58,26 +59,26 @@ func runDenialLoggingProbe(args []string, stderr io.Writer) int {
 	case "restrict":
 		self, err := os.Executable()
 		if err != nil {
-			return ExitSandboxSetup
+			return exitcode.SandboxSetup
 		}
 		if err := backends.ApplyFilesystemRestrictions(policy.Policy{ReadOnlyExec: []string{"/"}}); err != nil {
-			return ExitSandboxSetup
+			return exitcode.SandboxSetup
 		}
 		argv := []string{self, probeDenialLoggingCommand, "write", target}
 		if err := syscall.Exec(self, argv, os.Environ()); err != nil {
-			return ExitSandboxSetup
+			return exitcode.SandboxSetup
 		}
-		return ExitSandboxSetup
+		return exitcode.SandboxSetup
 	case "write":
 		if err := os.WriteFile(target, []byte("probe"), 0o600); err != nil {
 			// Denied, as intended. The parent looks for the kernel's record of
 			// it, not for this exit code.
-			return ExitCommandFailed
+			return exitcode.CommandFailed
 		}
-		return ExitOK
+		return exitcode.OK
 	}
 	fmt.Fprintf(stderr, "bulle: %s is an internal invocation and cannot be used directly\n", probeDenialLoggingCommand)
-	return ExitConfigError
+	return exitcode.ConfigError
 }
 
 // denialLoggingWorks reports whether a denial this machine refuses actually

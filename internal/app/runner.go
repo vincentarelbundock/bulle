@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/vincentarelbundock/bulle/internal/backends"
+	"github.com/vincentarelbundock/bulle/internal/exitcode"
 	"github.com/vincentarelbundock/bulle/internal/limits"
 	"github.com/vincentarelbundock/bulle/internal/policy"
 )
@@ -21,28 +22,28 @@ func isPreparedPolicyRunner(args []string) bool {
 func runPreparedPolicy(args []string, stderr io.Writer) int {
 	if len(args) != 4 || args[2] != "--policy-fd" {
 		fmt.Fprintln(stderr, "usage: bulle __run-prepared-policy --policy-fd FD")
-		return ExitSandboxSetup
+		return exitcode.SandboxSetup
 	}
 	fd, err := strconv.Atoi(args[3])
 	if err != nil || fd < 0 {
 		fmt.Fprintf(stderr, "invalid policy fd %q\n", args[3])
-		return ExitSandboxSetup
+		return exitcode.SandboxSetup
 	}
 	file := os.NewFile(uintptr(fd), "prepared-policy")
 	if file == nil {
 		fmt.Fprintf(stderr, "invalid policy fd %q\n", args[3])
-		return ExitSandboxSetup
+		return exitcode.SandboxSetup
 	}
 
 	var p policy.Policy
 	if err := json.NewDecoder(file).Decode(&p); err != nil {
 		_ = file.Close()
 		fmt.Fprintf(stderr, "decode prepared policy: %v\n", err)
-		return ExitSandboxSetup
+		return exitcode.SandboxSetup
 	}
 	if err := file.Close(); err != nil {
 		fmt.Fprintf(stderr, "close prepared policy fd: %v\n", err)
-		return ExitSandboxSetup
+		return exitcode.SandboxSetup
 	}
 	return runPreparedPolicyBackend(p, stderr)
 }
@@ -51,7 +52,7 @@ var runPreparedPolicyBackend = func(p policy.Policy, stderr io.Writer) int {
 	backend, err := backends.ForName(p.Backend)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
-		return ExitBackendMissing
+		return exitcode.BackendMissing
 	}
 	// Set the portable limits here, in the sandboxed child: applying them in
 	// the supervisor would constrain bulle itself, and the Linux backend execs
@@ -59,14 +60,14 @@ var runPreparedPolicyBackend = func(p policy.Policy, stderr io.Writer) int {
 	// platforms. rlimits survive the exec.
 	if err := limits.ApplyRlimits(p.Limits); err != nil {
 		fmt.Fprintln(stderr, err)
-		return ExitSandboxSetup
+		return exitcode.SandboxSetup
 	}
 	if err := backend.Run(p); err != nil {
 		fmt.Fprintln(stderr, err)
 		if isCommandExitError(err) {
-			return ExitCommandFailed
+			return exitcode.CommandFailed
 		}
-		return ExitSandboxSetup
+		return exitcode.SandboxSetup
 	}
-	return ExitOK
+	return exitcode.OK
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/vincentarelbundock/bulle/internal/cli"
 	"github.com/vincentarelbundock/bulle/internal/config"
+	"github.com/vincentarelbundock/bulle/internal/exitcode"
 )
 
 // A subcommand ties a CommandSpec to its handler. Run dispatches from this
@@ -66,10 +67,10 @@ func wantsHelp(rest []string) bool {
 func printCommandHelp(name string, stdout io.Writer) int {
 	if text, ok := cli.CommandHelp(name); ok {
 		fmt.Fprint(stdout, text)
-		return ExitOK
+		return exitcode.OK
 	}
 	fmt.Fprint(stdout, cli.Usage())
-	return ExitOK
+	return exitcode.OK
 }
 
 func commandSpecs() []cli.CommandSpec {
@@ -88,7 +89,7 @@ func runScratchDispatch(argv0 string, rest []string, stdout, stderr io.Writer) i
 	isRun, err := scratchArgsStartRun(rest)
 	if err != nil {
 		fmt.Fprintf(stderr, "bulle: %v\n", err)
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 	if isRun {
 		runArgs := append([]string{argv0, "--scratch"}, rest...)
@@ -113,23 +114,23 @@ func runShowDispatch(argv0 string, rest []string, stdout, stderr io.Writer) int 
 	case "profiles":
 		if len(rest) > 0 {
 			fmt.Fprintln(stderr, "usage: bulle show profiles")
-			return ExitConfigError
+			return exitcode.ConfigError
 		}
 		return runProfilesCommand([]string{"list"}, stdout, stderr)
 	case "resolvers":
 		if len(rest) > 0 {
 			fmt.Fprintln(stderr, "usage: bulle show resolvers")
-			return ExitConfigError
+			return exitcode.ConfigError
 		}
 		writeResolverListing(parentEnv(), stdout)
-		return ExitOK
+		return exitcode.OK
 	case "config":
 		return runConfigCommand(rest, stdout, stderr)
 	default:
 		runArgs, format, err := extractPolicyFormat(rest)
 		if err != nil {
 			fmt.Fprintln(stderr, err)
-			return ExitConfigError
+			return exitcode.ConfigError
 		}
 		return runMain(append([]string{argv0}, runArgs...), format, stdout, stderr, nil)
 	}
@@ -142,25 +143,25 @@ func runProfilesDispatch(_ string, rest []string, stdout, stderr io.Writer) int 
 func runCompletionDispatch(_ string, rest []string, stdout, stderr io.Writer) int {
 	if len(rest) != 1 {
 		fmt.Fprintln(stderr, "usage: bulle completion bash|zsh|fish")
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 	script, err := cli.CompletionScript(rest[0])
 	if err != nil {
 		fmt.Fprintf(stderr, "bulle: %v\n", err)
-		return ExitConfigError
+		return exitcode.ConfigError
 	}
 	fmt.Fprint(stdout, script)
-	return ExitOK
+	return exitcode.OK
 }
 
 func runHelpDispatch(_ string, rest []string, stdout, stderr io.Writer) int {
 	if len(rest) == 0 {
 		fmt.Fprint(stdout, cli.Usage())
-		return ExitOK
+		return exitcode.OK
 	}
 	if text, ok := cli.CommandHelp(rest[0]); ok {
 		fmt.Fprint(stdout, text)
-		return ExitOK
+		return exitcode.OK
 	}
 	var topics []string
 	for _, sub := range subcommands() {
@@ -169,7 +170,7 @@ func runHelpDispatch(_ string, rest []string, stdout, stderr io.Writer) int {
 		}
 	}
 	fmt.Fprintf(stderr, "bulle: no help topic %q; topics: %s\n", rest[0], strings.Join(topics, ", "))
-	return ExitConfigError
+	return exitcode.ConfigError
 }
 
 // runManDispatch prints the bulle.1 man page. Hidden: it exists for the
@@ -177,12 +178,12 @@ func runHelpDispatch(_ string, rest []string, stdout, stderr io.Writer) int {
 // the same strings the terminal help prints.
 func runManDispatch(_ string, _ []string, stdout, _ io.Writer) int {
 	fmt.Fprint(stdout, cli.ManPage(Version))
-	return ExitOK
+	return exitcode.OK
 }
 
 func runVersionDispatch(_ string, _ []string, stdout, _ io.Writer) int {
 	fmt.Fprintf(stdout, "bulle %s\n", Version)
-	return ExitOK
+	return exitcode.OK
 }
 
 // runCompleteDispatch answers shell completion requests from the shims
@@ -205,5 +206,5 @@ func runCompleteDispatch(_ string, rest []string, stdout, _ io.Writer) int {
 		fmt.Fprintln(stdout, candidate)
 	}
 	fmt.Fprintf(stdout, ":%d\n", directive)
-	return ExitOK
+	return exitcode.OK
 }

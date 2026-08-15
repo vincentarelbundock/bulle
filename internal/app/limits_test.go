@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vincentarelbundock/bulle/internal/exitcode"
 	"github.com/vincentarelbundock/bulle/internal/limits"
 	"github.com/vincentarelbundock/bulle/internal/policy"
 )
@@ -50,7 +51,7 @@ func TestWriteLimitsPrintsNothingWhenNoLimitIsRequested(t *testing.T) {
 func TestReportUnenforcedLimitsAllowsARunWithNoLimits(t *testing.T) {
 	var stderr bytes.Buffer
 	code, ok := reportUnenforcedLimits(policy.Policy{}, true, &stderr)
-	if !ok || code != ExitOK {
+	if !ok || code != exitcode.OK {
 		t.Fatalf("reportUnenforcedLimits = (%d, %v), want (0, true)", code, ok)
 	}
 	if stderr.Len() != 0 {
@@ -64,7 +65,7 @@ func TestReportUnenforcedLimitsStaysSilentForPortableLimits(t *testing.T) {
 	var stderr bytes.Buffer
 	p := policy.Policy{Limits: limits.Limits{NoFile: 4096, FSize: 1 << 20}}
 	code, ok := reportUnenforcedLimits(p, true, &stderr)
-	if !ok || code != ExitOK {
+	if !ok || code != exitcode.OK {
 		t.Fatalf("reportUnenforcedLimits = (%d, %v), want (0, true)", code, ok)
 	}
 	if stderr.Len() != 0 {
