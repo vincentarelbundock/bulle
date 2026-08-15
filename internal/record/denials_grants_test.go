@@ -142,7 +142,7 @@ func TestGrantForSeatbeltDenialReportsFlagAndCollapsedPath(t *testing.T) {
 func TestGrantSuggestionPathCollapsesPerProcessProcEntries(t *testing.T) {
 	cases := map[string]string{
 		// The pid differs for every process, so the denied path is never the
-		// path to Grant.
+		// path to grant.
 		"/proc/1234/cgroup":       "/proc",
 		"/proc/1/status":          "/proc",
 		"/proc/1234":              "/proc",

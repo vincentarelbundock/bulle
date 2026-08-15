@@ -37,8 +37,10 @@ ro = [
   # files, and those hashes differ on every machine, so no entry here can name
   # them. A denial on a font tree is not fatal — fontconfig falls back and text
   # still renders, in the wrong typeface — which is why it is easy to miss.
-  # Record the set for your machine and inherit from this profile:
-  #   bulle record --profile gui --out ~/.config/bulle/profiles/mygui.toml -- <app>
+  # Run the app under this profile and accept the save prompt when it reports a
+  # denied font path; the grants land in ~/.config/bulle/profiles/gui.toml and
+  # merge over this file:
+  #   bulle gui -- <app>
   # Mesa and Vulkan enumerate devices and drivers through sysfs and these
   # manifests. A denial here does not fail the program: it silently falls back
   # to software rendering, which is why they are worth granting explicitly.

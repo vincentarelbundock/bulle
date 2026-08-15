@@ -44,7 +44,7 @@ func TestCoveredByPolicyChecksEachAccessAgainstItsLists(t *testing.T) {
 func TestCoveredByPolicyFollowsSymlinksToTheGrantedPath(t *testing.T) {
 	// The kernel reports the path it resolved, while a profile commonly grants
 	// the link. Both spellings must count as covered, or every run through a
-	// symlinked directory records a duplicate of a Grant that already exists.
+	// symlinked directory records a duplicate of a grant that already exists.
 	dir := t.TempDir()
 	real := filepath.Join(dir, "real")
 	if err := os.MkdirAll(filepath.Join(real, "sub"), 0o755); err != nil {

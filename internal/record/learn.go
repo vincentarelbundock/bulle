@@ -100,7 +100,7 @@ func learnTargetProfile(opts cli.Options, global config.Config) (string, bool) {
 }
 
 // learnedFile is the shape of a profile file bulle manages. It holds nothing
-// but the Grant lists and the identity fields the creation case writes, so a
+// but the grant lists and the identity fields the creation case writes, so a
 // rewrite loses nothing.
 type learnedFile struct {
 	Title       string   `toml:"title,omitempty"`

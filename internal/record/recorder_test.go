@@ -1,31 +1,11 @@
 package record
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 )
 
-func TestIsProbeArtifact(t *testing.T) {
-	tmp := os.TempDir()
-	if resolved, err := filepath.EvalSymlinks(tmp); err == nil {
-		tmp = resolved
-	}
-	if !isProbeArtifact(filepath.Join(tmp, probeDirPrefix+"123", "denied")) {
-		t.Error("probe temp file is not recognized")
-	}
-	if isProbeArtifact(filepath.Join(tmp, "something-else", "denied")) {
-		t.Error("unrelated temp file recognized as a probe artifact")
-	}
-	// A directory of that name outside the temp root belongs to whoever made
-	// it, and a denial there is the command's business.
-	if isProbeArtifact(filepath.Join("/home/user", probeDirPrefix+"123", "denied")) {
-		t.Error("path outside the temp root recognized as a probe artifact")
-	}
-}
-
 func TestRecorderDeduplicatesGrantsButAccumulatesOrigins(t *testing.T) {
-	// The same path denied to several processes is one Grant, but every
+	// The same path denied to several processes is one grant, but every
 	// process that hit it is worth showing.
 	rec := NewRecorder()
 	gr := Grant{Flag: "--ro", Path: "/etc/a"}

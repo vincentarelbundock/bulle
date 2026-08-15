@@ -6,7 +6,7 @@ import (
 )
 
 // coveredByPolicy reports whether a resolved policy already permits everything
-// a Grant asks for. Each access bit is checked against the lists that confer
+// a grant asks for. Each access bit is checked against the lists that confer
 // it, so a path granted read-only does not count as covering a denied execute.
 //
 // A denial implies the access was refused, so this is not merely a
@@ -37,7 +37,7 @@ func coveredByPolicy(gr Grant, p policy.Policy) bool {
 
 // pathWithinRoots reports whether any spelling of a path falls under a granted
 // root. Every symlink variant is tried, not only the fully resolved one: the
-// link and its target are equally valid ways to name the Grant, and a profile
+// link and its target are equally valid ways to name the grant, and a profile
 // is as likely to have written one as the other.
 func pathWithinRoots(path string, roots []string) bool {
 	if bpaths.IsWithinAnyRoot(path, roots) {
@@ -53,7 +53,7 @@ func pathWithinRoots(path string, roots []string) bool {
 
 // filterCoveredGrants drops the grants a policy already permits, preserving
 // order. Filtering happens on absolute paths, before generalization, so a
-// covered denial never reaches the rewriting layer and never widens a Grant to
+// covered denial never reaches the rewriting layer and never widens a grant to
 // a resolver directory on the strength of an access that was already allowed.
 func filterCoveredGrants(grants []ObservedGrant, p policy.Policy) []ObservedGrant {
 	out := make([]ObservedGrant, 0, len(grants))
@@ -66,7 +66,7 @@ func filterCoveredGrants(grants []ObservedGrant, p policy.Policy) []ObservedGran
 	return out
 }
 
-// An ObservedGrant is a Grant together with what the platform could say about
+// An ObservedGrant is a grant together with what the platform could say about
 // who was denied.
 //
 // Origin is the process name on macOS and empty on Linux, because the two

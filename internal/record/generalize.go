@@ -24,10 +24,10 @@ type recordedEntry struct {
 	Comment string
 }
 
-// listForFlag maps a Grant's command-line flag to the profile list name.
+// listForFlag maps a grant's command-line flag to the profile list name.
 func listForFlag(flag string) string { return strings.TrimPrefix(flag, "--") }
 
-// access is a Grant's access level as a set of bits, so grants for the same
+// access is a grant's access level as a set of bits, so grants for the same
 // path can be merged into the weakest entry that covers all of them.
 type access uint8
 
@@ -150,7 +150,7 @@ func preferSubstitution(a, b substitution) bool {
 	return a.Entry < b.Entry
 }
 
-// generalize turns one Grant into the profile entry that should be written
+// generalize turns one grant into the profile entry that should be written
 // for it.
 func (g *generalizer) generalize(gr Grant) recordedEntry {
 	list := listForFlag(gr.Flag)
@@ -189,7 +189,7 @@ func (g *generalizer) generalize(gr Grant) recordedEntry {
 			}
 			return entry
 		case rest == "":
-			// A bare variable root is never a Grant worth writing: $HOME and
+			// A bare variable root is never a grant worth writing: $HOME and
 			// the app directories are exactly the trees a sandbox exists to
 			// withhold. Stop here rather than continuing down the table, or a
 			// broader variable would spell the same root a different way and
@@ -205,7 +205,7 @@ func (g *generalizer) generalize(gr Grant) recordedEntry {
 	return entry
 }
 
-// commandName reports the bare command name for an executable Grant whose
+// commandName reports the bare command name for an executable grant whose
 // denied path is what the parent PATH resolves that name to. Recording
 // "which:pandoc" instead of one machine's pandoc path is the difference
 // between a profile that travels and one that does not.
@@ -247,7 +247,7 @@ func pathUnder(path string, root string) (rest string, ok bool) {
 }
 
 // mergeEntries collapses entries that name the same thing, keeping the
-// weakest access that covers every Grant made against it. A file both read
+// weakest access that covers every grant made against it. A file both read
 // and executed becomes one rox entry rather than two.
 func mergeEntries(entries []recordedEntry) []recordedEntry {
 	merged := map[string]*recordedEntry{}
@@ -287,7 +287,7 @@ func finalizeEntries(entries []recordedEntry) []recordedEntry {
 	return dropCoveredEntries(mergeEntries(entries))
 }
 
-// dropCoveredEntries removes entries another directory Grant already covers,
+// dropCoveredEntries removes entries another directory grant already covers,
 // at an access level at least as strong.
 //
 // Only entries written as directories (a trailing slash, which promotion adds)
@@ -313,7 +313,7 @@ func coveredByAnother(e recordedEntry, entries []recordedEntry) bool {
 		if !strings.HasPrefix(e.Entry, other.Entry) {
 			continue
 		}
-		// The covering Grant must permit everything this entry asks for.
+		// The covering grant must permit everything this entry asks for.
 		if accessForList(e.List)&^accessForList(other.List) == 0 {
 			return true
 		}
@@ -326,7 +326,7 @@ func coveredByAnother(e recordedEntry, entries []recordedEntry) bool {
 // and a tool that touched three files in a directory will touch a fourth.
 const promotionThreshold = 3
 
-// promoteDirectories replaces clusters of sibling entries with a single Grant
+// promoteDirectories replaces clusters of sibling entries with a single grant
 // on their parent directory. It runs after generalization, so the safety floor
 // is simply that the parent must still have a component of its own below the
 // variable or root it sits under — a cluster directly inside $HOME or $CACHE
@@ -396,8 +396,8 @@ func promoteDirectories(entries []recordedEntry) []recordedEntry {
 }
 
 // promotableEntry reports whether an entry is a plain path that could be
-// replaced by a Grant on its parent. Resolver entries already name a whole
-// directory, and an entry that is already a directory Grant is not promoted
+// replaced by a grant on its parent. Resolver entries already name a whole
+// directory, and an entry that is already a directory grant is not promoted
 // further: growing "$CACHE/x/" into "$CACHE/" is exactly the widening the
 // floor exists to prevent.
 func promotableEntry(e recordedEntry) bool {
@@ -405,7 +405,7 @@ func promotableEntry(e recordedEntry) bool {
 		return false
 	}
 	// A package root's parent is the store itself. Merging several of them
-	// would replace one Grant per package with a Grant on every package on the
+	// would replace one grant per package with a grant on every package on the
 	// machine, undoing the collapse that produced them.
 	if isPackageStoreRoot(e.Entry) {
 		return false
@@ -429,7 +429,7 @@ func ancestorEntries(entry string) []string {
 	return out
 }
 
-// promotableDirectory reports whether a directory is deep enough to Grant.
+// promotableDirectory reports whether a directory is deep enough to grant.
 // It must have a component of its own below whatever root it hangs from:
 // "$CACHE/foo" qualifies and "$CACHE" does not; "/usr/lib/x" qualifies and
 // "/usr" does not. Those roots are the trees a sandbox exists to withhold.

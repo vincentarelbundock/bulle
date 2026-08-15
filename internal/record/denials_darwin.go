@@ -33,7 +33,7 @@ func StartProbe(p policy.Policy) Probe {
 	return Probe{start: time.Now(), enabled: true}
 }
 
-// hints returns copy-pasteable suggestions for sandbox denials logged since
+// Hints returns copy-pasteable suggestions for sandbox denials logged since
 // the probe started, or nil when the log is unreadable or shows no denials.
 // Best-effort: violation records are written asynchronously, so denials from
 // the very end of a run can be missed.
@@ -60,20 +60,8 @@ func (probe Probe) records() []seatbeltDenial {
 	return parseSeatbeltDenials(strings.Split(string(out), "\n"))
 }
 
-// grants returns the same violations as the policy entries that would allow
+// Grants returns the same violations as the policy entries that would allow
 // them, for profile recording.
-func (probe Probe) Grants() []ObservedGrant {
-	return grantsForSeatbeltDenials(probe.records())
-}
-
-// Supported reports whether this machine can record a profile.
-//
-// The check is weaker than the Linux one, and deliberately so. There, a
-// deliberately triggered denial is confirmed to reach the log, because a kernel
-// can advertise audit support with auditing switched off. Here the kernel logs
-// sandbox violations unconditionally, so the failure that check defends
-// against does not exist; what remains is whether the log can be read at all,
-// which `log show` answers directly.
 //
 // Attribution is the honest limitation on macOS. The unified log reports
 // violations from every sandboxed process on the machine, and a violation
@@ -81,16 +69,6 @@ func (probe Probe) Grants() []ObservedGrant {
 // cannot be traced back to this run's process group. Rather than guess — a
 // filter by process name would drop real grants from a command's helpers —
 // recording keeps the process name on each entry and says so in the output.
-func Supported() (string, bool) {
-	if policy.RuntimeDefaultBackend() != policy.BackendMacOSSeatbelt {
-		return "recording needs the Seatbelt backend", false
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), denialLogTimeout)
-	defer cancel()
-	if err := exec.CommandContext(ctx, "log", "show", "--style", "syslog",
-		"--last", "1m", "--predicate", `sender == "Sandbox"`).Run(); err != nil {
-		return "recording needs the unified log; `log show` failed here, so denials could not be read back" +
-			" and recording would produce an empty profile that looks like success", false
-	}
-	return "", true
+func (probe Probe) Grants() []ObservedGrant {
+	return grantsForSeatbeltDenials(probe.records())
 }

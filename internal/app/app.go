@@ -31,9 +31,6 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if isPreparedPolicyRunner(args) {
 		return runPreparedPolicy(args, stderr)
 	}
-	if record.IsDenialLoggingProbe(args) {
-		return record.RunDenialLoggingProbe(args, stderr)
-	}
 	// An incomplete internal-runner invocation must not fall through to the
 	// public CLI, where command inference would try to execute the reserved
 	// name as a sandboxed command.

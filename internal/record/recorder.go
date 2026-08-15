@@ -12,8 +12,6 @@ package record
 
 import (
 	"os"
-	"path/filepath"
-	"strings"
 
 	benv "github.com/vincentarelbundock/bulle/internal/env"
 	bpaths "github.com/vincentarelbundock/bulle/internal/paths"
@@ -26,7 +24,7 @@ import (
 type Recorder struct {
 	grants []Grant
 	seen   map[Grant]bool
-	// origins records which processes were denied each Grant, where the
+	// origins records which processes were denied each grant, where the
 	// platform reports one. It annotates the output rather than filtering it.
 	origins map[Grant][]string
 	// saved marks grants already written to a profile by the save prompt.
@@ -57,7 +55,7 @@ func (r *Recorder) Unsaved() []Grant {
 	return out
 }
 
-// MarkSaved records that every accumulated Grant has been written, so a later
+// MarkSaved records that every accumulated grant has been written, so a later
 // prompt in the same session only shows what is new.
 func (r *Recorder) MarkSaved() {
 	for _, gr := range r.grants {
@@ -71,19 +69,16 @@ func (r *Recorder) MarkSaved() {
 // spinning to the cap.
 func (r *Recorder) BeginRound() { r.LastAdded, r.LastObserved = 0, 0 }
 
-// observe collects the denials of one round, dropping those the round's own
+// Observe collects the denials of one round, dropping those the round's own
 // policy already granted, and reports how many were new. Zero means the round
 // learned nothing: either the command succeeded, or it is failing for a reason
-// no Grant will fix.
+// no grant will fix.
 func (r *Recorder) Observe(p policy.Policy, probe Probe) int {
 	added := 0
 	all := probe.Grants()
 	r.LastObserved = len(all)
 	for _, observed := range filterCoveredGrants(all, p) {
 		gr := observed.Grant
-		if isProbeArtifact(gr.Path) {
-			continue
-		}
 		r.noteOrigin(gr, observed.Origin)
 		if r.seen[gr] {
 			continue
@@ -96,8 +91,8 @@ func (r *Recorder) Observe(p policy.Policy, probe Probe) int {
 	return added
 }
 
-// noteOrigin records a process that was denied a Grant, keeping the list
-// deduplicated and ordered by first sighting. A Grant can be hit by several
+// noteOrigin records a process that was denied a grant, keeping the list
+// deduplicated and ordered by first sighting. A grant can be hit by several
 // processes across rounds, and all of them are worth showing.
 func (r *Recorder) noteOrigin(gr Grant, origin string) {
 	if origin == "" {
@@ -109,31 +104,6 @@ func (r *Recorder) noteOrigin(gr Grant, origin string) {
 		}
 	}
 	r.origins[gr] = append(r.origins[gr], origin)
-}
-
-// probeDirPrefix names the temporary directories the denial-logging probe
-// creates. See isProbeArtifact.
-const probeDirPrefix = "bulle-probe-"
-
-// isProbeArtifact reports whether a denied path is one the precondition probe
-// caused rather than the observed command.
-//
-// The probe deliberately triggers a denial moments before the first round, and
-// journalctl filters by whole seconds, so its record routinely lands inside
-// round one's window. Without this the first recorded profile of every session
-// would Grant write access to a temporary file that no longer exists.
-func isProbeArtifact(path string) bool {
-	dir := filepath.Dir(path)
-	if !strings.HasPrefix(filepath.Base(dir), probeDirPrefix) {
-		return false
-	}
-	// Only inside a temporary directory: a real path that happens to sit in a
-	// directory of that name is still the command's business.
-	tmp := os.TempDir()
-	if resolved, err := filepath.EvalSymlinks(tmp); err == nil {
-		tmp = resolved
-	}
-	return strings.HasPrefix(dir, filepath.Clean(tmp)+string(filepath.Separator))
 }
 
 // recordVars rebuilds the variable table the generalizer substitutes against.

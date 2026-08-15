@@ -105,7 +105,7 @@ func TestGeneralizeRewritesPathsToPortableEntries(t *testing.T) {
 
 func TestGeneralizeNeverEmitsABareVariableRoot(t *testing.T) {
 	g := newTestGeneralizer(noLookPath)
-	// A denial on $HOME or $CACHE itself must not become a Grant on the whole
+	// A denial on $HOME or $CACHE itself must not become a grant on the whole
 	// tree; it stays literal so a human has to decide.
 	for _, path := range []string{"/home/user", "/home/user/.cache"} {
 		got := g.generalize(Grant{Flag: "--ro", Path: path})
@@ -144,7 +144,7 @@ func TestGeneralizeRecognizesCommandsOnPath(t *testing.T) {
 		t.Errorf("entry = %q, want which:pandoc", got.Entry)
 	}
 
-	// A read of the same file is not an executable Grant, so the which:
+	// A read of the same file is not an executable grant, so the which:
 	// spelling does not apply.
 	if got := g.generalize(Grant{Flag: "--ro", Path: "/usr/local/bin/pandoc"}); got.Entry != "/usr/local/bin/pandoc" {
 		t.Errorf("read entry = %q, want the literal path", got.Entry)
@@ -198,7 +198,7 @@ func TestPromoteDirectoriesCollapsesSiblingClusters(t *testing.T) {
 }
 
 func TestPromoteDirectoriesRespectsTheFloor(t *testing.T) {
-	// Three files directly inside $HOME must not promote to a Grant on $HOME.
+	// Three files directly inside $HOME must not promote to a grant on $HOME.
 	entries := promoteDirectories([]recordedEntry{
 		{List: "ro", Entry: "$HOME/.a"},
 		{List: "ro", Entry: "$HOME/.b"},
@@ -258,7 +258,7 @@ func TestGeneralizeExplainsAWholeProcGrant(t *testing.T) {
 
 func TestPromoteDirectoriesNeverGrantsAWholePackageStore(t *testing.T) {
 	// Each of these is a package root produced by the store collapse. Merging
-	// them would replace three package grants with a Grant on every package on
+	// them would replace three package grants with a grant on every package on
 	// the machine — the exact opposite of what the collapse is for.
 	entries := promoteDirectories([]recordedEntry{
 		{List: "ro", Entry: "/nix/store/aaa-openblas-0.3"},
@@ -305,7 +305,7 @@ func TestIsPackageStoreRoot(t *testing.T) {
 
 func TestPromoteDirectoriesCollapsesFannedOutCaches(t *testing.T) {
 	// A content-addressed cache spreads one file per fanout directory, so
-	// grouping by immediate parent finds nothing. The Grant that is worth
+	// grouping by immediate parent finds nothing. The grant that is worth
 	// writing is the cache root; the individual hashes never recur.
 	var entries []recordedEntry
 	for _, hash := range []string{"0d/aaa", "0f/bbb", "29/ccc", "3c/ddd", "5d/eee"} {
@@ -354,7 +354,7 @@ func TestPromoteDirectoriesStillRefusesToReachAVariableRoot(t *testing.T) {
 
 func TestFinalizeEntriesPrunesWhatAnotherGrantCovers(t *testing.T) {
 	// A cache denied both read and write, with a deeper cluster inside it.
-	// The output should be one writable directory Grant.
+	// The output should be one writable directory grant.
 	var entries []recordedEntry
 	for _, name := range []string{"0d/a", "0f/b", "29/c", "3c/d"} {
 		entries = append(entries, recordedEntry{List: "ro", Entry: "$CACHE/shader/" + name})
@@ -363,7 +363,7 @@ func TestFinalizeEntriesPrunesWhatAnotherGrantCovers(t *testing.T) {
 		entries = append(entries, recordedEntry{List: "rw", Entry: "$CACHE/shader/" + name})
 	}
 	got := finalizeEntries(entries)
-	// The write was only ever denied inside cb/, so the writable Grant stays
+	// The write was only ever denied inside cb/, so the writable grant stays
 	// there: promoting it to the whole cache would hand out write access the
 	// run never needed.
 	byEntry := map[string]string{}
@@ -382,7 +382,7 @@ func TestFinalizeEntriesMergesADirectoryPromotedInTwoLists(t *testing.T) {
 	// What a real recording produced: the same cache denied read and write,
 	// promoted once per list, plus a read cluster in a subdirectory. The two
 	// promotions are the same directory and must merge, after which the
-	// subdirectory Grant is redundant.
+	// subdirectory grant is redundant.
 	var entries []recordedEntry
 	for _, name := range []string{"0d/a", "0f/b", "29/c"} {
 		entries = append(entries, recordedEntry{List: "ro", Entry: "$CACHE/shader/" + name})
@@ -401,7 +401,7 @@ func TestFinalizeEntriesMergesADirectoryPromotedInTwoLists(t *testing.T) {
 }
 
 func TestDropCoveredEntriesKeepsStrongerNestedGrants(t *testing.T) {
-	// A read-only directory Grant does not cover a writable file inside it.
+	// A read-only directory grant does not cover a writable file inside it.
 	entries := dropCoveredEntries([]recordedEntry{
 		{List: "ro", Entry: "/dev/dri/"},
 		{List: "rw", Entry: "/dev/dri/renderD128"},
