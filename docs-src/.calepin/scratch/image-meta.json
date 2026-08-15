@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "images": {
+    "/assets/favicon.png": {
+      "path": "assets/favicon.png",
+      "xxh3": "fac746390cd0efe7",
+      "bytes": 5136,
+      "width": 48,
+      "height": 48
+    },
+    "assets/favicon.png": {
+      "path": "assets/favicon.png",
+      "xxh3": "fac746390cd0efe7",
+      "bytes": 5136,
+      "width": 48,
+      "height": 48
+    }
+  }
+}

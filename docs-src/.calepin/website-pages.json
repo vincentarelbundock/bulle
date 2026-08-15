@@ -1,0 +1,80 @@
+[
+  {
+    "href": "cli-reference.html",
+    "language": null,
+    "meta": {
+      "description": "Command-line reference for bulle.",
+      "title": "CLI Reference"
+    },
+    "path": "cli-reference.typ",
+    "pdf": null,
+    "title": "CLI Reference",
+    "translation_key": "cli-reference",
+    "translations": {}
+  },
+  {
+    "href": "denial-diagnostics.html",
+    "language": null,
+    "meta": {
+      "description": "How bulle reports sandbox denials with copy-pasteable policy fixes, and how to retry the run with the missing grant.",
+      "title": "Diagnostics"
+    },
+    "path": "denial-diagnostics.typ",
+    "pdf": null,
+    "title": "Diagnostics",
+    "translation_key": "denial-diagnostics",
+    "translations": {}
+  },
+  {
+    "href": "index.html",
+    "language": null,
+    "meta": {
+      "description": "A simple sandbox for dangerous tools like coding agents",
+      "title": "Home"
+    },
+    "path": "index.typ",
+    "pdf": null,
+    "title": "Home",
+    "translation_key": "index",
+    "translations": {}
+  },
+  {
+    "href": "permissions.html",
+    "language": null,
+    "meta": {
+      "description": "Filesystem and environment grants, network access, policy inspection, configuration defaults, and how the sandbox is enforced.",
+      "title": "Permissions"
+    },
+    "path": "permissions.typ",
+    "pdf": null,
+    "title": "Permissions",
+    "translation_key": "permissions",
+    "translations": {}
+  },
+  {
+    "href": "profiles.html",
+    "language": null,
+    "meta": {
+      "description": "Named bundles of permissions: selection and inference, the TOML format, portable path entries, and how to write your own.",
+      "title": "Profiles"
+    },
+    "path": "profiles.typ",
+    "pdf": null,
+    "title": "Profiles",
+    "translation_key": "profiles",
+    "translations": {}
+  },
+  {
+    "href": "scratch.html",
+    "language": null,
+    "meta": {
+      "description": "Run an agent against a disposable clone of your repository, then review and integrate the changes with git.",
+      "title": "Scratch Workspaces"
+    },
+    "path": "scratch.typ",
+    "pdf": null,
+    "title": "Scratch Workspaces",
+    "translation_key": "scratch",
+    "translations": {}
+  }
+]

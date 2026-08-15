@@ -156,6 +156,64 @@ ro = ["?~/.gitconfig"]
 
 Explicit flags always win: `--profile codex` overrides the default profile, `--timeout` the default timeout, and list-valued defaults (`env`, `ro`, `rox`, `rw`, `rwx`) are merged with command-line entries taking precedence. Pass `--no-defaults` to ignore the block entirely.
 
+= Resource limits
+<resource-limits>
+
+Beyond the wall-clock `--timeout`, `bulle` can cap what a run consumes:
+
+#table(
+  columns: 3,
+  table.header([Flag], [Caps], [Mechanism]),
+  [`--memory SIZE`], [resident memory, as in `512M` or `4G`], [cgroup v2],
+  [`--cpu PERCENT`], [CPU use as a percentage of one core, as in `200%`], [cgroup v2],
+  [`--nproc N`], [processes in the sandbox], [cgroup v2],
+  [`--nofile N`], [open file descriptors], [`RLIMIT_NOFILE`],
+  [`--fsize SIZE`], [the size of any single file written], [`RLIMIT_FSIZE`],
+  [`--cpu-time DURATION`], [consumed CPU time, as opposed to wall clock], [`RLIMIT_CPU`],
+)
+
+== Platform differences
+<limit-platform-differences>
+
+The first three limits require cgroup v2, so they apply on Linux when a cgroup is delegated to your user, and nowhere else. macOS has no equivalent: Seatbelt has no resource controls, and the POSIX limits that look like substitutes are not per-process-tree. `RLIMIT_AS` caps virtual address space rather than resident memory, which kills runtimes that merely reserve large sparse mappings — Go, the JVM, and Node all do. `RLIMIT_NPROC` counts every process owned by your user across the whole system, so using it here would throttle your editor and your other shells rather than the sandbox. Silently substituting either one would report a cap that does not do what it says, so `bulle` declines instead.
+
+The remaining three limits are portable and apply on both platforms.
+
+`--cpu-time` measures a different clock than `--timeout`: an agent waiting for input consumes wall clock but almost no CPU, so `--cpu-time 5m --timeout 8h` permits a long idle session while still stopping a process that spins. Note that `RLIMIT_CPU` applies per process rather than to the whole tree — children inherit the limit but each gets its own budget, so a run that spawns many processes is capped less tightly than the number suggests. Neither cgroup v2 nor macOS offers a cumulative per-tree CPU-time cap, so there is no stronger mechanism to fall back on; `--cpu` caps the rate instead.
+
+When a requested limit cannot be enforced, `bulle` says so on stderr and runs anyway:
+
+```
+bulle: --memory is not enforced here: macOS has no per-process-tree memory cap
+```
+
+Pass `--strict-limits` (or set `strict_limits = true` under `[defaults]`) to make that a refusal to run instead, with exit code 2. Warning by default keeps a single configuration usable across a Linux workstation and a Mac laptop; `--strict-limits` suits continuous integration, where an unenforced limit means the run should not proceed at all.
+
+`bulle policy` names the mechanism behind every limit, so whether a cap is real is something you can check rather than infer:
+
+```
+  limits:
+    memory:  4G      (cgroup v2)
+    nofile:  4096    (rlimit)
+    cpu:     200%    (NOT ENFORCED — macOS has no per-process-tree CPU quota)
+```
+
+== Limits in the configuration
+<limits-in-configuration>
+
+Limits go in a `[defaults.limits]` block, and may be scoped to a platform. A limit under `[defaults.linux.limits]` is simply not requested on macOS, so a shared configuration warns about nothing:
+
+```toml
+[defaults.limits]
+nofile = "4096"
+
+[defaults.linux.limits]
+memory = "8G"
+nproc = "512"
+```
+
+Platform blocks layer over the shared block, so a `memory` in both means the platform value wins where it applies.
+
 The same file holds the `[vars]` table used by #link("profiles.html#portable-profiles")[portable profiles], and the `[scratch]` table that relocates #link("scratch.html")[scratch workspaces].
 
 = OS-level sandboxing

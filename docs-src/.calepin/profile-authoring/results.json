@@ -1,0 +1,90 @@
+{
+  "schema": 2,
+  "calepin_version": "0.0.44",
+  "input": "profile-authoring.typ",
+  "generation": "7a0867ebdf9c4a82-1349cde127705c16",
+  "store": {},
+  "chunks": {
+    "chunk-1": {
+      "label": "chunk-1",
+      "engine": "toml",
+      "source": "# profiles/mytool.toml\ntitle = \"MyTool\"\ndescription = \"mytool interpreter and libraries\"\ninherits = [\"tool\", \"terminal\"]\n\nrox = [\"?which:mytool\", \"?mytool:home\"]\nro = [\"?mytool:libs\", \"?$CONFIG/mytool\"]\nenv = [\"MYTOOL_HOME\", \"MYTOOL_OPTIONS\"]\ndeny = [\"network\"]\nadd_libs = true",
+      "status": "skipped",
+      "options": {
+        "echo": true,
+        "output": true,
+        "results": "render",
+        "warning": true,
+        "message": true,
+        "placeholder": true,
+        "fig-width": "70%",
+        "fig-height": null,
+        "fig-align": "center",
+        "fig-responsive": true,
+        "fig-link": null,
+        "fig-caption": null,
+        "fig-cap-location": null,
+        "fig-alt-text": null,
+        "fig-subcaptions": null,
+        "fig-layout-columns": null,
+        "fig-layout-rows": null,
+        "kind": null
+      },
+      "items": []
+    },
+    "chunk-2": {
+      "label": "chunk-2",
+      "engine": "toml",
+      "source": "# profiles/mytool-install.toml\ntitle = \"MyTool (with package installation)\"\ndescription = \"mytool plus a writable user library and registry access\"\ninherits = \"mytool\"\n\nrw = [\"?+mytool:libs-user\"]\nallow = [\"network\"]",
+      "status": "skipped",
+      "options": {
+        "echo": true,
+        "output": true,
+        "results": "render",
+        "warning": true,
+        "message": true,
+        "placeholder": true,
+        "fig-width": "70%",
+        "fig-height": null,
+        "fig-align": "center",
+        "fig-responsive": true,
+        "fig-link": null,
+        "fig-caption": null,
+        "fig-cap-location": null,
+        "fig-alt-text": null,
+        "fig-subcaptions": null,
+        "fig-layout-columns": null,
+        "fig-layout-rows": null,
+        "kind": null
+      },
+      "items": []
+    },
+    "chunk-3": {
+      "label": "chunk-3",
+      "engine": "go",
+      "source": "{\n    tool: \"mytool\", aspect: \"libs\",\n    argv:        []string{\"mytool\", \"config\", \"libdir\"},\n    format:      formatSingle, // or formatLines\n    description: \"mytool's library directory\",\n},",
+      "status": "skipped",
+      "options": {
+        "echo": true,
+        "output": true,
+        "results": "render",
+        "warning": true,
+        "message": true,
+        "placeholder": true,
+        "fig-width": "70%",
+        "fig-height": null,
+        "fig-align": "center",
+        "fig-responsive": true,
+        "fig-link": null,
+        "fig-caption": null,
+        "fig-cap-location": null,
+        "fig-alt-text": null,
+        "fig-subcaptions": null,
+        "fig-layout-columns": null,
+        "fig-layout-rows": null,
+        "kind": null
+      },
+      "items": []
+    }
+  }
+}
