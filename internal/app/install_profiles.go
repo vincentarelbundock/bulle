@@ -12,7 +12,17 @@ import (
 	"github.com/vincentarelbundock/bulle/internal/config"
 )
 
-func installProfiles(source string, configRoot string, stdout io.Writer) error {
+// installProfiles copies profile files from a local directory or a GitHub
+// repository into the user's profile directory.
+//
+// An installed profile is code in every sense that matters here: it decides
+// what a sandbox grants, and a file whose name matches a built-in profile
+// merges into it — so a plausible-looking node.toml can widen every profile
+// that inherits from node, on runs that never mention node. So the install is
+// neither silent nor destructive: what each file grants is printed, an existing
+// file is never replaced without --force, and shadowing a built-in name is
+// called out.
+func installProfiles(source string, configRoot string, force bool, stdout io.Writer) error {
 	resolved, cleanup, err := resolveInstallProfileSource(source)
 	if cleanup != nil {
 		defer cleanup()
@@ -25,13 +35,14 @@ func installProfiles(source string, configRoot string, stdout io.Writer) error {
 		return err
 	}
 	type installFile struct {
-		name string
-		base string
-		data []byte
+		name    string
+		base    string
+		data    []byte
+		profile config.Profile
 	}
 	installFiles := make([]installFile, 0, len(files))
 	for _, sourceFile := range files {
-		name, err := validateInstallProfileFile(sourceFile)
+		name, profile, err := validateInstallProfileFile(sourceFile)
 		if err != nil {
 			return err
 		}
@@ -39,10 +50,22 @@ func installProfiles(source string, configRoot string, stdout io.Writer) error {
 		if err != nil {
 			return err
 		}
-		installFiles = append(installFiles, installFile{name: name, base: filepath.Base(sourceFile), data: data})
+		installFiles = append(installFiles, installFile{name: name, base: filepath.Base(sourceFile), data: data, profile: profile})
 	}
 
 	profileDir := filepath.Join(configRoot, "profiles")
+	builtIn := config.DefaultConfig().Profiles
+	var existing []string
+	for _, file := range installFiles {
+		if _, err := os.Stat(filepath.Join(profileDir, file.base)); err == nil {
+			existing = append(existing, file.base)
+		}
+	}
+	if len(existing) > 0 && !force {
+		return fmt.Errorf("refusing to replace profiles already installed here: %s\n"+
+			"review %s first, then re-run with --force to overwrite",
+			strings.Join(existing, ", "), profileDir)
+	}
 	if err := os.MkdirAll(profileDir, 0o755); err != nil {
 		return err
 	}
@@ -52,8 +75,47 @@ func installProfiles(source string, configRoot string, stdout io.Writer) error {
 			return err
 		}
 		fmt.Fprintf(stdout, "installed %s\n", file.name)
+		if _, shadows := builtIn[file.name]; shadows {
+			fmt.Fprintf(stdout, "  warning: %q is a built-in profile; this file merges into it, and into every profile that inherits from it\n", file.name)
+		}
+		for _, line := range describeInstalledGrants(file.profile) {
+			fmt.Fprintf(stdout, "  %s\n", line)
+		}
 	}
 	return nil
+}
+
+// describeInstalledGrants renders the filesystem entries a profile file
+// declares, so installing is not a decision made sight unseen. Entries are
+// printed as written; resolving them would need the machine state a run has.
+func describeInstalledGrants(profile config.Profile) []string {
+	var out []string
+	for _, block := range []struct {
+		label    string
+		settings config.Settings
+	}{{"", profile.Settings}, {"linux ", profile.Linux}, {"macos ", profile.MacOS}} {
+		for _, list := range []struct {
+			name    string
+			entries []string
+		}{
+			{"ro", block.settings.ReadOnly}, {"rox", block.settings.ReadOnlyExec},
+			{"rw", block.settings.ReadWrite}, {"rwx", block.settings.ReadWriteExec},
+		} {
+			if len(list.entries) > 0 {
+				out = append(out, fmt.Sprintf("%s%-4s %s", block.label, list.name, strings.Join(list.entries, ", ")))
+			}
+		}
+		if len(block.settings.Deny) > 0 {
+			out = append(out, block.label+"deny "+strings.Join(block.settings.Deny, ", "))
+		}
+		if len(block.settings.Allow) > 0 {
+			out = append(out, block.label+"allow "+strings.Join(block.settings.Allow, ", "))
+		}
+	}
+	if len(profile.Inherits.Names) > 0 {
+		out = append(out, "inherits "+strings.Join(profile.Inherits.Names, ", "))
+	}
+	return out
 }
 
 func resolveInstallProfileSource(source string) (string, func(), error) {
@@ -186,10 +248,10 @@ func hasDirectTOMLFiles(path string) bool {
 	return false
 }
 
-func validateInstallProfileFile(path string) (string, error) {
-	name, _, _, err := config.LoadProfileFile(path)
+func validateInstallProfileFile(path string) (string, config.Profile, error) {
+	name, profile, _, err := config.LoadProfileFile(path)
 	if err != nil {
-		return "", err
+		return "", config.Profile{}, err
 	}
-	return name, nil
+	return name, profile, nil
 }

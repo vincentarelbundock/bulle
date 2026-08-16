@@ -31,7 +31,13 @@ func composeEnvEntries(profileEnv []string, vars bpaths.Vars, parentEnv map[stri
 		entries = append(entries, name+"="+expanded)
 	}
 	if len(allExcept) > 0 {
-		entries = append(entries, allEnvExcept(parentEnv, allExcept)...)
+		// A profile that sets NAME=VALUE is making a decision about the
+		// sandbox, often a hardening one (uv.toml pins UV_NO_CACHE=1 so
+		// sandboxed code cannot poison a cache later runs import). Bulk
+		// passthrough must not silently undo it: --env-all-except means "carry
+		// the rest of my environment across", not "override the profile".
+		// --env and --env-file still win, because those name the variable.
+		entries = append(entries, allEnvExcept(parentEnv, append(allExcept, explicitEnvNames(profileEnv)...))...)
 	}
 	for _, file := range envFiles {
 		fromFile, err := readEnvFile(file)
@@ -41,6 +47,18 @@ func composeEnvEntries(profileEnv []string, vars bpaths.Vars, parentEnv map[stri
 		entries = append(entries, fromFile...)
 	}
 	return append(entries, flagEnv...), nil
+}
+
+// explicitEnvNames lists the variables a profile assigns a value to, as
+// opposed to the bare names it merely passes through.
+func explicitEnvNames(profileEnv []string) []string {
+	var names []string
+	for _, entry := range profileEnv {
+		if name, _, explicit := strings.Cut(entry, "="); explicit {
+			names = append(names, strings.TrimSpace(name))
+		}
+	}
+	return names
 }
 
 // allEnvExcept returns name-copy entries for every parent variable not in the

@@ -134,6 +134,8 @@ bulle profiles install github:vincentarelbundock/bulle/custom_profiles
 
 By default, profiles are installed under the operating system user config directory: usually `$XDG_CONFIG_HOME/bulle/profiles/` or `~/.config/bulle/profiles/` on Linux, and `~/Library/Application Support/bulle/profiles/` on macOS. Use `--config PATH` to install into a different config directory; `bulle` creates its `profiles/` subdirectory if needed. The filename becomes the profile name, so `profiles/agent.toml` is selected with `--profile agent`.
 
+Installing prints the grants each file declares, because an installed profile decides what a sandbox permits. A file named after a profile you already have is not replaced unless you pass `--force`: the merge also reaches every profile that inherits from that name, so an innocuous-looking `node.toml` can widen runs that never mention `node`.
+
 When installing from a local git repository root or `github:owner/repo`, `bulle` uses `profiles/*.toml` if that directory exists. When a GitHub source includes a subdirectory, such as `github:owner/repo/custom_profiles`, that subdirectory is used as the profile source.
 
 = The TOML format

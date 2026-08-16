@@ -416,3 +416,34 @@ func TestDropCoveredEntriesKeepsStrongerNestedGrants(t *testing.T) {
 		}
 	}
 }
+
+// Three files in a credential directory are exactly the cluster promotion
+// looks for, and exactly the grant it must never write.
+func TestPromotionFloorRefusesTopLevelAndCredentialDirectories(t *testing.T) {
+	refused := [][]string{
+		{"$HOME/.ssh/known_hosts", "$HOME/.ssh/config", "$HOME/.ssh/id_ed25519.pub"},
+		{"$HOME/.aws/config", "$HOME/.aws/credentials", "$HOME/.aws/cli/cache"},
+		{"$HOME/.local/bin/x", "$HOME/.local/lib/y", "$HOME/.local/opt/z"},
+		{"/var/lib/dbus/machine-id", "/var/lib/systemd/x", "/var/lib/misc/y"},
+	}
+	for _, group := range refused {
+		for _, entry := range finalizeEntries(entriesFor(group)) {
+			if strings.HasSuffix(entry.Entry, "/") {
+				t.Fatalf("%v promoted to the directory grant %q", group, entry.Entry)
+			}
+		}
+	}
+	// A cluster deep inside an app-directory variable still promotes.
+	got := finalizeEntries(entriesFor([]string{"$CACHE/mesa/a", "$CACHE/mesa/b", "$CACHE/mesa/c"}))
+	if len(got) != 1 || got[0].Entry != "$CACHE/mesa/" {
+		t.Fatalf("finalizeEntries = %#v, want one $CACHE/mesa/ grant", got)
+	}
+}
+
+func entriesFor(paths []string) []recordedEntry {
+	out := make([]recordedEntry, 0, len(paths))
+	for _, path := range paths {
+		out = append(out, recordedEntry{List: "ro", Entry: path})
+	}
+	return out
+}

@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/vincentarelbundock/bulle/internal/record"
 )
 
 // scratchState describes a disposable clone of the workspace created for a
@@ -120,6 +122,11 @@ func createScratch(origin string, configuredRoot string, invocation []string, st
 	}
 	s := &scratchState{Dir: dir, Origin: origin, ID: id, BaseCommit: base, BaselineTree: baseline}
 	writeScratchMeta(s, invocation)
+	if err := saveScratchGitConfig(s); err != nil {
+		os.RemoveAll(dir)
+		os.Remove(scratchMetaPath(dir))
+		return nil, fmt.Errorf("--scratch: %w", err)
+	}
 
 	carried := "clean"
 	if modified > 0 || untracked > 0 {
@@ -180,12 +187,12 @@ func worktreeTree(scratch string) (string, error) {
 	os.Remove(indexPath) // git add refuses a zero-byte index file
 	defer os.Remove(indexPath)
 	env := append(os.Environ(), "GIT_INDEX_FILE="+indexPath)
-	add := exec.Command("git", "-C", scratch, "add", "-A")
+	add := exec.Command("git", scratchGitArgs(scratch, "add", "-A")...)
 	add.Env = env
 	if out, err := add.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("git add: %s", strings.TrimSpace(string(out)))
 	}
-	write := exec.Command("git", "-C", scratch, "write-tree")
+	write := exec.Command("git", scratchGitArgs(scratch, "write-tree")...)
 	write.Env = env
 	out, err := write.Output()
 	if err != nil {
@@ -198,6 +205,9 @@ func worktreeTree(scratch string) (string, error) {
 // code of the run, and never deletes a scratch that holds changes except on
 // an explicit, confirmed discard.
 func reviewScratch(s *scratchState, skipPrompt bool, stdout, stderr io.Writer) {
+	// The run is over but its output is still on disk, and the next thing that
+	// happens is bulle running git in a repository the run could write to.
+	sanitizeScratchGit(s)
 	final, err := worktreeTree(s.Dir)
 	if err != nil {
 		fmt.Fprintf(stderr, "bulle: scratch kept at %s (could not compute changes: %v)\n", s.Dir, err)
@@ -268,7 +278,7 @@ func reviewScratch(s *scratchState, skipPrompt bool, stdout, stderr io.Writer) {
 }
 
 func scratchIsDirty(s *scratchState) bool {
-	status, err := runGit(s.Dir, "status", "--porcelain")
+	status, err := runScratchGit(s.Dir, "status", "--porcelain")
 	return err != nil || status != ""
 }
 
@@ -287,7 +297,7 @@ func pullScratch(s *scratchState, stdout, stderr io.Writer) bool {
 		if _, mergeErr := runGit(s.Origin, "rev-parse", "-q", "--verify", "MERGE_HEAD"); mergeErr == nil {
 			fmt.Fprintf(stderr, "bulle: merge conflict: %s is now mid-merge\n", s.Origin)
 			fmt.Fprintf(stderr, "resolve the conflicts there (git status shows them), then git add and git commit\n")
-			fmt.Fprintf(stderr, "the scratch is kept at %s until you remove it: rm -rf %s\n", s.Dir, s.Dir)
+			fmt.Fprintf(stderr, "the scratch is kept at %s until you remove it: rm -rf %s\n", s.Dir, shellQuote(s.Dir))
 		} else {
 			fmt.Fprintf(stderr, "bulle: pull failed and nothing was merged; the origin and the scratch are untouched\n")
 			printScratchRecipe(s, stderr)
@@ -300,7 +310,7 @@ func pullScratch(s *scratchState, stdout, stderr io.Writer) bool {
 }
 
 func scratchChangeSummary(s *scratchState, final string) (lines []string, added, deleted, changed int) {
-	out, err := runGit(s.Dir, "diff", "--name-status", s.BaselineTree, final)
+	out, err := runScratchGit(s.Dir, "diff", "--name-status", s.BaselineTree, final)
 	if err != nil {
 		return nil, 0, 0, 0
 	}
@@ -324,7 +334,7 @@ func scratchChangeSummary(s *scratchState, final string) (lines []string, added,
 // pageScratchDiff shows the full diff with the user's terminal inherited, so
 // git's own pager takes over.
 func pageScratchDiff(s *scratchState, final string, stderr io.Writer) {
-	cmd := exec.Command("git", "-C", s.Dir, "diff", s.BaselineTree, final)
+	cmd := exec.Command("git", scratchGitArgs(s.Dir, "diff", s.BaselineTree, final)...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -360,28 +370,105 @@ func openScratchShell(s *scratchState, stdout, stderr io.Writer) {
 // so when the scratch working tree is dirty the recipe warns and leads with
 // the commit step instead of silently integrating a partial result.
 func printScratchRecipe(s *scratchState, w io.Writer) {
+	// Every path in a copy-pasteable line is shell-quoted: the scratch name
+	// ends in the workspace's basename, which may contain spaces, and an
+	// unquoted "rm -rf" over a split path deletes something else entirely.
+	dir, origin := shellQuote(s.Dir), shellQuote(s.Origin)
 	fmt.Fprintf(w, "scratch kept: %s\n", s.Dir)
-	status, err := runGit(s.Dir, "status", "--porcelain")
+	status, err := runScratchGit(s.Dir, "status", "--porcelain")
 	dirty := err != nil || status != ""
 	if dirty {
 		fmt.Fprintln(w, "the scratch has uncommitted changes; integration only sees commits, so commit first:")
-		fmt.Fprintf(w, "  git -C %s add -A && git -C %s commit\n", s.Dir, s.Dir)
+		fmt.Fprintf(w, "  git -C %s add -A && git -C %s commit\n", dir, dir)
 		fmt.Fprintln(w, "then integrate from your repository:")
 	} else {
 		fmt.Fprintln(w, "all changes are committed; to integrate, from your repository:")
 	}
-	fmt.Fprintf(w, "  git -C %s pull %s\n", s.Origin, s.Dir)
-	fmt.Fprintf(w, "  rm -rf %s\n", s.Dir)
-	fmt.Fprintf(w, "to inspect before merging: git -C %s fetch %s HEAD:scratch/%s\n", s.Origin, s.Dir, s.ID)
+	fmt.Fprintf(w, "  git -C %s pull %s\n", origin, dir)
+	fmt.Fprintf(w, "  rm -rf %s\n", dir)
+	fmt.Fprintf(w, "to inspect before merging: git -C %s fetch %s HEAD:scratch/%s\n", origin, dir, s.ID)
 }
 
 func removeScratch(s *scratchState) {
 	os.RemoveAll(s.Dir)
 	os.Remove(scratchMetaPath(s.Dir))
+	os.Remove(scratchGitConfigPath(s.Dir))
 }
 
 func scratchMetaPath(dir string) string {
 	return dir + ".meta.toml"
+}
+
+// scratchGitConfigPath is where the pristine copy of the scratch's git
+// configuration is kept: beside the scratch, never inside it, so the sandboxed
+// command has no way to reach the copy it is going to be compared against.
+func scratchGitConfigPath(dir string) string {
+	return dir + ".gitconfig"
+}
+
+// saveScratchGitConfig snapshots the configuration git wrote when it made the
+// clone, before anything has run inside it.
+func saveScratchGitConfig(s *scratchState) error {
+	data, err := os.ReadFile(filepath.Join(s.Dir, ".git", "config"))
+	if err != nil {
+		return fmt.Errorf("reading the scratch's git configuration: %w", err)
+	}
+	return os.WriteFile(scratchGitConfigPath(s.Dir), data, 0o600)
+}
+
+// sanitizeScratchGit undoes anything the sandboxed command did to the scratch's
+// git configuration before bulle runs git there again.
+//
+// The scratch's own .git/ sits inside the workspace, which is granted
+// read-write — it has to be, or the agent could not commit. That makes every
+// exec hook git reads from configuration (filter.<name>.clean, core.pager,
+// core.hooksPath, diff.external, uploadpack.packObjectsHook, core.sshCommand)
+// something the confined process can set and bulle would then run, unsandboxed
+// and as the user, the moment the review gate touches the repository. Restoring
+// the configuration git itself wrote at clone time and clearing the hook
+// directory removes the whole class: a .gitattributes naming a filter driver
+// that no configuration defines is inert.
+func sanitizeScratchGit(s *scratchState) {
+	if data, err := os.ReadFile(scratchGitConfigPath(s.Dir)); err == nil {
+		_ = os.WriteFile(filepath.Join(s.Dir, ".git", "config"), data, 0o600)
+	}
+	hooks := filepath.Join(s.Dir, ".git", "hooks")
+	if err := os.RemoveAll(hooks); err == nil {
+		_ = os.Mkdir(hooks, 0o700)
+	}
+	// .git/info/attributes and .git/info/exclude are read as configuration too;
+	// the clone creates neither, so anything there arrived from the run.
+	_ = os.Remove(filepath.Join(s.Dir, ".git", "info", "attributes"))
+}
+
+// scratchGitArgs builds the argument list for a git command run against a
+// scratch: the hardening overrides, then -C, then the command itself.
+func scratchGitArgs(dir string, args ...string) []string {
+	out := append(hardenedGitArgs(), "-C", dir)
+	return append(out, args...)
+}
+
+// runScratchGit runs a git command against a scratch with the hardening
+// overrides applied.
+func runScratchGit(dir string, args ...string) (string, error) {
+	return runGit("", scratchGitArgs(dir, args...)...)
+}
+
+// hardenedGitArgs are overrides bulle passes to every git command it runs
+// against a scratch. They are belt to sanitizeScratchGit's braces: -c beats
+// repository configuration, so even a configuration file restored from a stale
+// or missing snapshot cannot route git through a program of the run's choosing.
+func hardenedGitArgs() []string {
+	return []string{
+		"-c", "core.hooksPath=" + os.DevNull,
+		"-c", "core.fsmonitor=",
+		"-c", "diff.external=",
+		"-c", "core.sshCommand=",
+		"-c", "core.askPass=",
+		"-c", "uploadpack.packObjectsHook=",
+		"-c", "gpg.program=" + os.DevNull,
+		"-c", "protocol.ext.allow=never",
+	}
 }
 
 // writeScratchMeta records scratch metadata beside (not inside) the scratch,
@@ -497,10 +584,28 @@ func stdinIsTerminal() bool {
 	return err == nil
 }
 
+// shellQuote renders a path as a single POSIX shell word, so a printed command
+// stays one command however the path is spelled.
+func shellQuote(path string) string {
+	if path != "" && !strings.ContainsAny(path, " \t\n\"'\\$`&;|<>()*?[]#~!{}") {
+		return path
+	}
+	return "'" + strings.ReplaceAll(path, "'", `'\''`) + "'"
+}
+
 func randomID() (string, error) {
 	buf := make([]byte, 4)
 	if _, err := rand.Read(buf); err != nil {
 		return "", err
 	}
 	return hex.EncodeToString(buf), nil
+}
+
+// scratchRewrite exposes the scratch-to-origin mapping to the recorder, so a
+// grant learned during a scratch run is saved against the real workspace.
+func scratchRewrite(s *scratchState) *record.ScratchRewrite {
+	if s == nil {
+		return nil
+	}
+	return &record.ScratchRewrite{Dir: s.Dir, Origin: s.Origin}
 }

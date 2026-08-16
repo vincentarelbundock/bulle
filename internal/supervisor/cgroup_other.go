@@ -12,7 +12,9 @@ import (
 // reported as unenforced before the run ever reaches here.
 type runCgroup struct{}
 
-func prepareCgroup(cmd *exec.Cmd, l limits.Limits) *runCgroup { return nil }
+func prepareCgroup(cmd *exec.Cmd, l limits.Limits, supported bool) (*runCgroup, error) {
+	return nil, nil
+}
 
 func (c *runCgroup) kill() bool { return false }
 

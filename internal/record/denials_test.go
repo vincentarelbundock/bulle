@@ -138,3 +138,16 @@ func TestAbbreviateHome(t *testing.T) {
 		}
 	}
 }
+
+// macOS filenames may contain newlines, so a denied path can carry what looks
+// like a second log line. Only lines that really are kernel log lines count.
+func TestParseSeatbeltDenialsIgnoresFabricatedLines(t *testing.T) {
+	lines := []string{
+		`Sandbox: cat(1) deny(1) file-read-data /Users/v/.ssh/id_rsa`,
+		`  (Sandbox) Sandbox: cat(1) deny(1) file-read-data /Users/v/.ssh/id_rsa`,
+		`something else entirely`,
+	}
+	if got := parseSeatbeltDenials(lines); len(got) != 0 {
+		t.Fatalf("parseSeatbeltDenials = %#v, want nothing from lines that are not kernel log lines", got)
+	}
+}

@@ -137,6 +137,18 @@ func safeVarPath(value string, home string) (string, error) {
 	if !filepath.IsAbs(value) {
 		return "", fmt.Errorf("value %q is not an absolute path", value)
 	}
+	// A variable names one directory. Glob metacharacters would make it name a
+	// set of them: an entry built from "$GOPATH" would expand to every sibling
+	// of the directory the variable was supposed to point at.
+	if strings.ContainsAny(value, "*?[") {
+		return "", fmt.Errorf("value %q contains glob metacharacters", value)
+	}
+	// A value re-read as a path is expanded exactly once, but a dollar sign in
+	// it is still a spelling no legitimate directory needs and the kind of thing
+	// a hostile parent environment supplies on purpose.
+	if strings.Contains(value, "$") {
+		return "", fmt.Errorf("value %q contains a variable reference", value)
+	}
 	clean := filepath.Clean(value)
 	if clean == string(filepath.Separator) {
 		return "", fmt.Errorf("value resolves to the filesystem root")
@@ -152,6 +164,10 @@ func safeVarPath(value string, home string) (string, error) {
 		}
 		if candidate == homeReal || sameExistingPath(clean, home) {
 			return "", fmt.Errorf("value resolves to the home directory")
+		}
+		// An ancestor of home (/home, /Users) holds every user's home.
+		if strings.HasPrefix(homeReal, strings.TrimSuffix(candidate, "/")+"/") {
+			return "", fmt.Errorf("value %q contains the home directory", clean)
 		}
 	}
 	return clean, nil

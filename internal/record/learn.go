@@ -23,24 +23,57 @@ import (
 // is never rewritten.
 const learnedMarker = "# Saved by bulle. bulle rewrites this file when you save new grants;"
 
-// PromptLearnedGrants runs the end-of-run save gate: it shows the grants that
+// ScratchRewrite maps paths inside a --scratch workspace back to the origin
+// they were cloned from. A scratch directory is per-run and gone tomorrow, so a
+// grant recorded against it would be written into a permanent profile as a path
+// that resolves nowhere — one stale entry per scratch run.
+type ScratchRewrite struct {
+	Dir    string
+	Origin string
+}
+
+func (s *ScratchRewrite) apply(grants []Grant) []Grant {
+	if s == nil || s.Dir == "" || s.Origin == "" {
+		return grants
+	}
+	out := make([]Grant, len(grants))
+	for i, gr := range grants {
+		switch {
+		case gr.Path == s.Dir:
+			gr.Path = s.Origin
+		case strings.HasPrefix(gr.Path, s.Dir+string(filepath.Separator)):
+			gr.Path = s.Origin + strings.TrimPrefix(gr.Path, s.Dir)
+		}
+		out[i] = gr
+	}
+	return out
+}
+
+// PromptLearnedGrants runs the end-of-run save gate: it shows the entries that
 // would allow what this run was denied, and offers to save them to the
 // profile. It reports whether the run should be repeated. Only called on a
 // terminal, and it never changes the exit code of the run.
-func PromptLearnedGrants(opts cli.Options, global config.Config, rec *Recorder, inScratch bool, stdout, stderr io.Writer) bool {
-	fresh := rec.Unsaved()
-	if len(fresh) == 0 {
+func PromptLearnedGrants(opts cli.Options, global config.Config, rec *Recorder, scratch *ScratchRewrite, stdout, stderr io.Writer) bool {
+	inScratch := scratch != nil
+	if len(rec.Unsaved()) == 0 {
 		return false
 	}
 	name, create := learnTargetProfile(opts, global)
 	if name == "" {
 		return false
 	}
-	fmt.Fprintln(stderr, "bulle: the sandbox denied accesses this run; grants that would allow them:")
-	for _, gr := range fresh {
-		line := fmt.Sprintf("  %-5s %s", strings.TrimPrefix(gr.Flag, "--"), gr.Path)
-		if origins := rec.origins[gr]; len(origins) > 0 {
-			line += "  (denied to " + strings.Join(origins, ", ") + ")"
+	// What is shown is what would be written, entry for entry. Generalization
+	// and directory promotion happen before the prompt, not after it: a prompt
+	// listing three files while the save writes the directory holding them is
+	// consent obtained for something other than what happens.
+	entries := learnedEntries(scratch.apply(rec.grants))
+	fmt.Fprintln(stderr, "bulle: the sandbox denied accesses this run; the profile would receive:")
+	for _, entry := range entries {
+		line := fmt.Sprintf("  %-5s %s", entry.List, "?"+strings.TrimPrefix(entry.Entry, "?"))
+		if entry.Comment != "" {
+			line += "  (" + entry.Comment + ")"
+		} else if entry.Denied != "" && entry.Denied != entry.Entry {
+			line += "  (for " + entry.Denied + ")"
 		}
 		fmt.Fprintln(stderr, line)
 	}
@@ -65,7 +98,7 @@ func PromptLearnedGrants(opts cli.Options, global config.Config, rec *Recorder, 
 			if inScratch && choice == "s" {
 				continue
 			}
-			path, err := saveLearnedGrants(opts, global, name, create, rec.grants)
+			path, err := saveLearnedGrants(opts, global, name, create, entries)
 			if err != nil {
 				fmt.Fprintf(stderr, "bulle: cannot save: %v\n", err)
 				fmt.Fprintln(stderr, "bulle: add the grants above to the profile yourself")
@@ -99,9 +132,9 @@ func learnTargetProfile(opts cli.Options, global config.Config) (string, bool) {
 	return name, !exists
 }
 
-// learnedFile is the shape of a profile file bulle manages. It holds nothing
-// but the grant lists and the identity fields the creation case writes, so a
-// rewrite loses nothing.
+// learnedFile is the part of a profile file bulle manages: the grant lists and
+// the identity fields the creation case writes. Everything else the user put in
+// the file is carried across a rewrite verbatim — see keptKeys.
 type learnedFile struct {
 	Title       string   `toml:"title,omitempty"`
 	Description string   `toml:"description,omitempty"`
@@ -111,14 +144,52 @@ type learnedFile struct {
 	Rox         []string `toml:"rox,omitempty"`
 	Rw          []string `toml:"rw,omitempty"`
 	Rwx         []string `toml:"rwx,omitempty"`
+	// kept holds every other top-level key the file had. The header the tool
+	// writes invites hand-editing, and a rewrite that silently dropped a
+	// deny = ["network"] the user added would turn an edit meant to tighten the
+	// profile into one that loosens it.
+	kept map[string]any
+}
+
+// learnedEntries turns the accumulated grants into the exact entries a save
+// would write: generalized (variables substituted, store roots collapsed),
+// merged, and promoted.
+func learnedEntries(grants []Grant) []recordedEntry {
+	g := newGeneralizer(recordVars(), policy.ListResolvers(os.Getenv("PATH"), benv.Parent()), exec.LookPath)
+	entries := make([]recordedEntry, 0, len(grants))
+	for _, gr := range grants {
+		entries = append(entries, g.generalize(gr))
+	}
+	return finalizeEntries(entries)
+}
+
+// managedKeys are the top-level keys saveLearnedGrants renders itself.
+var managedKeys = map[string]bool{
+	"title": true, "description": true, "inherits": true, "default_app": true,
+	"ro": true, "rox": true, "rw": true, "rwx": true,
+}
+
+// keptKeys extracts every top-level key the typed struct does not model, so a
+// rewrite preserves it.
+func keptKeys(data []byte) (map[string]any, error) {
+	var all map[string]any
+	if err := toml.Unmarshal(data, &all); err != nil {
+		return nil, err
+	}
+	kept := map[string]any{}
+	for key, value := range all {
+		if !managedKeys[key] {
+			kept[key] = value
+		}
+	}
+	return kept, nil
 }
 
 // saveLearnedGrants writes the accumulated grants to
-// <config>/profiles/<name>.toml, generalized the way record output was
-// (variables substituted, store roots collapsed, every entry optional). The
-// file merges into any same-named profile at load time, so an overlay on a
-// built-in profile and a newly created profile are the same mechanism.
-func saveLearnedGrants(opts cli.Options, global config.Config, name string, create bool, grants []Grant) (string, error) {
+// <config>/profiles/<name>.toml (every entry optional). The file merges into
+// any same-named profile at load time, so an overlay on a built-in profile and
+// a newly created profile are the same mechanism.
+func saveLearnedGrants(opts cli.Options, global config.Config, name string, create bool, entries []recordedEntry) (string, error) {
 	root := opts.Config
 	if root == "" {
 		root = config.DefaultRoot()
@@ -134,9 +205,15 @@ func saveLearnedGrants(opts cli.Options, global config.Config, name string, crea
 		if !strings.HasPrefix(string(data), learnedMarker) {
 			return "", fmt.Errorf("%s exists and was not written by bulle; refusing to rewrite it", path)
 		}
-		if err := toml.Unmarshal(stripComments(data), &file); err != nil {
+		stripped := stripComments(data)
+		if err := toml.Unmarshal(stripped, &file); err != nil {
 			return "", fmt.Errorf("re-read %s: %w", path, err)
 		}
+		kept, err := keptKeys(stripped)
+		if err != nil {
+			return "", fmt.Errorf("re-read %s: %w", path, err)
+		}
+		file.kept = kept
 	} else if !os.IsNotExist(err) {
 		return "", err
 	} else if create {
@@ -148,12 +225,7 @@ func saveLearnedGrants(opts cli.Options, global config.Config, name string, crea
 		}
 	}
 
-	g := newGeneralizer(recordVars(), policy.ListResolvers(os.Getenv("PATH"), benv.Parent()), exec.LookPath)
-	entries := make([]recordedEntry, 0, len(grants))
-	for _, gr := range grants {
-		entries = append(entries, g.generalize(gr))
-	}
-	for _, entry := range finalizeEntries(entries) {
+	for _, entry := range entries {
 		list := listFor(&file, entry.List)
 		*list = appendUnique(*list, "?"+strings.TrimPrefix(entry.Entry, "?"))
 	}
@@ -235,6 +307,15 @@ func renderLearnedFile(file learnedFile) string {
 			fmt.Fprintf(&b, "  %q,\n", entry)
 		}
 		b.WriteString("]\n")
+	}
+	// Anything the user added by hand goes back at the end, after the arrays
+	// above, so a rewrite never turns their edit into a deletion. Table headers
+	// this emits are legal there because nothing bulle writes is a table.
+	if len(file.kept) > 0 {
+		if rest, err := toml.Marshal(file.kept); err == nil {
+			b.WriteString("\n")
+			b.Write(rest)
+		}
 	}
 	return b.String()
 }

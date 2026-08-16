@@ -1,8 +1,8 @@
 {
   "schema": 2,
-  "calepin_version": "0.0.48",
+  "calepin_version": "0.0.51",
   "input": "permissions.typ",
-  "generation": "8b9efc0a0d7fa7df-1349cde127705c16",
+  "generation": "5078c031fcbf8eda-1349cde127705c16",
   "store": {},
   "chunks": {
     "chunk-1": {
@@ -28,6 +28,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -55,6 +57,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -82,6 +86,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -109,6 +115,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -136,6 +144,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -163,6 +173,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -190,6 +202,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -217,6 +231,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -244,6 +260,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -271,6 +289,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -298,6 +318,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -325,6 +347,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []

@@ -1,0 +1,13 @@
+# bulle
+
+> bulle runs local commands in a sandbox, exposing only the essential parts of your machine.
+
+## Pages
+
+- [CLI Reference](https://vincentarelbundock.github.io/bulle/cli-reference.html): Command-line reference for bulle.
+- [Diagnostics](https://vincentarelbundock.github.io/bulle/denial-diagnostics.html): How bulle reports sandbox denials with copy-pasteable policy fixes, and how to retry the run with the missing grant.
+- [Home](https://vincentarelbundock.github.io/bulle/): A simple sandbox for dangerous tools like coding agents
+- [Permissions](https://vincentarelbundock.github.io/bulle/permissions.html): Filesystem and environment grants, network access, policy inspection, configuration defaults, and how the sandbox is enforced.
+- [Profiles](https://vincentarelbundock.github.io/bulle/profiles.html): Named bundles of permissions: selection and inference, the TOML format, portable path entries, and how to write your own.
+- [Recording Profiles](https://vincentarelbundock.github.io/bulle/record.html): Draft a profile for a new tool by running it under observation: bulle collects what the sandbox denied, adds those grants, and runs again until nothing new is denied.
+- [Scratch Workspaces](https://vincentarelbundock.github.io/bulle/scratch.html): Run an agent against a disposable clone of your repository, then review and integrate the changes with git.

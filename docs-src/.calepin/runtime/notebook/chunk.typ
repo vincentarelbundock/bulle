@@ -26,14 +26,44 @@
   out
 }
 
-#let _query-crossref-placeholders(crossref-labels) = {
-  let out = []
+// The query pass evaluates the document before any results exist, so a label
+// that only gets attached during the render pass would be undefined here and
+// every `@ref` to it would fail the query. Emit an empty figure of the matching
+// kind per label so the reference resolves in both passes.
+#let _query-placeholder-kinds = (
+  "fig-": image,
+  "tbl-": table,
+  "lst-": raw,
+)
+
+// An `lst-` label names the chunk's echoed source as a listing. The labels here
+// are the raw names from the chunk header, not the classified docs the results
+// document carries, so match on the prefix.
+#let _listing-names(crossref-labels) = {
+  let out = ()
   for name in crossref-labels {
-    if type(name) == str and name.starts-with("fig-") {
-      out += [#figure(box(width: 0pt, height: 0pt), caption: none) #label(name)]
+    if type(name) == str and name.starts-with("lst-") {
+      out.push(name)
     }
   }
   out
+}
+
+// Render the echoed source, wrapped as a listing figure when the chunk carries
+// an `lst-` label or caption. Without either, the code renders exactly as it
+// did before, with no figure and no counter consumed.
+#let _listing-block(code, engine, label, crossref-labels, options) = {
+  let block = _input-block(code, lang: engine)
+  let names = _listing-names(crossref-labels)
+  let caption = options.at("lst-caption", default: none)
+  if names.len() == 0 and caption == none {
+    return block
+  }
+  let rendered = figure(block, kind: raw, caption: caption)
+  for name in names {
+    rendered = [#rendered #std.label(name)]
+  }
+  rendered
 }
 
 #let _strip-qmd-label-quotes(value) = {
@@ -84,6 +114,67 @@
     }
   }
   none
+}
+
+// The panel count for a `#|` header chunk. Typst reads only `label` out of the
+// header (the rest is parsed on the Rust side, after this pass), but the query
+// pass needs the count to emit one placeholder per referenceable panel.
+#let _qmd-subcaption-count(body) = {
+  let code = _raw-text(body)
+  let code = if code.starts-with("\n") { code.slice(1) } else { code }
+  for line in code.split("\n") {
+    let trimmed = line.trim()
+    if not trimmed.starts-with("#|") {
+      return 0
+    }
+    let directive = trimmed.slice(2).trim()
+    let colon = directive.position(":")
+    if colon == none {
+      continue
+    }
+    let key = directive.slice(0, colon).trim()
+    if key in ("fig-subcap", "fig-subcaptions", "fig.subcap") {
+      let value = _parse-qmd-label-value(directive.slice(colon + 1))
+      return if type(value) == array { value.len() } else { 0 }
+    }
+  }
+  0
+}
+
+// How many panels a `fig-` label can address. The panels themselves only exist
+// once the chunk has run, which is after this pass, so the sub-caption list is
+// the one count available here: a document that references a panel captions it.
+#let _query-panel-count(options, body) = {
+  let subcaptions = options.at("fig-subcaptions", default: none)
+  let from-options = if type(subcaptions) == array { subcaptions.len() } else { 0 }
+  calc.max(from-options, _qmd-subcaption-count(body))
+}
+
+#let _query-crossref-placeholders(crossref-labels, options, body) = {
+  let out = []
+  let panels = _query-panel-count(options, body)
+  for name in crossref-labels {
+    if type(name) != str {
+      continue
+    }
+    for (prefix, figure-kind) in _query-placeholder-kinds {
+      if name.starts-with(prefix) {
+        out += [
+          #figure(box(width: 0pt, height: 0pt), kind: figure-kind, caption: none)
+          #label(name)
+        ]
+        if prefix == "fig-" {
+          for index in range(panels) {
+            out += [
+              #figure(box(width: 0pt, height: 0pt), kind: figure-kind, caption: none)
+              #label(name + "-" + str(index + 1))
+            ]
+          }
+        }
+      }
+    }
+  }
+  out
 }
 
 #let _label-name(value) = {
@@ -188,7 +279,7 @@
     [
       #label-step
       #metadata(_chunk-spec(body, engine, label, crossref-labels, options)) <calepin-chunk>
-      #_query-crossref-placeholders(crossref-labels)
+      #_query-crossref-placeholders(crossref-labels, options, body)
     ]
   } else {
     let code = _raw-text(body)
@@ -269,9 +360,9 @@
       })
 
       if show-echo {
-        _input-block(code, lang: engine)
+        _listing-block(code, engine, label, crossref-labels, options)
       } else if results-path == none or results-path == "" {
-        _input-block(code, lang: engine)
+        _listing-block(code, engine, label, crossref-labels, options)
       }
       // `results: "hide"`/`"hidden"` runs the chunk but renders nothing here; the
       // output can still be shown elsewhere with `#calepin.results(label)`.

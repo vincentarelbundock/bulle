@@ -33,7 +33,7 @@ func PreparePolicy(p policy.Policy) (policy.Policy, error) {
 		// prefix, a Nix store path) and its runtime libraries are discovered
 		// from there. Package store roots are trusted for RPATH/RUNPATH
 		// resolution so those libraries resolve even before they are granted.
-		scan := scanTreesForELFSeeds(executableRoots(prepared), prepared.ReadOnly)
+		scan := scanTreesForELFSeeds(scannableExecutableRoots(prepared), prepared.ReadOnly)
 		seeds := append(linuxELFDependencyRoots(prepared.Command[0]), scan.seeds...)
 		// Store references chain: a wrapper script references a store item
 		// whose nix-support files reference further items (a cc wrapper
@@ -67,7 +67,7 @@ func PreparePolicy(p policy.Policy) (policy.Policy, error) {
 			prepared.ReadOnlyExec = appendAbsolutePaths(prepared.ReadOnlyExec, interpreter, real)
 			seeds = append(seeds, real)
 		}
-		trusted := append(executableRoots(prepared), packageStoreRoots...)
+		trusted := append(scannableExecutableRoots(prepared), packageStoreRoots...)
 		deps, err := elfdeps.GetLibraryDependenciesForAll(seeds, elfdeps.DependencyOptions{TrustedRpathRoots: trusted})
 		if err != nil {
 			return prepared, err
@@ -193,6 +193,18 @@ func executablePathAllowed(path string, p policy.Policy) bool {
 
 func executableRoots(p policy.Policy) []string {
 	return append(append([]string{}, p.ReadOnlyExec...), p.ReadWriteExec...)
+}
+
+// scannableExecutableRoots are the executable trees library discovery may read
+// as evidence. Read-write-exec trees are excluded on purpose: their contents
+// are chosen by the confined process, so a shebang or a store reference found
+// in one is not a fact about the machine but an instruction from the sandbox —
+// and following it would let a run pick what the next run grants FS_EXECUTE on.
+// Deciding whether the command itself is allowed to run still consults every
+// executable root; that is a question about what was granted, not about what
+// the grant's contents ask for.
+func scannableExecutableRoots(p policy.Policy) []string {
+	return append([]string{}, p.ReadOnlyExec...)
 }
 
 func appendAbsolutePaths(paths []string, extra ...string) []string {

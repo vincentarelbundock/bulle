@@ -108,15 +108,18 @@ func TestRunSendsSIGCONTAfterForegroundHandoff(t *testing.T) {
 	restoreSetIoctl := ioctlSetForegroundProcessGroup
 	restoreWithSIGTTOUBlocked := withSIGTTOUBlocked
 	restoreContinueProcessGroup := continueProcessGroup
+	restoreOwnProcessGroup := ownProcessGroup
 	t.Cleanup(func() {
 		ioctlGetForegroundProcessGroup = restoreGetIoctl
 		ioctlSetForegroundProcessGroup = restoreSetIoctl
 		withSIGTTOUBlocked = restoreWithSIGTTOUBlocked
 		continueProcessGroup = restoreContinueProcessGroup
+		ownProcessGroup = restoreOwnProcessGroup
 	})
 
 	const parentPGID = 42
 	var foregroundPGIDs []int
+	ownProcessGroup = func() int { return parentPGID }
 	ioctlGetForegroundProcessGroup = func(fd int) (int, error) {
 		return parentPGID, nil
 	}
@@ -189,6 +192,9 @@ func TestSignalForwarderQueuesSignalsBeforeTargetIsSet(t *testing.T) {
 	forwarder := newSignalForwarder(func(pgid int, sig syscall.Signal) error {
 		if pgid != 123 {
 			t.Fatalf("forwarded pgid = %d, want 123", pgid)
+		}
+		if sig == syscall.Signal(0) {
+			return nil // liveness probe, not a forwarded signal
 		}
 		kills <- sig
 		return nil

@@ -1,8 +1,8 @@
 {
   "schema": 2,
-  "calepin_version": "0.0.48",
+  "calepin_version": "0.0.51",
   "input": "profiles.typ",
-  "generation": "2d70bccb229b93bd-1349cde127705c16",
+  "generation": "c11a3200705ee00e-1349cde127705c16",
   "store": {},
   "chunks": {
     "chunk-1": {
@@ -28,6 +28,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -55,6 +57,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -82,6 +86,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -109,6 +115,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -136,6 +144,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -163,6 +173,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -190,6 +202,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -217,6 +231,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -244,6 +260,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -271,6 +289,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -298,6 +318,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -325,6 +347,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -352,6 +376,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -379,6 +405,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -406,6 +434,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -433,6 +463,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -460,6 +492,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -487,6 +521,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []
@@ -514,6 +550,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "items": []

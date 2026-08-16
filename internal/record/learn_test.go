@@ -31,9 +31,9 @@ func TestSaveLearnedGrantsCreatesAndMerges(t *testing.T) {
 	opts := cli.Options{Flags: cli.Flags{Config: root}, Command: []string{"mytool"}}
 	global := config.DefaultConfig()
 
-	path, err := saveLearnedGrants(opts, global, "mytool", true, []Grant{
+	path, err := saveLearnedGrants(opts, global, "mytool", true, learnedEntries([]Grant{
 		{Flag: "--ro", Path: "/etc/mytool.conf"},
-	})
+	}))
 	if err != nil {
 		t.Fatalf("saveLearnedGrants: %v", err)
 	}
@@ -49,10 +49,10 @@ func TestSaveLearnedGrantsCreatesAndMerges(t *testing.T) {
 	}
 
 	// A second save unions into the same file without losing anything.
-	if _, err := saveLearnedGrants(opts, global, "mytool", true, []Grant{
+	if _, err := saveLearnedGrants(opts, global, "mytool", true, learnedEntries([]Grant{
 		{Flag: "--ro", Path: "/etc/mytool.conf"},
 		{Flag: "--rw", Path: "/var/lib/mytool"},
-	}); err != nil {
+	})); err != nil {
 		t.Fatalf("second save: %v", err)
 	}
 	data, _ = os.ReadFile(path)
@@ -86,8 +86,26 @@ func TestSaveLearnedGrantsRefusesForeignFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	opts := cli.Options{Flags: cli.Flags{Config: root}, Profile: "claude"}
-	_, err := saveLearnedGrants(opts, config.DefaultConfig(), "claude", false, []Grant{{Flag: "--ro", Path: "/etc/x"}})
+	_, err := saveLearnedGrants(opts, config.DefaultConfig(), "claude", false, learnedEntries([]Grant{{Flag: "--ro", Path: "/etc/x"}}))
 	if err == nil || !strings.Contains(err.Error(), "not written by bulle") {
 		t.Fatalf("err = %v, want refusal to rewrite a hand-written file", err)
+	}
+}
+func TestSavePreservesHandEditedKeys(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "profiles")
+	os.MkdirAll(dir, 0o755)
+	path := filepath.Join(dir, "mytool.toml")
+	os.WriteFile(path, []byte(learnedMarker+"\ndeny = [\"network\"]\nenv = [\"PATH\"]\nro = [\"?/etc/a\"]\n\n[linux]\nro = [\"/proc\"]\n"), 0o644)
+	opts := cli.Options{Flags: cli.Flags{Config: root}, Profile: "mytool"}
+	if _, err := saveLearnedGrants(opts, config.DefaultConfig(), "mytool", false, learnedEntries([]Grant{{Flag: "--ro", Path: "/etc/b"}})); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(path)
+	t.Logf("\n%s", data)
+	for _, want := range []string{"deny", "network", "env", "PATH", "/etc/a", "/etc/b", "[linux]"} {
+		if !strings.Contains(string(data), want) {
+			t.Fatalf("lost %q", want)
+		}
 	}
 }

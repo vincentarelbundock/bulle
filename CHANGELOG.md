@@ -472,6 +472,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Markers survive resolver expansion.** `?` and `+` on a resolver entry
   were dropped when it expanded, so an optional resolver whose directory did
   not yet exist became a hard failure in a `rw` list.
+- **`--json` after `--` belongs to the command.** `bulle show policy … -- curl
+  --json …` no longer has that flag stolen from the command line it reports.
+- **Parse errors name the flag that failed**, not the longest flag name
+  appearing anywhere in the message — including one that was only a rejected
+  value.
+
+### Security
+
+Following a whole-codebase audit. The through-line of the serious findings is
+one mistake in several places: content the confined process or the untrusted
+workspace controls flowed into a decision bulle makes *outside* the sandbox.
+
+- **The scratch's own `.git` can no longer drive code execution after the
+  run.** A `--scratch` workspace is granted read-write, `.git/` included, and
+  the review gate then runs `git add -A` as the user with the sandbox gone —
+  so a `filter.<name>.clean`, `core.pager`, `core.hooksPath`, `diff.external`
+  or `uploadpack.packObjectsHook` written during the run executed unsandboxed,
+  before the review prompt was even printed. The configuration git wrote at
+  clone time is snapshotted outside the workspace and restored before any
+  post-run git command, hooks are cleared, and every scratch-directed git
+  invocation additionally passes `-c` overrides for the exec-capable settings.
+- **Tool resolvers no longer run interpreters in the workspace.** `r:*`,
+  `npm:cache`, `go:*` and friends ran with the current directory as cwd, so a
+  repository's `.Rprofile` or `.npmrc` steered the answer — and, for R, ran
+  code — before any sandbox existed. Resolvers now run from `/`, and `Rscript`
+  is invoked with `--no-init-file --no-site-file`.
+- **Resolver output is guarded for every entry, not one.** The system-root and
+  home refusal applied only to `r:prefix`; a tool persuaded to report `$HOME`
+  (or an ancestor of it) had that granted verbatim.
+- **Path variables are expanded exactly once.** An entry was expanded, then
+  expanded again, so a `$` arriving *inside* an environment value was
+  reinterpreted as a further reference — turning a value that passed
+  validation into `/` or `$HOME`. Fallbacks (`${CODEX_HOME:-$HOME/.codex}`)
+  still resolve, because a fallback is profile text rather than data. An entry
+  that becomes the filesystem root or the home directory only through
+  expansion is refused, and variable values containing glob metacharacters or
+  a dollar sign are rejected.
+- **Linux: the seccomp network filter checks `seccomp_data.arch`,** so a
+  32-bit or x32 process can neither slip past `network = none` (i386 `socket`
+  is 359, not 41) nor be hit by it (i386 41 is `dup`); a foreign ABI is killed.
+  The filter is also installed on a pinned OS thread and the exec happens on
+  that same thread — `PR_SET_SECCOMP` is per-thread, so the runtime was free to
+  exec from a thread that never received it, leaving the network fully open
+  while bulle reported it offline.
+- **`add_libs` no longer scans writable executable trees.** A shebang or Nix
+  store reference found under an `rwx` grant is written by the confined
+  process, so following it let a run choose what the next run grants
+  `FS_EXECUTE` on. Only read-only executable roots are scanned now.
+- **Symlink grants refuse ancestors of the home directory,** not just the home
+  directory itself: `/home` and `/Users` hold every other user's keys.
+- **A `..` component that crosses a symlink grants only what the kernel
+  reaches.** `x/link/../b` was cleaned lexically to `x/b` and both were
+  granted, so a directory the entry never traverses came along.
+- **cgroup limits fail closed.** Support was probed by creating a directory,
+  which does not test whether the controllers can be delegated — a parent
+  holding processes of its own can never gain one. The run then swallowed the
+  creation failure, so `memory: 4G (cgroup v2)` and `--strict-limits` both
+  passed over a run with no cap at all. Detection now checks delegation, and a
+  cgroup that could not be created after being reported as enforced is a hard
+  failure. Each run's cgroup is uniquely named (pids are recycled) and stale
+  empty ones are swept.
+- **The permission summary no longer prints `none` over a real grant.** A path
+  held both `rw` and `rox` was treated as subsumed by "the other" list and
+  dropped from both — including in the summary a user approves a profile from,
+  and the one pasted to the agent as its system prompt.
+- **Learned grants: a much higher promotion floor, and a prompt that shows
+  what is written.** Three denied files promoted to a grant on the directory
+  holding them with only one component below `$HOME` or `/`, so
+  `~/.ssh/known_hosts` and two harmless siblings produced a grant on every
+  private key you own. Directories one level below `$HOME` or a filesystem
+  root no longer promote, credential directories never do, and a home is
+  recognized by location rather than by whether `$HOME` happens to spell it.
+  The save prompt now lists the generalized, promoted entries the file will
+  receive rather than the literal per-file grants.
+- **`--env-all-except` no longer overrides values a profile set.** Bulk
+  passthrough silently undid profile hardening such as uv's `UV_NO_CACHE=1`.
+  Explicit `--env` and `--env-file` values still win.
+- **`profiles install` is neither silent nor destructive.** It prints what
+  each file grants, warns when a file merges into a built-in profile (and so
+  into everything inheriting from it), and refuses to replace an already
+  installed profile without `--force`.
+- **Saved profiles keep hand-written keys.** A rewrite modeled only the grant
+  lists, so a `deny = ["network"]` added by hand — exactly what the file's own
+  header invites — was silently dropped on the next save.
+- **macOS: the Seatbelt log pattern is anchored,** so a filename containing a
+  newline cannot inject a fabricated denial (and therefore a suggested grant)
+  into the parser.
+- **The terminal is only handed to the child when bulle holds it.** Backgrounded
+  (`bulle -- cmd &`), bulle took the foreground from the shell, sending the
+  user's keystrokes to the sandboxed command.
+- **Signal forwarding probes before it signals** and stops once the forwarder
+  has been shut down, so a buffered signal cannot be delivered to a recycled
+  process group after the run has returned.
+- **Learned grants no longer record scratch paths.** A denial under `--scratch`
+  wrote a per-run scratch path into a permanent profile; those paths are mapped
+  back to the origin workspace first.
+- **macOS: the fd sweep honors `RLIMIT_NOFILE`.** The fallback stopped at 1023
+  even where the limit had been raised, leaking inherited descriptors past the
+  sandbox profile — the Linux fallback already did this.
+- **Copy-pasteable scratch commands are shell-quoted,** so a workspace whose
+  name contains a space cannot turn a printed `rm -rf` into two arguments.
 
 ## [0.0.7] - 2026-08-10
 

@@ -1,5 +1,6 @@
 [
   {
+    "excerpt": "Command-line reference for bulle.",
     "href": "cli-reference.html",
     "language": null,
     "meta": {
@@ -13,6 +14,7 @@
     "translations": {}
   },
   {
+    "excerpt": "How bulle reports sandbox denials with copy-pasteable policy fixes, and how to retry the run with the missing grant.",
     "href": "denial-diagnostics.html",
     "language": null,
     "meta": {
@@ -26,6 +28,7 @@
     "translations": {}
   },
   {
+    "excerpt": "A simple sandbox for dangerous tools like coding agents",
     "href": "index.html",
     "language": null,
     "meta": {
@@ -39,6 +42,7 @@
     "translations": {}
   },
   {
+    "excerpt": "Filesystem and environment grants, network access, policy inspection, configuration defaults, and how the sandbox is enforced.",
     "href": "permissions.html",
     "language": null,
     "meta": {
@@ -52,6 +56,7 @@
     "translations": {}
   },
   {
+    "excerpt": "Named bundles of permissions: selection and inference, the TOML format, portable path entries, and how to write your own.",
     "href": "profiles.html",
     "language": null,
     "meta": {
@@ -65,6 +70,7 @@
     "translations": {}
   },
   {
+    "excerpt": "Draft a profile for a new tool by running it under observation: bulle collects what the sandbox denied, adds those grants, and runs again until nothing new is denied.",
     "href": "record.html",
     "language": null,
     "meta": {
@@ -78,6 +84,7 @@
     "translations": {}
   },
   {
+    "excerpt": "Run an agent against a disposable clone of your repository, then review and integrate the changes with git.",
     "href": "scratch.html",
     "language": null,
     "meta": {

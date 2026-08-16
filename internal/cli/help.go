@@ -80,15 +80,18 @@ Related run flags:
 
 Usage:
   bulle profiles list
-  bulle profiles install SOURCE
+  bulle profiles install [--force] SOURCE
 
 install accepts profile TOML files from a file, a directory, a local git
 repository, or a GitHub source (github:owner/repo[/subdir]), and copies them
-into your configuration directory's profiles/ folder.
+into your configuration directory's profiles/ folder. What each file grants
+is printed as it is installed.
 
 A profile file named after an existing profile merges into it: that is how
 the end-of-run save prompt extends a profile, and you can use it the same way
-by hand.
+by hand. Because that merge also reaches every profile inheriting from the
+name, installing over a profile you already have is refused unless you pass
+--force.
 
 Examples:
   bulle profiles install agent.toml

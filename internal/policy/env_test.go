@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -43,4 +44,32 @@ func TestReadEnvFileRejectsMalformedLine(t *testing.T) {
 	if _, err := readEnvFile(file); err == nil {
 		t.Fatalf("readEnvFile succeeded, want malformed-line error")
 	}
+}
+
+// --env-all-except carries the rest of the environment across; it does not
+// override a value the profile set deliberately, which is often a hardening
+// one (uv pins UV_NO_CACHE=1 so sandboxed code cannot poison a shared cache).
+func TestComposeEnvEntriesAllExceptDoesNotOverrideProfileValues(t *testing.T) {
+	parent := map[string]string{"UV_NO_CACHE": "0", "OTHER": "x"}
+	entries, err := composeEnvEntries([]string{"UV_NO_CACHE=1"}, nil, parent, []string{"NOTHING"}, nil, nil)
+	if err != nil {
+		t.Fatalf("composeEnvEntries: %v", err)
+	}
+	for _, entry := range entries[1:] {
+		if entry == "UV_NO_CACHE" || strings.HasPrefix(entry, "UV_NO_CACHE=") {
+			t.Fatalf("passthrough re-added UV_NO_CACHE after the profile set it: %v", entries)
+		}
+	}
+	if !containsEntry(entries, "OTHER") {
+		t.Fatalf("passthrough dropped an unrelated variable: %v", entries)
+	}
+}
+
+func containsEntry(entries []string, want string) bool {
+	for _, entry := range entries {
+		if entry == want {
+			return true
+		}
+	}
+	return false
 }

@@ -1,6 +1,7 @@
 package record
 
 import (
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -429,26 +430,78 @@ func ancestorEntries(entry string) []string {
 	return out
 }
 
+// credentialDirectoryNames are directories whose whole purpose is to hold
+// secrets. Three denials inside one of them is exactly the pattern promotion
+// looks for, and exactly the grant that must never be written: the files that
+// were denied leak nothing, while the directory holds every private key.
+var credentialDirectoryNames = map[string]bool{
+	".ssh": true, ".gnupg": true, ".gpg": true, ".aws": true, ".kube": true,
+	".docker": true, ".azure": true, ".netrc": true, ".password-store": true,
+	"credentials": true, "secrets": true, "keys": true, "keyrings": true,
+}
+
 // promotableDirectory reports whether a directory is deep enough to grant.
-// It must have a component of its own below whatever root it hangs from:
-// "$CACHE/foo" qualifies and "$CACHE" does not; "/usr/lib/x" qualifies and
-// "/usr" does not. Those roots are the trees a sandbox exists to withhold.
+//
+// The floor is not "has a component of its own". One component below a root is
+// still a top-level directory of that root — $HOME/.ssh, $HOME/.local, /var/lib,
+// /home/someone — and those are the trees a sandbox exists to withhold just as
+// much as the roots above them. So a directory hanging off $HOME or off the
+// filesystem root needs two components of its own, while one under an
+// app-directory variable ($CACHE, $CONFIG, $STATE) needs one: those variables
+// already name a specific per-user tree, and $CACHE/mesa_shader_cache is a
+// grant worth writing.
 func promotableDirectory(dir string) bool {
 	if dir == "" || isStoreRootDirectory(dir) {
 		return false
 	}
-	var rest string
-	if strings.HasPrefix(dir, "$") {
-		_, rest, _ = strings.Cut(dir, "/")
-	} else {
-		rest = strings.TrimPrefix(dir, "/")
-		if i := strings.Index(rest, "/"); i >= 0 {
-			rest = rest[i+1:]
-		} else {
-			rest = ""
+	if credentialDirectoryNames[entryBase(dir)] {
+		return false
+	}
+	// The $HOME floor is a location, not a spelling: a home that is symlinked
+	// or that HOME does not name is still a home, and it is spelled absolutely
+	// when no variable matched it.
+	if !strings.HasPrefix(dir, "$") && containsRealHome(dir) {
+		return false
+	}
+	root, rest, _ := strings.Cut(strings.TrimPrefix(dir, "/"), "/")
+	if rest == "" {
+		return false
+	}
+	if strings.HasPrefix(dir, "$") && root != "$HOME" {
+		return true
+	}
+	// $HOME and absolute paths: require a second component of their own.
+	return strings.Contains(rest, "/")
+}
+
+// entryBase is the last component of a profile entry. It is deliberately not
+// filepath.Base: entries are written with forward slashes whatever the
+// platform, and may begin with a "$VAR" component.
+func entryBase(entry string) string {
+	if i := strings.LastIndex(entry, "/"); i >= 0 {
+		return entry[i+1:]
+	}
+	return entry
+}
+
+// containsRealHome reports whether an absolute directory is a home directory or
+// an ancestor of one, whatever HOME says.
+func containsRealHome(dir string) bool {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return false
+	}
+	candidates := []string{filepath.Clean(home)}
+	if real, err := filepath.EvalSymlinks(home); err == nil {
+		candidates = append(candidates, filepath.Clean(real))
+	}
+	clean := filepath.Clean(dir)
+	for _, candidate := range candidates {
+		if clean == candidate || strings.HasPrefix(candidate, clean+"/") {
+			return true
 		}
 	}
-	return rest != ""
+	return false
 }
 
 // isStoreRootDirectory reports whether a path is the root of a package store

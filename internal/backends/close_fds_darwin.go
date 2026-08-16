@@ -11,7 +11,8 @@ import (
 func closeUnexpectedFileDescriptors() error {
 	entries, err := os.ReadDir("/dev/fd")
 	if err != nil {
-		for fd := 3; fd < 1024; fd++ {
+		max := fallbackFDCeiling()
+		for fd := 3; fd < max; fd++ {
 			syscall.CloseOnExec(fd)
 		}
 		return nil

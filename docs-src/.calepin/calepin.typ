@@ -43,11 +43,40 @@
   it,
   fallback: _fenced-source-fallback,
 )
-#let code-block = code.code-block
 #let elements = elementmod
+
+// A reference to a panel reports both numbers: `@fig-x-2` reads "Figure 1b",
+// the form Quarto and LaTeX subcaption use. The panel caption itself is
+// rendered by a rule the grid installs.
+// A panel's own supplement is suppressed so its caption reads "(a) ...", so a
+// reference borrows the enclosing figure's. Typst resolves the localized default
+// for `auto` at layout and does not expose it, hence the literal fallback.
+#let _subfigure-supplement(it, location) = {
+  if it.supplement != auto and it.supplement != none {
+    return it.supplement
+  }
+  let parents = query(figure.where(kind: image).before(location))
+  if parents.len() > 0 and parents.last().supplement not in (auto, none) {
+    return parents.last().supplement
+  }
+  [Figure]
+}
+
+#let _subfigure-ref = it => {
+  let el = it.element
+  if el == none or el.func() != figure or el.kind != render._subfigure-kind {
+    return it
+  }
+  context {
+    let parent = counter(figure.where(kind: image)).at(el.location()).first()
+    let sub = render._subfigure-number(el.location())
+    link(el.location())[#_subfigure-supplement(it, el.location()) #parent#sub]
+  }
+}
 
 #let _document(config, body) = {
   let config = runtimeconfig._runtime-config(bound: config)
+  show ref: _subfigure-ref
   // Which languages run is decided by `_fenced-chunk` alone, from the
   // document's own `fenced-chunks` setting. Gating here on a language list
   // instead would make the decision depend on data that differs between the
@@ -70,7 +99,7 @@
 
 #let document(body) = _document(none, body)
 
-#let bind(config) = {
+#let _bind(config) = {
   let config = runtimeconfig._runtime-config(bound: config)
   (
     pages: pagesmod.pages,
@@ -85,8 +114,7 @@
       body,
       fallback: _fenced-source-fallback,
     ),
-    code-block: code.code-block,
-    elements: elementmod.bind(config),
+    elements: elementmod._bind(config),
     _resolve-asset-href: (path) => assets._resolve-asset-href(path, config: config),
     _resolve-asset-path: (path) => assets._resolve-asset-path(path, config: config),
     document: body => _document(config, body),

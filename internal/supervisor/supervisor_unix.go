@@ -30,6 +30,10 @@ var ioctlSetForegroundProcessGroup = func(fd int, pgid int) error {
 }
 
 var withSIGTTOUBlocked = blockSIGTTOU
+
+// ownProcessGroup reports bulle's own process group, indirected so the
+// terminal-handoff tests can describe a session bulle is the foreground of.
+var ownProcessGroup = unix.Getpgrp
 var continueProcessGroup = killProcessGroup
 
 type signalNotifier interface {
@@ -54,11 +58,16 @@ type Options struct {
 	Timeout    time.Duration
 	// Limits carries the cgroup-backed resource limits. The rlimit-backed ones
 	// are applied in the sandboxed child instead, from the policy.
-	Limits      limits.Limits
-	GracePeriod time.Duration
-	Stdin       *os.File
-	Stdout      *os.File
-	Stderr      *os.File
+	Limits limits.Limits
+	// CgroupSupported is what the run told the user: true when the
+	// cgroup-backed limits were reported as enforced. It makes a failure to
+	// create the cgroup fatal instead of silent, so a limit that was promised
+	// can never be quietly absent.
+	CgroupSupported bool
+	GracePeriod     time.Duration
+	Stdin           *os.File
+	Stdout          *os.File
+	Stderr          *os.File
 }
 
 func Run(p policy.Policy, opts Options) error {
@@ -104,7 +113,10 @@ func Run(p policy.Policy, opts Options) error {
 	cmd.Env = os.Environ()
 	cmd.ExtraFiles = []*os.File{read}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cgroup := prepareCgroup(cmd, opts.Limits)
+	cgroup, err := prepareCgroup(cmd, opts.Limits, opts.CgroupSupported)
+	if err != nil {
+		return err
+	}
 	defer cgroup.close()
 
 	term, err := prepareForegroundTerminal(stdin)
@@ -332,6 +344,7 @@ type signalForwarder struct {
 	done     chan struct{}
 	stopOnce sync.Once
 	mu       sync.Mutex
+	stopped  bool
 	target   int
 	pending  []syscall.Signal
 	kill     func(int, syscall.Signal) error
@@ -364,6 +377,9 @@ func newSignalForwarder(kill func(int, syscall.Signal) error) *signalForwarder {
 
 func (f *signalForwarder) stop() {
 	f.stopOnce.Do(func() {
+		f.mu.Lock()
+		f.stopped = true
+		f.mu.Unlock()
 		if f.signals != nil {
 			supervisorSignalNotifier.Stop(f.signals)
 		}
@@ -387,6 +403,14 @@ func (f *signalForwarder) forward(sig syscall.Signal) {
 	f.last.Store(int64(sig))
 
 	f.mu.Lock()
+	// A signal can already be buffered in the channel when stop() runs, and the
+	// goroutine's select is free to pick it over the closed done channel. After
+	// stop() the run is over and the child reaped, so forwarding then would
+	// signal a pgid bulle no longer owns.
+	if f.stopped {
+		f.mu.Unlock()
+		return
+	}
 	pgid := f.target
 	if pgid == 0 {
 		f.pending = append(f.pending, sig)
@@ -395,6 +419,12 @@ func (f *signalForwarder) forward(sig syscall.Signal) {
 	}
 	f.mu.Unlock()
 
+	// Probe with signal 0 first, the same reuse guard killAll applies: the
+	// group may have been reaped already, and a pgid is a recyclable number, so
+	// signalling blind can land on an unrelated same-user process group.
+	if f.kill(pgid, syscall.Signal(0)) != nil {
+		return
+	}
 	_ = f.kill(pgid, sig)
 }
 
@@ -420,6 +450,14 @@ func prepareForegroundTerminal(file *os.File) (*foregroundTerminal, error) {
 			return nil, nil
 		}
 		return nil, err
+	}
+	// Handing the terminal to the child is only bulle's to do when bulle holds
+	// it. Backgrounded (`bulle -- cmd &`), the foreground group is the shell's,
+	// and setting it to the child — which the kernel permits, since SIGTTOU is
+	// blocked — would route the user's keystrokes to the sandboxed command and
+	// stop the shell with SIGTTIN.
+	if pgid != ownProcessGroup() {
+		return nil, nil
 	}
 	return &foregroundTerminal{fd: fd, pgid: pgid}, nil
 }

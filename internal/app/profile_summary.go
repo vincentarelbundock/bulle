@@ -256,11 +256,16 @@ type pathSummaryFormatter struct {
 	home         string
 	tmp          string
 	shortenStore bool
-	granted      map[string]int
+	granted      map[string][]int
 }
 
 func newPathSummaryFormatter(p policy.Policy) pathSummaryFormatter {
-	granted := map[string]int{}
+	// Each list a path appears in is recorded separately rather than unioned.
+	// A path granted both rw and rox is covered by neither of them: unioning
+	// them into rwx would make each list look subsumed by "the other", and the
+	// path would be dropped from both — printing "none" over a grant that is in
+	// fact read, write, and execute.
+	granted := map[string][]int{}
 	for _, group := range []struct {
 		rights int
 		paths  []string
@@ -268,8 +273,12 @@ func newPathSummaryFormatter(p policy.Policy) pathSummaryFormatter {
 		{summaryRO, p.ReadOnly}, {summaryROX, p.ReadOnlyExec}, {summaryRW, p.ReadWrite}, {summaryRWX, p.ReadWriteExec},
 	} {
 		for _, path := range group.paths {
-			if clean := cleanPath(path); clean != "" {
-				granted[clean] |= group.rights
+			clean := cleanPath(path)
+			if clean == "" {
+				continue
+			}
+			if !containsInt(granted[clean], group.rights) {
+				granted[clean] = append(granted[clean], group.rights)
 			}
 		}
 	}
@@ -313,13 +322,13 @@ func (f pathSummaryFormatter) dropSubsumed(values []string, rights int) []string
 			out = append(out, value)
 			continue
 		}
-		if held := f.granted[clean]; held&rights == rights && held != rights {
+		if coveredByStrongerGrant(f.granted[clean], rights) {
 			continue
 		}
 		subsumed := false
 		if info, err := os.Lstat(clean); err == nil && info.Mode()&os.ModeSymlink == 0 {
 			for dir := filepath.Dir(clean); ; dir = filepath.Dir(dir) {
-				if held, ok := f.granted[dir]; ok && held&rights == rights {
+				if coveredByGrant(f.granted[dir], rights) {
 					subsumed = true
 					break
 				}
@@ -333,6 +342,38 @@ func (f pathSummaryFormatter) dropSubsumed(values []string, rights int) []string
 		}
 	}
 	return out
+}
+
+// coveredByStrongerGrant reports whether one single other grant on the same
+// path permits everything this list does and more.
+func coveredByStrongerGrant(held []int, rights int) bool {
+	for _, r := range held {
+		if r != rights && r&rights == rights {
+			return true
+		}
+	}
+	return false
+}
+
+// coveredByGrant reports whether one single grant permits everything this list
+// does. Unlike coveredByStrongerGrant it accepts an equal grant, because the
+// path being tested is a descendant rather than the same path.
+func coveredByGrant(held []int, rights int) bool {
+	for _, r := range held {
+		if r&rights == rights {
+			return true
+		}
+	}
+	return false
+}
+
+func containsInt(values []int, want int) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 // collapseSymlinkAliases keeps one path per distinct filesystem object: a

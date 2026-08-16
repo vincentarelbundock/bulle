@@ -255,7 +255,13 @@ type seatbeltDenial struct {
 //
 //	2026-08-10 12:00:00.123456-0400  localhost kernel[0]: (Sandbox) Sandbox: cat(1234) deny(1) file-read-data /Users/v/.gitconfig
 //	2026-08-10 12:00:01.000000-0400  localhost kernel[0]: (Sandbox) Sandbox: curl(1235) deny(1) network-outbound *:443
-var seatbeltDenialPattern = regexp.MustCompile(`Sandbox: (\S+)\((\d+)\) deny\(\d+\) ([a-z][a-z0-9.*-]*)(?: (.+))?$`)
+//
+// The pattern is anchored at both ends and carries the syslog prefix: macOS
+// filenames may contain newlines, so an unanchored pattern would let a denied
+// path whose name embeds a second log line manufacture a denial — and a
+// fabricated denial becomes a suggested grant on a path nothing ever asked for.
+var seatbeltDenialPattern = regexp.MustCompile(
+	`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+[-+]\d{4} +\S+ kernel\[\d+\]: \(Sandbox\) Sandbox: (\S+)\((\d+)\) deny\(\d+\) ([a-z][a-z0-9.*-]*)(?: (.+))?$`)
 
 // parseSeatbeltDenials extracts sandbox violations from unified log lines.
 // Only file, exec, and network operations are kept: Seatbelt profiles deny

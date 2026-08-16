@@ -303,11 +303,11 @@ func TestDropSubsumedRemovesCoveredEntries(t *testing.T) {
 	if err := os.Symlink(child, link); err != nil {
 		t.Fatal(err)
 	}
-	f := pathSummaryFormatter{granted: map[string]int{
-		dir:         summaryRO,
-		child:       summaryRO,
-		link:        summaryRO,
-		"/dev/null": summaryRO | summaryRW,
+	f := pathSummaryFormatter{granted: map[string][]int{
+		dir:         {summaryRO},
+		child:       {summaryRO},
+		link:        {summaryRO},
+		"/dev/null": {summaryRO, summaryRW},
 	}}
 	got := f.dropSubsumed([]string{dir, child, link, "/dev/null"}, summaryRO)
 	// child is covered by its granted parent; link stays because a granted
@@ -332,5 +332,19 @@ func TestCollapseSymlinkAliasesKeepsFirstSpelling(t *testing.T) {
 	got, dropped := collapseSymlinkAliases([]string{real, alias, filepath.Join(dir, "other-missing")})
 	if dropped != 1 || strings.Join(got, ",") != real+","+filepath.Join(dir, "other-missing") {
 		t.Fatalf("collapseSymlinkAliases() = %v, dropped %d", got, dropped)
+	}
+}
+
+// A path granted rw by one entry and rox by another is covered by neither:
+// each list must still print it, or the summary reports "none" over a grant
+// that is in fact read, write, and execute.
+func TestDropSubsumedKeepsPathHeldByTwoIncomparableLists(t *testing.T) {
+	f := pathSummaryFormatter{granted: map[string][]int{
+		"/w": {summaryRW, summaryROX},
+	}}
+	for _, rights := range []int{summaryRW, summaryROX} {
+		if got := f.dropSubsumed([]string{"/w"}, rights); len(got) != 1 {
+			t.Fatalf("dropSubsumed(rights=%d) = %v, want the path kept", rights, got)
+		}
 	}
 }

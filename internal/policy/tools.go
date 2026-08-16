@@ -48,39 +48,30 @@ type toolResolver struct {
 	// what makes a Command Line Tools install (no enclosing .app) resolve to
 	// nothing rather than to /Library/Developer.
 	appBundleRoot bool
-	// denySystemRoots drops results that are whole system trees. An aspect
-	// reporting an installation prefix is narrow where a tool lives in its own
-	// directory (a Nix store path, a Homebrew Cellar entry) and far too broad
-	// where it is installed into /usr. Dropping rather than failing is
-	// deliberate: on a distribution install the prefix is both dangerous and
-	// unnecessary, because the binary and library directories are granted by
-	// other entries.
-	denySystemRoots bool
 }
 
 var toolResolvers = []toolResolver{
 	{
 		tool: "r", aspect: "home",
-		argv:        []string{"Rscript", "-e", `cat(R.home())`},
+		argv:        []string{"Rscript", "--no-init-file", "--no-site-file", "-e", `cat(R.home())`},
 		format:      formatSingle,
 		description: "R installation directory (R.home()), including etc/ and lib/",
 	},
 	{
 		tool: "r", aspect: "prefix",
-		argv:            []string{"Rscript", "-e", `cat(dirname(dirname(R.home())))`},
-		format:          formatSingle,
-		description:     "R installation prefix, for builds whose bin/ sits beside R_HOME",
-		denySystemRoots: true,
+		argv:        []string{"Rscript", "--no-init-file", "--no-site-file", "-e", `cat(dirname(dirname(R.home())))`},
+		format:      formatSingle,
+		description: "R installation prefix, for builds whose bin/ sits beside R_HOME",
 	},
 	{
 		tool: "r", aspect: "libs",
-		argv:        []string{"Rscript", "-e", `cat(.libPaths(), sep="\n")`},
+		argv:        []string{"Rscript", "--no-init-file", "--no-site-file", "-e", `cat(.libPaths(), sep="\n")`},
 		format:      formatLines,
 		description: "every directory on R's package search path (.libPaths())",
 	},
 	{
 		tool: "r", aspect: "libs-user",
-		argv:        []string{"Rscript", "-e", `cat(Sys.getenv("R_LIBS_USER"))`},
+		argv:        []string{"Rscript", "--no-init-file", "--no-site-file", "-e", `cat(Sys.getenv("R_LIBS_USER"))`},
 		format:      formatSingle,
 		description: "R's writable user library (R_LIBS_USER)",
 	},
@@ -255,6 +246,13 @@ func (r toolResolver) run(parentPATH string, parentEnv map[string]string) ([]str
 	defer cancel()
 	cmd := exec.CommandContext(ctx, binary, r.argv[1:]...)
 	cmd.Env = envSlice(parentEnv)
+	// Resolvers run before any sandbox exists, so whatever they read is read
+	// with the user's full authority. Several of them source files from the
+	// current directory — R evaluates ./.Rprofile, npm reads ./.npmrc, go reads
+	// ./go.env — and the current directory is normally the workspace, which is
+	// exactly the untrusted thing the sandbox is being built for. Run them from
+	// the filesystem root, which no unprivileged user can plant files in.
+	cmd.Dir = string(filepath.Separator)
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = nil
@@ -269,9 +267,11 @@ func (r toolResolver) run(parentPATH string, parentEnv map[string]string) ([]str
 	if r.appBundleRoot {
 		paths = keepAppBundleRoots(paths)
 	}
-	if r.denySystemRoots {
-		paths = dropSystemRoots(paths, parentEnv["HOME"])
-	}
+	// Every resolver's output is dropped through the same guard, not just the
+	// aspects that report an installation prefix: a tool reads its own
+	// configuration to answer, and that configuration is not always the user's
+	// (an .npmrc in the workspace decides what "npm config get cache" prints).
+	paths = dropSystemRoots(paths, parentEnv["HOME"])
 	return paths, nil
 }
 
@@ -303,6 +303,10 @@ func dropSystemRoots(paths []string, home string) []string {
 	out := make([]string, 0, len(paths))
 	for _, path := range paths {
 		if pkgRootDenylist[path] || (home != "" && sameExistingPath(path, home)) {
+			continue
+		}
+		// An ancestor of home is no narrower than home itself.
+		if home != "" && strings.HasPrefix(filepath.Clean(home), strings.TrimSuffix(path, "/")+"/") {
 			continue
 		}
 		out = append(out, path)

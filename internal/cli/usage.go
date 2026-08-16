@@ -37,7 +37,7 @@ Subcommands:
   bulle scratch list|diff|pull|wipe|shell      review kept scratches
   bulle show [policy|profiles|resolvers|config]
                                                inspect without running
-  bulle profiles install SOURCE                install profiles (file, dir, git, github:)
+  bulle profiles install [--force] SOURCE      install profiles (file, dir, git, github:)
   bulle completion bash|zsh|fish               shell completion
   bulle help [grants|env|limits|config]        the advanced material
 

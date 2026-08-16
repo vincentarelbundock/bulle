@@ -19,7 +19,7 @@ func runProfilesCommand(args []string, stdout, stderr io.Writer) int {
 		return exitcode.ConfigError
 	}
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: bulle profiles list | bulle profiles install SOURCE")
+		fmt.Fprintln(stderr, "usage: bulle profiles list | bulle profiles install [--force] SOURCE")
 		return exitcode.ConfigError
 	}
 	switch args[0] {
@@ -38,8 +38,18 @@ func runProfilesCommand(args []string, stdout, stderr io.Writer) int {
 		}
 		return exitcode.OK
 	case "install":
+		force := false
+		rest := make([]string, 0, len(args))
+		for _, arg := range args {
+			if arg == "--force" {
+				force = true
+				continue
+			}
+			rest = append(rest, arg)
+		}
+		args = rest
 		if len(args) != 2 {
-			fmt.Fprintln(stderr, "usage: bulle profiles install SOURCE")
+			fmt.Fprintln(stderr, "usage: bulle profiles install [--force] SOURCE")
 			return exitcode.ConfigError
 		}
 		root := configRoot
@@ -50,7 +60,7 @@ func runProfilesCommand(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stderr, "could not determine user config directory")
 			return exitcode.ConfigError
 		}
-		if err := installProfiles(args[1], root, stdout); err != nil {
+		if err := installProfiles(args[1], root, force, stdout); err != nil {
 			fmt.Fprintln(stderr, err)
 			return exitcode.ConfigError
 		}

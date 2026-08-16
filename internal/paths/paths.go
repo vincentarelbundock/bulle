@@ -158,9 +158,9 @@ func resolveEntry(path string, vars Vars, optional bool, create string, source S
 		return nil, "", err
 	}
 	if strings.Contains(expanded, "*") {
-		return resolveGlob(expanded, vars)
+		return resolveGlob(path, expanded, vars)
 	}
-	resolved, exists, err := resolve(expanded, vars)
+	resolved, exists, err := resolveExpanded(expanded, path, vars)
 	if err != nil {
 		return nil, "", err
 	}
@@ -170,7 +170,7 @@ func resolveEntry(path string, vars Vars, optional bool, create string, source S
 			if err != nil {
 				return nil, "", err
 			}
-			resolved, _, err = resolve(expanded, vars)
+			resolved, _, err = resolveExpanded(expanded, path, vars)
 			if err != nil {
 				return nil, "", err
 			}
@@ -184,7 +184,7 @@ func resolveEntry(path string, vars Vars, optional bool, create string, source S
 	return resolved, "granted", nil
 }
 
-func resolveGlob(pattern string, vars Vars) ([]string, string, error) {
+func resolveGlob(raw string, pattern string, vars Vars) ([]string, string, error) {
 	if strings.Contains(pattern, "**") {
 		return nil, "", fmt.Errorf("configured path %q uses **; only single * wildcards are supported", pattern)
 	}
@@ -198,7 +198,7 @@ func resolveGlob(pattern string, vars Vars) ([]string, string, error) {
 	sort.Strings(matches)
 	out := []string{}
 	for _, match := range matches {
-		resolved, exists, err := resolve(match, vars)
+		resolved, exists, err := resolveExpanded(match, raw, vars)
 		if err != nil {
 			return nil, "", err
 		}
@@ -251,6 +251,15 @@ func resolve(raw string, vars Vars) ([]string, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
+	return resolveExpanded(expanded, raw, vars)
+}
+
+// resolveExpanded resolves a path whose variables have already been
+// substituted. Expansion happens exactly once, in the caller: a variable's
+// value is untrusted data, and a second pass over it would reinterpret any
+// dollar sign it contains as a further variable reference — rewriting a value
+// that passed validation into one that never would have.
+func resolveExpanded(expanded string, raw string, vars Vars) ([]string, bool, error) {
 	if !filepath.IsAbs(expanded) {
 		abs, err := filepath.Abs(expanded)
 		if err != nil {
@@ -258,6 +267,14 @@ func resolve(raw string, vars Vars) ([]string, bool, error) {
 		}
 		expanded = abs
 	}
+	if err := refuseExpandedRoot(raw, expanded, vars); err != nil {
+		return nil, false, err
+	}
+	// A ".." component is collapsed lexically by Clean, but the kernel resolves
+	// a symlinked component first: "x/link/../b" cleans to "x/b" while the
+	// kernel reaches "<link target>/b". Remember it so only the path the kernel
+	// would reach is granted.
+	traversed := hasDotDotComponent(expanded)
 	alias := filepath.Clean(expanded)
 	if _, err := os.Stat(expanded); err != nil {
 		if os.IsNotExist(err) {
@@ -280,9 +297,44 @@ func resolve(raw string, vars Vars) ([]string, bool, error) {
 		if err := refuseSensitiveSymlinkTarget(alias, real, vars); err != nil {
 			return nil, false, err
 		}
+		if traversed {
+			return []string{real}, true, nil
+		}
 		return []string{alias, real}, true, nil
 	}
 	return []string{real}, true, nil
+}
+
+func hasDotDotComponent(path string) bool {
+	for _, part := range strings.Split(path, string(filepath.Separator)) {
+		if part == ".." {
+			return true
+		}
+	}
+	return false
+}
+
+// refuseExpandedRoot refuses a path that became the filesystem root or the home
+// directory only through variable expansion. An author who writes "/" or "~"
+// means it; an empty ${VAR:-} fallback, or an environment value that widens
+// where a grant points, does not. The workspace is exempt because running bulle
+// with the home directory as the workspace is a legitimate, deliberate choice.
+func refuseExpandedRoot(raw string, expanded string, vars Vars) error {
+	if raw == expanded {
+		return nil
+	}
+	clean := filepath.Clean(expanded)
+	if clean == string(filepath.Separator) {
+		return fmt.Errorf("configured path %q expands to the filesystem root; refusing to grant", raw)
+	}
+	home, ok := vars["HOME"]
+	if !ok || home == "" || clean != filepath.Clean(home) {
+		return nil
+	}
+	if workspace := vars["WORKSPACE"]; workspace != "" && filepath.Clean(workspace) == clean {
+		return nil
+	}
+	return fmt.Errorf("configured path %q expands to the home directory %q; refusing to grant", raw, clean)
 }
 
 func refuseSensitiveSymlinkTarget(alias, real string, vars Vars) error {
@@ -303,8 +355,21 @@ func refuseSensitiveSymlinkTarget(alias, real string, vars Vars) error {
 		if sameFile(real, homeReal) {
 			return fmt.Errorf("configured path %q resolves through a symlink to the home directory %q; refusing to grant", alias, homeReal)
 		}
+		// An ancestor of the home directory is no safer than the home directory
+		// itself: /home holds every other user's home, keys included.
+		if isProperAncestor(real, homeReal) {
+			return fmt.Errorf("configured path %q resolves through a symlink to %q, which contains the home directory %q; refusing to grant", alias, real, homeReal)
+		}
 	}
 	return nil
+}
+
+// isProperAncestor reports whether dir strictly contains path.
+func isProperAncestor(dir string, path string) bool {
+	if dir == path || dir == "" || path == "" {
+		return false
+	}
+	return strings.HasPrefix(path, strings.TrimSuffix(dir, string(filepath.Separator))+string(filepath.Separator))
 }
 
 func sameFile(a, b string) bool {
@@ -326,7 +391,26 @@ func ExpandValue(raw string, vars Vars) (string, error) {
 	return expand(raw, vars)
 }
 
+// maxFallbackDepth bounds the recursion through nested ${VAR:-${OTHER:-...}}
+// fallbacks. Two levels is all any profile uses; the bound exists so a
+// pathological entry cannot recurse without end.
+const maxFallbackDepth = 8
+
 func expand(raw string, vars Vars) (string, error) {
+	return expandDepth(raw, vars, 0)
+}
+
+// expandDepth substitutes path variables exactly once each. A variable's value
+// is never re-scanned for further references: values arrive from the parent
+// environment and from [vars], and a second pass would let a value containing a
+// dollar sign rewrite itself into a path that could never have been configured
+// directly. A fallback is different — it is profile text, not data — so it is
+// expanded in its own right, which is what makes "${CODEX_HOME:-$HOME/.codex}"
+// resolve.
+func expandDepth(raw string, vars Vars, depth int) (string, error) {
+	if depth > maxFallbackDepth {
+		return "", fmt.Errorf("configured path %q nests variable fallbacks too deeply", raw)
+	}
 	if strings.HasPrefix(raw, "~/") {
 		home, ok := vars["HOME"]
 		if !ok {
@@ -335,20 +419,25 @@ func expand(raw string, vars Vars) (string, error) {
 		raw = filepath.Join(home, strings.TrimPrefix(raw, "~/"))
 	}
 	unknown := map[string]bool{}
+	var fallbackErr error
 	expanded := os.Expand(raw, func(key string) string {
 		name, fallback, hasFallback := strings.Cut(key, ":-")
 		if value, ok := vars[name]; ok && value != "" {
 			return value
 		}
 		if hasFallback {
-			if home, ok := vars["HOME"]; ok && strings.HasPrefix(fallback, "~/") {
-				return filepath.Join(home, strings.TrimPrefix(fallback, "~/"))
+			resolved, err := expandDepth(fallback, vars, depth+1)
+			if err != nil && fallbackErr == nil {
+				fallbackErr = err
 			}
-			return fallback
+			return resolved
 		}
 		unknown[name] = true
 		return ""
 	})
+	if fallbackErr != nil {
+		return "", fallbackErr
+	}
 	if len(unknown) > 0 {
 		for key := range unknown {
 			return "", fmt.Errorf("unknown path variable: $%s", key)

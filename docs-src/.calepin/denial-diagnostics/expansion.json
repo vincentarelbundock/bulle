@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "fingerprint": 15115962389898865480,
-  "generation": "d1c6afb4b0162b48-1349cde127705c16",
+  "fingerprint": 13967562910691732767,
+  "generation": "c1d6c076c5b3ad1f-1349cde127705c16",
   "completed_store": {},
   "stabilized_chunks": [
     {
@@ -38,6 +38,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "ordinal": 0,
@@ -77,6 +79,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "ordinal": 1,
@@ -116,6 +120,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "ordinal": 2,
@@ -155,6 +161,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "ordinal": 3,
@@ -194,6 +202,8 @@
         "fig-subcaptions": null,
         "fig-layout-columns": null,
         "fig-layout-rows": null,
+        "tbl-caption": null,
+        "lst-caption": null,
         "kind": null
       },
       "ordinal": 4,

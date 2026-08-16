@@ -1,6 +1,7 @@
 package supervisor
 
 import (
+	"fmt"
 	"os/exec"
 	"syscall"
 
@@ -18,23 +19,28 @@ type runCgroup struct {
 // cgroup.procs after the fact removes the window in which the child could run
 // — or fork — before the limits applied.
 //
-// A failure to create the cgroup is not fatal: the caller has already reported
-// the affected limits as unenforced, so the run proceeds unconstrained rather
-// than failing on a machine that simply has no delegation.
-func prepareCgroup(cmd *exec.Cmd, l limits.Limits) *runCgroup {
+// A failure to create the cgroup is fatal when this machine was reported as
+// able to enforce the limits, and silent when it was not. The distinction is
+// the whole point: a run told the user "memory: 4G (cgroup v2)" and then
+// proceeding without a cap is a limit that exists only on screen, while a
+// machine with no delegation at all has already been warned about.
+func prepareCgroup(cmd *exec.Cmd, l limits.Limits, supported bool) (*runCgroup, error) {
 	if l.Memory == 0 && l.CPU == 0 && l.NProc == 0 {
-		return nil
+		return nil, nil
 	}
 	cgroup, err := limits.Create(l)
 	if err != nil {
-		return nil
+		if supported {
+			return nil, fmt.Errorf("the requested limits were reported as enforced, but the run's cgroup could not be created: %w", err)
+		}
+		return nil, nil
 	}
 	if cmd.SysProcAttr == nil {
 		cmd.SysProcAttr = &syscall.SysProcAttr{}
 	}
 	cmd.SysProcAttr.UseCgroupFD = true
 	cmd.SysProcAttr.CgroupFD = cgroup.FD()
-	return &runCgroup{cgroup: cgroup}
+	return &runCgroup{cgroup: cgroup}, nil
 }
 
 // kill terminates every process in the cgroup at once. It reports whether the

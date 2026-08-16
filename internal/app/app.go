@@ -17,6 +17,7 @@ import (
 	"github.com/vincentarelbundock/bulle/internal/didyoumean"
 	benv "github.com/vincentarelbundock/bulle/internal/env"
 	"github.com/vincentarelbundock/bulle/internal/exitcode"
+	"github.com/vincentarelbundock/bulle/internal/limits"
 	bpaths "github.com/vincentarelbundock/bulle/internal/paths"
 	"github.com/vincentarelbundock/bulle/internal/policy"
 	"github.com/vincentarelbundock/bulle/internal/record"
@@ -62,11 +63,19 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 }
 
 // extractPolicyFormat pulls --json out of `bulle policy` arguments; the rest
-// are ordinary run arguments.
+// are ordinary run arguments. Everything from the first -- onwards belongs to
+// the command being described and is passed through untouched: `curl --json`
+// and `gh --json` are real invocations, and stealing that flag would both flip
+// bulle's output format and report a command line other than the one that
+// would run.
 func extractPolicyFormat(args []string) ([]string, string, error) {
 	format := "summary"
 	out := make([]string, 0, len(args))
-	for _, arg := range args {
+	for i, arg := range args {
+		if arg == "--" {
+			out = append(out, args[i:]...)
+			break
+		}
 		switch arg {
 		case "--json":
 			format = "json"
@@ -272,11 +281,12 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 	code := exitcode.OK
 	failed := false
 	if err := supervisor.Run(p, supervisor.Options{
-		Timeout: p.Timeout,
-		Limits:  p.Limits,
-		Stdin:   os.Stdin,
-		Stdout:  os.Stdout,
-		Stderr:  os.Stderr,
+		Timeout:         p.Timeout,
+		Limits:          p.Limits,
+		CgroupSupported: limits.Current().Cgroup,
+		Stdin:           os.Stdin,
+		Stdout:          os.Stdout,
+		Stderr:          os.Stderr,
 	}); err != nil {
 		code = exitCodeForSupervisorError(err, stderr)
 		failed = true
@@ -290,7 +300,7 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 		rec.BeginRound()
 		rec.Observe(p, probe)
 		if rec.LastAdded > 0 && stdinIsTerminal() {
-			learnAgain = record.PromptLearnedGrants(opts, global, rec, scratch != nil, stdout, stderr)
+			learnAgain = record.PromptLearnedGrants(opts, global, rec, scratchRewrite(scratch), stdout, stderr)
 		} else if failed {
 			printDenialHints(probe, scratch, home, stderr)
 		}

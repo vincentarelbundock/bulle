@@ -209,3 +209,80 @@ func TestResolverNamespaceRecognizesResolverEntries(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveRejectsSymlinkToAncestorOfHomeDirectory(t *testing.T) {
+	tmp := t.TempDir()
+	homes := filepath.Join(tmp, "homes")
+	home := filepath.Join(homes, "user")
+	if err := os.MkdirAll(home, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(tmp, "escape")
+	if err := os.Symlink(homes, alias); err != nil {
+		t.Fatal(err)
+	}
+	_, err := ResolveList([]Input{{Path: alias, Source: SourceUser}}, Vars{"HOME": home})
+	if err == nil {
+		t.Fatalf("ResolveList succeeded, want refusal for a symlink to the directory holding every home")
+	}
+}
+
+// A variable's value is data, not configuration: a dollar sign inside it must
+// stay a dollar sign rather than being reinterpreted on a second pass.
+func TestResolveExpandsVariableValuesOnlyOnce(t *testing.T) {
+	tmp := t.TempDir()
+	home := filepath.Join(tmp, "home")
+	if err := os.MkdirAll(home, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, hostile := range []string{"/${NOPE:-}", "/$HOME"} {
+		vars := Vars{"HOME": home, "RUSTUP_HOME": hostile}
+		got, err := ResolveList([]Input{{Path: "?$RUSTUP_HOME", Source: SourceUser, Optional: true}}, vars)
+		if err != nil {
+			continue // refused outright is also fine
+		}
+		for _, path := range got {
+			if path == "/" || path == filepath.Clean(home) {
+				t.Fatalf("RUSTUP_HOME=%q granted %q", hostile, path)
+			}
+		}
+	}
+}
+
+func TestResolveRefusesEntryThatExpandsToTheFilesystemRoot(t *testing.T) {
+	_, err := ResolveList([]Input{{Path: "${FOO:-}/", Source: SourceUser}}, Vars{"HOME": "/home/u"})
+	if err == nil {
+		t.Fatalf("ResolveList succeeded, want refusal for an entry expanding to /")
+	}
+}
+
+// A ".." component is collapsed lexically, but the kernel resolves a symlinked
+// component first, so only the path the kernel reaches may be granted.
+func TestResolveDoesNotGrantTheLexicalParentAcrossASymlink(t *testing.T) {
+	tmp := t.TempDir()
+	real := filepath.Join(tmp, "other", "real")
+	secret := filepath.Join(tmp, "b")
+	if err := os.MkdirAll(filepath.Join(tmp, "other", "b"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(real, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(secret, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(real, filepath.Join(tmp, "link")); err != nil {
+		t.Fatal(err)
+	}
+	// Not filepath.Join: it would clean the ".." away before resolution ever saw it.
+	entry := tmp + "/link/../b"
+	got, err := ResolveList([]Input{{Path: entry, Source: SourceUser}}, Vars{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range got {
+		if path == secret {
+			t.Fatalf("granted the lexically-cleaned %q, which the entry never traverses: %v", secret, got)
+		}
+	}
+}

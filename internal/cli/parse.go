@@ -183,13 +183,21 @@ func decorateParseError(err error) error {
 		}
 		return fmt.Errorf("%s (run 'bulle --help' for the flag list)", msg)
 	}
-	// Attribute the error to the longest flag name the message mentions, so
-	// "--rox" is not mistaken for "--ro".
+	// Attribute the error to the first flag the message mentions, which is the
+	// one kong is complaining about — a later mention is usually the rejected
+	// value ("--nofile: expected a value, got --memory"), and pointing the user
+	// at that one sends them to the wrong flag's usage. Ties at the same
+	// position go to the longest name, so "--rox" is not mistaken for "--ro".
 	var match *FlagSpec
+	matchAt := -1
 	for i := range flags {
 		f := &flags[i]
-		if strings.Contains(msg, "--"+f.Name) && (match == nil || len(f.Name) > len(match.Name)) {
-			match = f
+		at := strings.Index(msg, "--"+f.Name)
+		if at < 0 {
+			continue
+		}
+		if match == nil || at < matchAt || (at == matchAt && len(f.Name) > len(match.Name)) {
+			match, matchAt = f, at
 		}
 	}
 	if match != nil {

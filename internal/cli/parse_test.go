@@ -179,7 +179,7 @@ func TestUsageShowsTheGrammarAndPointers(t *testing.T) {
 		"--env NAME[=VALUE]",
 		"bulle scratch",
 		"bulle show",
-		"bulle profiles install SOURCE",
+		"bulle profiles install [--force] SOURCE",
 		"bulle completion bash|zsh|fish",
 		"bulle help [grants|env|limits|config]",
 	} {

@@ -3,8 +3,11 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Profiles</title>
     
     
-    <meta name="description" content="bulle runs local commands in a sandbox, exposing only the essential parts of your machine.">
-    <meta property="og:description" content="bulle runs local commands in a sandbox, exposing only the essential parts of your machine.">
+    
+    <meta name="description" content="Named bundles of permissions: selection and inference, the TOML format, portable path entries, and how to write your own.">
+    <meta property="og:description" content="Named bundles of permissions: selection and inference, the TOML format, portable path entries, and how to write your own.">
+    <meta name="twitter:description" content="Named bundles of permissions: selection and inference, the TOML format, portable path entries, and how to write your own.">
+    
     
     
     <meta property="og:site_name" content="bulle">
@@ -15,7 +18,12 @@
     
     
     <meta property="og:title" content="Profiles | bulle">
+    <meta name="twitter:title" content="Profiles | bulle">
     
+    
+    <meta property="og:type" content="article">
+    
+    <meta name="twitter:card" content="summary">
     
     
     <link rel="canonical" href="https://vincentarelbundock.github.io/bulle/profiles.html">
@@ -2810,7 +2818,7 @@ ping: cannot resolve google.com: Unknown host
 </code></pre></div><p>They can also be combined on the command line: <code>bulle --profile tool,git,rust -- cargo build</code>.</p><h3 id="installing-profiles">Installing profiles</h3><p>Install or override profiles with <code>bulle profiles install SOURCE</code>. The source can be one <code>.toml</code> file, a directory containing <code>.toml</code> files, a local git repository, or a GitHub source such as <code>github:vincentarelbundock/bulle/custom_profiles</code>.</p><div class="sourceCode" data-lang="bash"><pre><code data-lang="bash"><span class="calepin-syntax-scope-8">bulle</span> profiles install agent.toml
 <span class="calepin-syntax-scope-8">bulle</span> profiles install ./profiles
 <span class="calepin-syntax-scope-8">bulle</span> profiles install github:vincentarelbundock/bulle/custom_profiles
-</code></pre></div><p>By default, profiles are installed under the operating system user config directory: usually <code>$XDG_CONFIG_HOME/bulle/profiles/</code> or <code>~/.config/bulle/profiles/</code> on Linux, and <code>~/Library/Application Support/bulle/profiles/</code> on macOS. Use <code>--config PATH</code> to install into a different config directory; <code>bulle</code> creates its <code>profiles/</code> subdirectory if needed. The filename becomes the profile name, so <code>profiles/agent.toml</code> is selected with <code>--profile agent</code>.</p><p>When installing from a local git repository root or <code>github:owner/repo</code>, <code>bulle</code> uses <code>profiles/*.toml</code> if that directory exists. When a GitHub source includes a subdirectory, such as <code>github:owner/repo/custom_profiles</code>, that subdirectory is used as the profile source.</p><h2 id="toml">The TOML format</h2><p>Built-in and user profiles use the same one-profile TOML format. The filename is the profile name, and profile fields live at the top level of that file. This example shows all profile option groups:</p><div class="sourceCode" data-lang="toml"><pre><code data-lang="toml"><span class="calepin-syntax-scope-7">title</span> <span class="calepin-syntax-scope-10">=</span> <span class="calepin-syntax-scope-2">"</span><span class="calepin-syntax-scope-2">Agent</span><span class="calepin-syntax-scope-2">"</span>
+</code></pre></div><p>By default, profiles are installed under the operating system user config directory: usually <code>$XDG_CONFIG_HOME/bulle/profiles/</code> or <code>~/.config/bulle/profiles/</code> on Linux, and <code>~/Library/Application Support/bulle/profiles/</code> on macOS. Use <code>--config PATH</code> to install into a different config directory; <code>bulle</code> creates its <code>profiles/</code> subdirectory if needed. The filename becomes the profile name, so <code>profiles/agent.toml</code> is selected with <code>--profile agent</code>.</p><p>Installing prints the grants each file declares, because an installed profile decides what a sandbox permits. A file named after a profile you already have is not replaced unless you pass <code>--force</code>: the merge also reaches every profile that inherits from that name, so an innocuous-looking <code>node.toml</code> can widen runs that never mention <code>node</code>.</p><p>When installing from a local git repository root or <code>github:owner/repo</code>, <code>bulle</code> uses <code>profiles/*.toml</code> if that directory exists. When a GitHub source includes a subdirectory, such as <code>github:owner/repo/custom_profiles</code>, that subdirectory is used as the profile source.</p><h2 id="toml">The TOML format</h2><p>Built-in and user profiles use the same one-profile TOML format. The filename is the profile name, and profile fields live at the top level of that file. This example shows all profile option groups:</p><div class="sourceCode" data-lang="toml"><pre><code data-lang="toml"><span class="calepin-syntax-scope-7">title</span> <span class="calepin-syntax-scope-10">=</span> <span class="calepin-syntax-scope-2">"</span><span class="calepin-syntax-scope-2">Agent</span><span class="calepin-syntax-scope-2">"</span>
 <span class="calepin-syntax-scope-7">description</span> <span class="calepin-syntax-scope-10">=</span> <span class="calepin-syntax-scope-2">"</span><span class="calepin-syntax-scope-2">custom Codex profile</span><span class="calepin-syntax-scope-2">"</span>
 <span class="calepin-syntax-scope-7">inherits</span> <span class="calepin-syntax-scope-10">=</span> <span class="calepin-syntax-scope-10">[</span><span class="calepin-syntax-scope-2">"</span><span class="calepin-syntax-scope-2">tool</span><span class="calepin-syntax-scope-2">"</span><span class="calepin-syntax-scope-10">,</span> <span class="calepin-syntax-scope-2">"</span><span class="calepin-syntax-scope-2">keychain</span><span class="calepin-syntax-scope-2">"</span><span class="calepin-syntax-scope-10">]</span>
 <span class="calepin-syntax-scope-7">default_app</span> <span class="calepin-syntax-scope-10">=</span> <span class="calepin-syntax-scope-2">"</span><span class="calepin-syntax-scope-2">codex</span><span class="calepin-syntax-scope-2">"</span>
