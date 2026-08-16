@@ -10,11 +10,16 @@ import (
 )
 
 func TestSeatbeltProfileMapsReadWriteAndExec(t *testing.T) {
+	// Real directories rather than system paths: the profile builder asks the
+	// filesystem whether an entry is a directory, so hardcoding /usr/share
+	// tests the machine (it does not exist on NixOS) instead of the mapping.
 	project := t.TempDir()
+	shared := t.TempDir()
+	execDir := t.TempDir()
 	p := policy.Policy{
 		ReadWrite:    []string{project},
-		ReadOnly:     []string{"/usr/share"},
-		ReadOnlyExec: []string{"/usr/bin"},
+		ReadOnly:     []string{shared},
+		ReadOnlyExec: []string{execDir},
 		MachLookup: []string{
 			"com.apple.SystemConfiguration.DNSConfiguration",
 			"com.apple.SystemConfiguration.configd",
@@ -26,7 +31,7 @@ func TestSeatbeltProfileMapsReadWriteAndExec(t *testing.T) {
 	for _, want := range []string{
 		"(deny default)",
 		`(subpath "` + project + `")`,
-		`(subpath "/usr/share")`,
+		`(subpath "` + shared + `")`,
 		"file-map-executable",
 		`(global-name "com.apple.SystemConfiguration.DNSConfiguration")`,
 		`(global-name "com.apple.SystemConfiguration.configd")`,

@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -189,10 +190,12 @@ func TestShowResolversLists(t *testing.T) {
 	}
 }
 
+// The configuration root is named explicitly rather than through
+// XDG_CONFIG_HOME: only Linux derives the root from XDG, so setting that
+// variable tests the platform rather than the reporting.
 func TestShowConfigReportsStatus(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
-	stdout, _, code := runForTest(t, "show", "config")
+	stdout, _, code := runForTest(t, "show", "config", "--config", dir)
 	if code != exitcode.OK {
 		t.Fatalf("exit %d, stdout %q", code, stdout)
 	}
@@ -202,14 +205,10 @@ func TestShowConfigReportsStatus(t *testing.T) {
 		}
 	}
 	// A broken config.toml becomes visible here, unlike during runs.
-	root := dir + "/bulle"
-	if err := os.MkdirAll(root, 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte("not toml ["), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(root+"/config.toml", []byte("not toml ["), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	stdout, _, code = runForTest(t, "show", "config")
+	stdout, _, code = runForTest(t, "show", "config", "--config", dir)
 	if code != exitcode.ConfigError || !strings.Contains(stdout, "config.toml: ERROR") {
 		t.Errorf("broken config: exit %d, stdout %q", code, stdout)
 	}

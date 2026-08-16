@@ -65,7 +65,7 @@ func TestMacOSSeatbeltAllowsInheritedTerminalIoctl(t *testing.T) {
 
 	// stty -g reads termios via ioctl(TIOCGETA) on stdin; it succeeds only when
 	// the sandbox grants file-ioctl on the inherited terminal device.
-	cmd := exec.Command(bin, project, "--rox", "/bin", "--",
+	cmd := exec.Command(bin, "default", project, "--rox", "/bin", "--",
 		"/bin/sh", "-c", "/bin/stty -g >/dev/null 2>&1 && printf RAWOK || printf RAWFAIL")
 	cmd.Stdin = slave
 	cmd.Stdout = slave

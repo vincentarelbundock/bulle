@@ -472,6 +472,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Markers survive resolver expansion.** `?` and `+` on a resolver entry
   were dropped when it expanded, so an optional resolver whose directory did
   not yet exist became a hard failure in a `rw` list.
+- **An optional `pkg:` entry degrades instead of failing the run.** A `?pkg:`
+  entry whose package root is a system directory — a distribution's
+  `/usr/bin/git`, whose root would be `/usr` — aborted the whole run, though
+  the `?` marker exists to say "grant this where it makes sense". It now grants
+  the binary and its symlink chain and drops the root, which is what git.toml's
+  own comment already claimed happened. Without the marker the refusal stands,
+  since the author asked for the package tree.
+- **Grant coverage compares resolved paths on both sides.** A path was
+  resolved through symlinks and then tested against roots that were not, so a
+  directory reached through a symlink covered nothing under it: on macOS, where
+  every temporary directory is `/var/…` resolving to `/private/var/…`, the
+  shim directory was silently dropped from `PATH`. A path whose resolved form
+  escapes every root is still refused.
 - **`--json` after `--` belongs to the command.** `bulle show policy … -- curl
   --json …` no longer has that flag stolen from the command line it reports.
 - **Parse errors name the flag that failed**, not the longest flag name

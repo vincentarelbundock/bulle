@@ -158,7 +158,7 @@ func TestProfileSmoke(t *testing.T) {
 			if tc.setup != nil {
 				tc.setup(t, workspace)
 			}
-			args := append([]string{workspace, "--profile", tc.profile, "--rw", workspace, "--"}, tc.args...)
+			args := append([]string{tc.profile, workspace, "--rw", workspace, "--"}, tc.args...)
 			cmd := exec.Command(bin, args...)
 			cmd.Dir = workspace
 			cmd.Env = os.Environ()

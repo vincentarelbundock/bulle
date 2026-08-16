@@ -9,6 +9,7 @@ import (
 
 	"github.com/vincentarelbundock/bulle/internal/cli"
 	"github.com/vincentarelbundock/bulle/internal/config"
+	bpaths "github.com/vincentarelbundock/bulle/internal/paths"
 )
 
 func TestBuildVarsPlatformDirs(t *testing.T) {
@@ -160,14 +161,20 @@ func TestResolveTraceRecordsOutcomes(t *testing.T) {
 	}
 }
 
+// The runtime directory is an XDG concept, so it is exposed on Linux and
+// nowhere else; addPlatformDirVars is called with the platform explicitly so
+// the test describes that rule rather than the machine it runs on.
 func TestBuildVarsExposesRuntimeDirWhenTheSessionHasOne(t *testing.T) {
 	home := t.TempDir()
-	vars, err := buildVars("/work", home, "/tmpdir", map[string]string{"XDG_RUNTIME_DIR": "/run/user/1000"}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	vars := bpaths.Vars{}
+	addPlatformDirVars(vars, home, map[string]string{"XDG_RUNTIME_DIR": "/run/user/1000"}, "linux")
 	if vars["XDG_RUNTIME_DIR"] != "/run/user/1000" {
 		t.Errorf("XDG_RUNTIME_DIR = %q, want /run/user/1000", vars["XDG_RUNTIME_DIR"])
+	}
+	vars = bpaths.Vars{}
+	addPlatformDirVars(vars, home, map[string]string{"XDG_RUNTIME_DIR": "/run/user/1000"}, "darwin")
+	if _, ok := vars["XDG_RUNTIME_DIR"]; ok {
+		t.Errorf("XDG_RUNTIME_DIR was exposed on darwin: %q", vars["XDG_RUNTIME_DIR"])
 	}
 }
 

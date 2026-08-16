@@ -68,16 +68,32 @@ func expandExecResolvers(entries []string, list string, parentPATH string, home 
 			return nil, nil, nil, fmt.Errorf("%s: entry %q: %q not found on parent PATH (mark it optional with a ? prefix)", kind, entry, name)
 		}
 		granted := bpaths.SymlinkPathVariants(binary)
+		note := ""
 		if kind == "pkg" {
 			root, err := packageRootFor(binary, home)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("pkg: entry %q: %w", entry, err)
+			switch {
+			case err == nil:
+				granted = append(granted, root)
+			case optional:
+				// The tool is installed, just not in a directory of its own —
+				// a distribution's /usr/bin/git rather than a version manager's
+				// tree. An optional entry says "grant this if it makes sense
+				// here"; failing the whole run because one machine packages the
+				// tool differently is what the ? marker exists to prevent. The
+				// binary and its symlink chain are still granted, and on such an
+				// install the libraries come from the system trees the profile
+				// already names.
+				note = "partially granted (package root dropped: " + err.Error() + ")"
+			default:
+				return nil, nil, nil, fmt.Errorf("pkg: entry %q: %w (mark it optional with a ? prefix to grant just the binary)", entry, err)
 			}
-			granted = append(granted, root)
 		}
 		out = append(out, granted...)
 		shims = append(shims, shimEntry{name: name, alias: binary})
 		trace.Outcome = "granted"
+		if note != "" {
+			trace.Outcome = note
+		}
 		trace.Paths = granted
 		traces = append(traces, trace)
 	}

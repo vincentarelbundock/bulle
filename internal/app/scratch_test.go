@@ -27,6 +27,12 @@ func makeOrigin(t *testing.T) string {
 	t.Helper()
 	origin := t.TempDir()
 	gitT(t, origin, "init", "-q")
+	// A repository-local identity, because bulle's own git calls run with the
+	// inherited environment: git refuses to start a merge it could not commit,
+	// and a machine with no global user.email (a CI runner) would otherwise
+	// never reach the conflict the review gate is meant to hand off.
+	gitT(t, origin, "config", "user.name", "t")
+	gitT(t, origin, "config", "user.email", "t@t")
 	if err := os.WriteFile(filepath.Join(origin, "tracked.txt"), []byte("v1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -31,7 +31,7 @@ func TestMacOSSeatbeltDeniesOutsideRead(t *testing.T) {
 	if err := os.WriteFile(outside, []byte("secret"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(bin, project, "--rw", project, "--env", "PATH", "--", "cat", outside)
+	cmd := exec.Command(bin, "default", project, "--rw", project, "--env", "PATH", "--", "cat", outside)
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("cat outside succeeded, output: %s", string(out))
@@ -47,7 +47,7 @@ func TestMacOSSeatbeltRunsScriptWithAddExecShebangInterpreter(t *testing.T) {
 	if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf shebang-ok\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(bin, project, "--add-exec", "--add-libs", "--rox", "/bin", "--", "./hello")
+	cmd := exec.Command(bin, "default", project, "--rox", "/bin", "--", "./hello")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("script failed: %v, output: %s", err, string(out))
@@ -72,7 +72,7 @@ func TestMacOSSeatbeltClosesInheritedFileDescriptors(t *testing.T) {
 	}
 	defer secret.Close()
 
-	cmd := exec.Command(bin, project, "--rox", "/bin", "--", "/bin/sh", "-c", "cat <&3")
+	cmd := exec.Command(bin, "default", project, "--rox", "/bin", "--", "/bin/sh", "-c", "cat <&3")
 	cmd.ExtraFiles = []*os.File{secret}
 	out, err := cmd.CombinedOutput()
 	if err == nil {
@@ -95,7 +95,7 @@ func TestMacOSSeatbeltRunsFromProjectPath(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	cmd := exec.Command(bin, project, "--rw", project, "--rox", "/bin", "--", "/bin/pwd")
+	cmd := exec.Command(bin, "default", project, "--rw", project, "--rox", "/bin", "--", "/bin/pwd")
 	cmd.Dir = other
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -116,7 +116,7 @@ func TestMacOSSeatbeltTimeoutExits124(t *testing.T) {
 	buildBulleForIntegration(t, bin)
 	project := t.TempDir()
 
-	cmd := exec.Command(bin, "--timeout", "100ms", project, "--rox", "/bin", "--", "/bin/sleep", "5")
+	cmd := exec.Command(bin, "--timeout", "100ms", "default", project, "--rox", "/bin", "--", "/bin/sleep", "5")
 	start := time.Now()
 	out, err := cmd.CombinedOutput()
 	elapsed := time.Since(start)
@@ -150,7 +150,7 @@ func TestMacOSSeatbeltTimeoutKillsBackgroundChild(t *testing.T) {
 	childDelay := 4 * time.Second
 	script := "(printf armed > " + shellQuote(armed) + "; sleep " + childDelaySeconds + "; printf survived > " + shellQuote(survived) + ") & wait"
 
-	cmd := exec.Command(bin, "--timeout", timeoutDuration, project, "--rw", project, "--rox", "/bin", "--", "/bin/sh", "-c", script)
+	cmd := exec.Command(bin, "--timeout", timeoutDuration, "default", project, "--rw", project, "--rox", "/bin", "--", "/bin/sh", "-c", script)
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("background child script succeeded, output: %s", string(out))
@@ -183,7 +183,7 @@ func TestMacOSSeatbeltTimeoutZeroBehavesLikeNoTimeout(t *testing.T) {
 		truePath = "/usr/bin/true"
 	}
 
-	cmd := exec.Command(bin, "--timeout", "0", project, "--rox", filepath.Dir(truePath), "--", truePath)
+	cmd := exec.Command(bin, "--timeout", "0", "default", project, "--rox", filepath.Dir(truePath), "--", truePath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("true failed: %v, output: %s", err, string(out))

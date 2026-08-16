@@ -346,11 +346,15 @@ func TestRunReturnsActualSignalWhenForwardedSignalDiffers(t *testing.T) {
 
 	dir := t.TempDir()
 	ready := filepath.Join(dir, "ready")
+	// The child dies from a signal other than the one that was forwarded.
+	// SIGUSR1 rather than SIGQUIT: a non-interactive bash ignores SIGQUIT, so a
+	// machine whose /bin/sh is bash (NixOS, macOS) would see the shell survive
+	// and the test measure the shell instead of the supervisor.
 	script := helperScript(t,
 		"trap '' TERM\n"+
 			"printf ready > "+shellQuote(ready)+"\n"+
 			"sleep 0.2\n"+
-			"kill -QUIT $$\n"+
+			"kill -USR1 $$\n"+
 			"sleep 5\n",
 	)
 	errc := make(chan error, 1)
@@ -366,13 +370,13 @@ func TestRunReturnsActualSignalWhenForwardedSignalDiffers(t *testing.T) {
 	select {
 	case err = <-errc:
 	case <-time.After(time.Second):
-		t.Fatal("Run did not return after child SIGQUIT")
+		t.Fatal("Run did not return after the child died from SIGUSR1")
 	}
 	var exitErr *ExitError
 	if !errors.As(err, &exitErr) {
 		t.Fatalf("Run error = %T %[1]v, want ExitError", err)
 	}
-	want := 128 + int(syscall.SIGQUIT)
+	want := 128 + int(syscall.SIGUSR1)
 	if exitErr.Code != want {
 		t.Fatalf("ExitError.Code = %d, want %d", exitErr.Code, want)
 	}

@@ -19,7 +19,7 @@ func TestLinuxLandlockDeniesOutsideRead(t *testing.T) {
 	if err := os.WriteFile(outside, []byte("secret"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	args := append([]string{project, "--rw", project}, linuxRuntimePathArgs()...)
+	args := append([]string{"default", project, "--rw", project}, linuxRuntimePathArgs()...)
 	args = append(args, "--env", "PATH", "--", "cat", outside)
 	cmd := exec.Command(bin, args...)
 	out, err := cmd.CombinedOutput()
@@ -36,9 +36,14 @@ func TestLinuxLandlockRunsScriptWithAddExecShebangInterpreter(t *testing.T) {
 	if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf shebang-ok\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	args := append([]string{project, "--add-exec"}, linuxRuntimePathArgs()...)
+	// No profile is named, so the workspace comes from the working directory
+	// and library discovery is on: the interpreter's own libraries live in the
+	// granted system directories on a distribution and in the package store on
+	// NixOS, and only discovery covers both.
+	args := append([]string{}, linuxRuntimePathArgs()...)
 	args = append(args, "--", "./hello")
 	cmd := exec.Command(bin, args...)
+	cmd.Dir = project
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("script failed: %v, output: %s", err, string(out))
@@ -62,7 +67,7 @@ func TestLinuxLandlockClosesInheritedFileDescriptors(t *testing.T) {
 	}
 	defer secret.Close()
 
-	args := append([]string{project}, linuxRuntimePathArgs()...)
+	args := append([]string{"default", project}, linuxRuntimePathArgs()...)
 	args = append(args, "--", "/bin/sh", "-c", "cat <&3")
 	cmd := exec.Command(bin, args...)
 	cmd.ExtraFiles = []*os.File{secret}
@@ -82,7 +87,7 @@ func TestLinuxOfflineProfileDeniesSocketCreation(t *testing.T) {
 	buildLinuxNetworkProbe(t, probe)
 	project := t.TempDir()
 
-	cmd := exec.Command(bin, project, "--profile", "offline", "--add-exec", "--", probe)
+	cmd := exec.Command(bin, "offline", project, "--", probe)
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("network probe succeeded with offline profile, output: %s", string(out))
@@ -121,12 +126,17 @@ func main() {
 }
 
 func TestLinuxLandlockRunsDynamicBinaryWithAddLibs(t *testing.T) {
+	requireExecutables(t, "/usr/bin/true")
 	bin := filepath.Join(t.TempDir(), "bulle")
 	buildBulleForIntegration(t, bin)
 	project := t.TempDir()
-	args := append([]string{project, "--add-libs"}, linuxROXPathArgs("/bin", "/usr/bin")...)
+	// No profile is named: that is what turns library discovery on, and it is
+	// also why the workspace comes from the working directory rather than a
+	// positional — naming one would mean naming a profile first.
+	args := append([]string{}, linuxROXPathArgs("/bin", "/usr/bin")...)
 	args = append(args, "--", "/usr/bin/true")
 	cmd := exec.Command(bin, args...)
+	cmd.Dir = project
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("true with add-libs failed: %v, output: %s", err, string(out))
@@ -134,6 +144,7 @@ func TestLinuxLandlockRunsDynamicBinaryWithAddLibs(t *testing.T) {
 }
 
 func TestLinuxLandlockRunsFromProjectPath(t *testing.T) {
+	requireExecutables(t, "/bin/pwd")
 	bin := filepath.Join(t.TempDir(), "bulle")
 	buildBulleForIntegration(t, bin)
 	root := t.TempDir()
@@ -144,7 +155,7 @@ func TestLinuxLandlockRunsFromProjectPath(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	args := append([]string{project, "--rw", project}, linuxRuntimePathArgs()...)
+	args := append([]string{"default", project, "--rw", project}, linuxRuntimePathArgs()...)
 	args = append(args, "--", "/bin/pwd")
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = other
@@ -162,10 +173,11 @@ func TestLinuxLandlockRunsFromProjectPath(t *testing.T) {
 }
 
 func TestLinuxLandlockTimeoutExits124(t *testing.T) {
+	requireExecutables(t, "/bin/sleep")
 	bin := filepath.Join(t.TempDir(), "bulle")
 	buildBulleForIntegration(t, bin)
 	project := t.TempDir()
-	args := append([]string{"--timeout", "100ms", project}, linuxRuntimePathArgs()...)
+	args := append([]string{"--timeout", "100ms", "default", project}, linuxRuntimePathArgs()...)
 	args = append(args, "--", "/bin/sleep", "5")
 
 	start := time.Now()
@@ -192,13 +204,14 @@ func TestLinuxLandlockTimeoutKillsBackgroundChild(t *testing.T) {
 		childDelay        = 4 * time.Second
 	)
 
+	requireExecutables(t, "/bin/sh", "/bin/sleep")
 	bin := filepath.Join(t.TempDir(), "bulle")
 	buildBulleForIntegration(t, bin)
 	project := t.TempDir()
 	armed := filepath.Join(project, "armed")
 	survived := filepath.Join(project, "survived")
 	script := "(printf armed > " + shellQuote(armed) + "; sleep " + childDelaySeconds + "; printf survived > " + shellQuote(survived) + ") & wait"
-	args := append([]string{"--timeout", timeoutDuration, project, "--rw", project}, linuxRuntimePathArgs()...)
+	args := append([]string{"--timeout", timeoutDuration, "default", project, "--rw", project}, linuxRuntimePathArgs()...)
 	args = append(args, "--", "/bin/sh", "-c", script)
 
 	cmd := exec.Command(bin, args...)
@@ -219,10 +232,11 @@ func TestLinuxLandlockTimeoutKillsBackgroundChild(t *testing.T) {
 }
 
 func TestLinuxLandlockTimeoutZeroBehavesLikeNoTimeout(t *testing.T) {
+	requireExecutables(t, "/usr/bin/true")
 	bin := filepath.Join(t.TempDir(), "bulle")
 	buildBulleForIntegration(t, bin)
 	project := t.TempDir()
-	args := append([]string{"--timeout", "0", project}, linuxRuntimePathArgs()...)
+	args := append([]string{"--timeout", "0", "default", project}, linuxRuntimePathArgs()...)
 	args = append(args, "--", "/usr/bin/true")
 
 	cmd := exec.Command(bin, args...)

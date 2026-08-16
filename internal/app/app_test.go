@@ -72,6 +72,7 @@ func TestRunDoesNotTreatIncompletePreparedPolicyInvocationAsRunner(t *testing.T)
 }
 
 func TestRunPreparedPolicyDoesNotShadowWorkspacePath(t *testing.T) {
+	requireAnyExecutable(t, "/bin/true", "/usr/bin/true")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	root := t.TempDir()
@@ -100,7 +101,9 @@ func TestRunPreparedPolicyDoesNotShadowWorkspacePath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	code := Run([]string{"bulle", "show", preparedPolicyRunnerCommand, "--rox", filepath.Dir(truePath), "--", truePath}, &stdout, &stderr)
+	// The directory sits in the workspace slot, which is the second positional:
+	// a profile always comes first.
+	code := Run([]string{"bulle", "show", "default", preparedPolicyRunnerCommand, "--rox", filepath.Dir(truePath), "--", truePath}, &stdout, &stderr)
 
 	if code != exitcode.OK {
 		t.Fatalf("exit code = %d, want %d; stderr = %s", code, exitcode.OK, stderr.String())
@@ -192,6 +195,7 @@ func TestRunDefaultsWorkspacePathToCurrentDirectory(t *testing.T) {
 }
 
 func TestRunAddExecWithoutProjectGrantsCurrentDirectory(t *testing.T) {
+	requireExecutable(t, "/bin/echo")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
@@ -539,6 +543,7 @@ default_app = "definitely-not-installed-bulle-test-command"
 }
 
 func TestRunUsesDefaultAppFromConfig(t *testing.T) {
+	requireExecutable(t, "/bin/echo")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
@@ -575,6 +580,7 @@ default_app = "echo profile"
 }
 
 func TestRunParsesQuotedDefaultApp(t *testing.T) {
+	requireExecutable(t, "/bin/echo")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
@@ -701,6 +707,7 @@ func TestRunPolicySummaryIncludesTimeoutWhenConfigured(t *testing.T) {
 }
 
 func TestRunPolicyPrintsHumanReadableSummaryByDefault(t *testing.T) {
+	requireExecutable(t, "/bin/echo")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
@@ -848,6 +855,7 @@ func TestRunPolicyIncludesLinuxLibraryDepsWhenAddLibsIsSet(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("ELF library discovery is Linux-specific")
 	}
+	requireExecutable(t, "/usr/bin/true")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	tmp := t.TempDir()
@@ -859,7 +867,12 @@ func TestRunPolicyIncludesLinuxLibraryDepsWhenAddLibsIsSet(t *testing.T) {
 		t.Skip("/usr/bin/true has no discoverable ELF dependencies")
 	}
 
-	code := Run([]string{"bulle", "show", "--json", tmp, "--", "/usr/bin/true"}, &stdout, &stderr)
+	// Library discovery is on exactly when no profile is named, and naming a
+	// workspace means naming a profile first — so the workspace comes from the
+	// working directory instead.
+	t.Chdir(tmp)
+
+	code := Run([]string{"bulle", "show", "--json", "--", "/usr/bin/true"}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr.String())
@@ -869,4 +882,29 @@ func TestRunPolicyIncludesLinuxLibraryDepsWhenAddLibsIsSet(t *testing.T) {
 			t.Fatalf("stdout = %s, want resolved Linux library grant %q", stdout.String(), dep)
 		}
 	}
+}
+
+// requireExecutable skips a test whose fixture is a system binary at a fixed
+// path. /bin/echo and /usr/bin/true exist on a distribution runner and not on
+// NixOS, where every binary lives in the store under a hashed path; a failure
+// there reports the layout of the machine rather than a defect.
+func requireExecutable(t *testing.T, path string) {
+	t.Helper()
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() || info.Mode()&0o111 == 0 {
+		t.Skipf("%s is not an executable on this machine", path)
+	}
+}
+
+// requireAnyExecutable skips unless at least one of the candidate paths is an
+// executable here; several system tools live in /bin on one distribution and
+// /usr/bin on another.
+func requireAnyExecutable(t *testing.T, paths ...string) {
+	t.Helper()
+	for _, path := range paths {
+		if info, err := os.Stat(path); err == nil && !info.IsDir() && info.Mode()&0o111 != 0 {
+			return
+		}
+	}
+	t.Skipf("none of %v is an executable on this machine", paths)
 }

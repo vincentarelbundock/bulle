@@ -97,7 +97,13 @@ func TestResolvePkgEntryGrantsPackageRoot(t *testing.T) {
 		t.Fatalf("Resolve: %v", err)
 	}
 	defer os.RemoveAll(p.ShimDir)
+	// The package root is granted by its resolved spelling: a grant names an
+	// inode, and on macOS every temporary directory is reached through a
+	// symlink (/var -> /private/var).
 	pkgRoot := filepath.Dir(filepath.Dir(real))
+	if resolved, err := filepath.EvalSymlinks(pkgRoot); err == nil {
+		pkgRoot = resolved
+	}
 	if !containsString(p.ReadOnlyExec, pkgRoot) {
 		t.Fatalf("ReadOnlyExec missing package root %q: %#v", pkgRoot, p.ReadOnlyExec)
 	}
@@ -139,5 +145,49 @@ func TestResolveRejectsWhichInReadOnlyList(t *testing.T) {
 	_, err := Resolve(whichTestInputs(t, cfg, t.TempDir()))
 	if err == nil || !strings.Contains(err.Error(), "only valid in rox and rwx") {
 		t.Fatalf("err = %v, want resolver-list rejection", err)
+	}
+}
+
+// A pkg: entry on a machine that installs the tool in a system directory has
+// no package tree to grant. An optional entry degrades to the binary alone,
+// because "?" means "grant this where it makes sense", not "fail elsewhere".
+func TestResolveOptionalPkgWithSystemRootGrantsTheBinaryOnly(t *testing.T) {
+	root := t.TempDir()
+	project := filepath.Join(root, "project")
+	binDir := filepath.Join(root, "bin")
+	for _, dir := range []string{project, binDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	binary := filepath.Join(binDir, "faketool")
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// The package root two levels up is the home directory itself, which is
+	// refused for the same reason /usr is.
+	inputs := Inputs{
+		Options:   cli.Options{ProjectPath: project},
+		Global:    profileWith(config.Settings{PathSettings: config.PathSettings{ReadOnlyExec: []string{"?pkg:faketool"}}}),
+		ParentEnv: map[string]string{"PATH": binDir},
+		Home:      root,
+		Tmp:       t.TempDir(),
+	}
+	p, err := Resolve(inputs)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	defer os.RemoveAll(p.ShimDir)
+	if !containsString(p.ReadOnlyExec, binary) {
+		t.Fatalf("ReadOnlyExec missing the binary %q: %#v", binary, p.ReadOnlyExec)
+	}
+	if containsString(p.ReadOnlyExec, filepath.Clean(root)) {
+		t.Fatalf("ReadOnlyExec granted the refused package root: %#v", p.ReadOnlyExec)
+	}
+
+	// Without the marker the author asked for the package tree, so say so.
+	inputs.Global = profileWith(config.Settings{PathSettings: config.PathSettings{ReadOnlyExec: []string{"pkg:faketool"}}})
+	if _, err := Resolve(inputs); err == nil || !strings.Contains(err.Error(), "system directory") {
+		t.Fatalf("err = %v, want a system-directory refusal for the required entry", err)
 	}
 }

@@ -73,8 +73,12 @@ func TestResolveListCreatesMissingDirAndFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveListTrace: %v", err)
 	}
-	if len(out) != 2 {
-		t.Fatalf("out = %#v", out)
+	// Each entry may resolve to an alias/real pair when the temporary
+	// directory is reached through a symlink, as it is on macOS.
+	for _, want := range []string{dir, file} {
+		if !containsResolved(out, want) {
+			t.Fatalf("out = %#v, missing %q", out, want)
+		}
 	}
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
 		t.Fatalf("dir not created: %v", err)
@@ -98,8 +102,11 @@ func TestResolveListGlob(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveListTrace: %v", err)
 	}
-	if len(out) != 2 {
-		t.Fatalf("out = %#v, want two matches", out)
+	for _, name := range []string{"v1", "v2"} {
+		want := filepath.Join(root, "versions", name, "bin")
+		if !containsResolved(out, want) {
+			t.Fatalf("out = %#v, missing %q", out, want)
+		}
 	}
 	if traces[0].Outcome != "granted (2 matches)" {
 		t.Fatalf("trace = %#v", traces[0])
@@ -139,4 +146,23 @@ func TestExpandFallbackSyntax(t *testing.T) {
 	if _, err := expand("$UNSET", vars); err == nil {
 		t.Fatalf("expand succeeded, want unknown variable error")
 	}
+}
+
+// containsResolved reports whether want appears in out under either spelling.
+// A configured path reached through a symlink is granted as both the alias and
+// its target, so an exact-length assertion says more about the machine's
+// temporary directory than about the resolution being tested.
+func containsResolved(out []string, want string) bool {
+	candidates := []string{filepath.Clean(want)}
+	if real, err := filepath.EvalSymlinks(want); err == nil {
+		candidates = append(candidates, filepath.Clean(real))
+	}
+	for _, got := range out {
+		for _, candidate := range candidates {
+			if filepath.Clean(got) == candidate {
+				return true
+			}
+		}
+	}
+	return false
 }
