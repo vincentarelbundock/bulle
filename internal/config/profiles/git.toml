@@ -11,6 +11,10 @@ rox = ["?which:git", "?pkg:git"]
 # when the files are symlinks into a store (home-manager, chezmoi), while a
 # directory grant does not cover symlink targets inside it.
 ro = [
+  # The system-wide configuration git reads before any user file. A denial is
+  # not a fallback: git aborts with "unknown error occurred while reading the
+  # configuration files" rather than carrying on without it.
+  "?/etc/gitconfig",
   "?$HOME/.gitconfig",
   "?$CONFIG/git",
   "?$CONFIG/git/config",

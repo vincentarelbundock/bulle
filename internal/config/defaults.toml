@@ -57,4 +57,8 @@ rox = [
   "/lib64",
   "/usr/lib",
   "/usr/lib64",
+  # The helper executables a toolchain runs behind the compiler driver:
+  # Debian 13 moved gcc's collect2 out of /usr/lib/gcc and into here, so a
+  # link step fails without it while compilation succeeds.
+  "/usr/libexec",
 ]

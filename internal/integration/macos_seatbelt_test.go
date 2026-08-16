@@ -47,7 +47,11 @@ func TestMacOSSeatbeltRunsScriptWithAddExecShebangInterpreter(t *testing.T) {
 	if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf shebang-ok\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(bin, "default", project, "--rox", "/bin", "--", "./hello")
+	// No profile is named, so the workspace comes from the working directory
+	// and library discovery is on — which is what grants /var/select, the
+	// selector /bin/sh reads to decide which shell it is.
+	cmd := exec.Command(bin, "--rox", "/bin", "--", "./hello")
+	cmd.Dir = project
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("script failed: %v, output: %s", err, string(out))
