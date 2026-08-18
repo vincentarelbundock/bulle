@@ -30,8 +30,8 @@ Ad-hoc grants (repeatable; compose with the profile):
   --rw PATH    read + write   --rwx PATH   read + write + execute
   --env NAME[=VALUE]          pass or set an environment variable
 
-When a run is denied something, bulle ends by showing the grants that would
-have fixed it, and offers to save them to your profile.
+When a run is denied something, bulle ends by printing the profile entries
+that would have allowed it, for you to add to the profile yourself.
 
 Subcommands:
   bulle scratch <profile> [dir] [-- command]   run in a disposable clone

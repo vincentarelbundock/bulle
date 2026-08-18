@@ -9,23 +9,6 @@ import (
 	"github.com/vincentarelbundock/bulle/internal/config"
 )
 
-func TestRetryHintLine(t *testing.T) {
-	hints := []string{
-		"denied: read /home/u/.gitconfig — add --ro ~/.gitconfig",
-		"denied: execute /opt/x — add --rox /opt/x",
-		"denied: connect tcp — network access is restricted by the sandbox policy",
-		"denied: read /home/u/.gitconfig — add --ro ~/.gitconfig",
-	}
-	got := retryHintLine(hints)
-	want := "bulle: retry with these grants added: --ro ~/.gitconfig --rox /opt/x"
-	if got != want {
-		t.Fatalf("retry = %q, want %q", got, want)
-	}
-	if retryHintLine([]string{"denied: connect tcp — network access is restricted by the sandbox policy"}) != "" {
-		t.Fatalf("network-only hints should produce no retry line")
-	}
-}
-
 func TestApplyConfigDefaults(t *testing.T) {
 	defaults := config.DefaultsSettings{
 		Profile: "claude",

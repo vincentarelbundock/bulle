@@ -284,12 +284,11 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 	// the policy that was actually in effect for this run. It observes
 	// successes too: a run can be denied an optional access and still exit
 	// zero, and that grant belongs in the profile.
-	learnAgain := false
 	if rec != nil {
 		rec.BeginRound()
 		rec.Observe(p, probe)
-		if rec.LastAdded > 0 && stdinIsTerminal() {
-			learnAgain = record.PromptLearnedGrants(opts, global, rec, scratchRewrite(scratch), stdout, stderr)
+		if rec.LastAdded > 0 {
+			record.ReportLearnedGrants(opts, global, rec, scratchRewrite(scratch), stderr)
 		} else if failed {
 			printDenialHints(probe, scratch, home, stderr)
 		}
@@ -300,9 +299,6 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 	// and timeout alike — and never changes the exit code.
 	if scratch != nil {
 		reviewScratch(scratch, opts.ScratchKeep, stdout, stderr)
-	}
-	if learnAgain {
-		return runMain(args, "", stdout, stderr, rec)
 	}
 	return code
 }
@@ -362,9 +358,6 @@ func printDenialHints(probe record.Probe, scratch *scratchState, home string, st
 			break
 		}
 		fmt.Fprintf(stderr, "  %s\n", hint)
-	}
-	if retry := retryHintLine(hints); retry != "" {
-		fmt.Fprintln(stderr, retry)
 	}
 }
 

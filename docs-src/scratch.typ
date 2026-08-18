@@ -91,6 +91,41 @@ return to the prompt); `w` wipes it after a confirmation. A subshell is as
 close as any program can get to "cd into the scratch": a child process can
 never change its parent shell's directory.
 
+== Pushing a scratch to a pull request
+
+Merging into your checkout is not the only way out of a scratch. Opening the
+review shell (`s`, or `bulle scratch shell <id>` later) also copies your
+repository's remotes into the scratch and prints the push:
+
+```text
+remote configured: origin -> git@github.com:you/repo.git
+to open a pull request from this scratch:
+  git push -u origin HEAD:scratch/4c014a01
+  gh pr create --head scratch/4c014a01
+```
+
+The clone's own remote --- the local path your scratch came from --- is
+renamed to `source` when your repository has an `origin` of its own, so
+`git push origin` in that shell means the forge, which is what typing it
+there intends. The refspec pushes to a branch named after the scratch rather
+than to the branch the scratch has checked out, so a scratch never lands on
+`main` by accident.
+
+This happens at review time and never during the run. The confined command
+sees a scratch whose only remote is the local clone path: no forge URL, no
+credentials, nothing to push with. The shell that _can_ push is unsandboxed
+and is you, so the git and `gh` credentials you already have are the ones
+that authenticate --- an agent running under `--dangerously-skip-permissions`
+never gets near them.
+
+One consequence of the same safety property: the review gate restores the
+scratch's git configuration to what git itself wrote at clone time, since the
+run could otherwise leave hooks and filters there for your shell to trip
+over. Configuration you set by hand inside the review shell --- including the
+upstream tracking that `git push -u` records --- does not survive the next
+`bulle scratch` command. The remotes are re-derived from your repository each
+time, so the push line keeps working.
+
 `p` never commits on your behalf: pull moves commits only, so if the scratch
 has uncommitted changes, bulle points you at `s` to commit them (or clean the
 tree) yourself --- when you exit the shell you are back at the prompt, ready to

@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/vincentarelbundock/bulle/internal/cli"
@@ -27,29 +26,6 @@ func stateRoot() string {
 		return dir
 	}
 	return filepath.Join(home, ".local", "state")
-}
-
-// retryHintLine builds the copy-pasteable retry suggestion from denial
-// hints of the form "denied: VERB PATH — add --ro PATH".
-func retryHintLine(hints []string) string {
-	grants := []string{}
-	seen := map[string]bool{}
-	for _, hint := range hints {
-		_, grant, ok := strings.Cut(hint, " — add ")
-		if !ok || seen[grant] {
-			continue
-		}
-		seen[grant] = true
-		grants = append(grants, grant)
-	}
-	if len(grants) == 0 {
-		return ""
-	}
-	const maxGrants = 10
-	if len(grants) > maxGrants {
-		grants = grants[:maxGrants]
-	}
-	return "bulle: retry with these grants added: " + strings.Join(grants, " ")
 }
 
 // applyConfigDefaults fills flag-shaped gaps from the [defaults] block of the

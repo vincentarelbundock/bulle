@@ -88,10 +88,10 @@ into your configuration directory's profiles/ folder. What each file grants
 is printed as it is installed.
 
 A profile file named after an existing profile merges into it: that is how
-the end-of-run save prompt extends a profile, and you can use it the same way
-by hand. Because that merge also reaches every profile inheriting from the
-name, installing over a profile you already have is refused unless you pass
---force.
+a file extends a built-in profile, and where the entries printed after a
+denied run belong. Because that merge also reaches every profile inheriting
+from the name, installing over a profile you already have is refused unless
+you pass --force.
 
 Examples:
   bulle profiles install agent.toml
@@ -213,10 +213,9 @@ Configuration lives in a directory (default: the platform config dir, e.g.
   config.toml       machine-local settings, [vars], and the [defaults] block
   profiles/*.toml   one profile per file, named after the file
 
-A profile file named after an existing profile merges into it. That is where
-the end-of-run save prompt writes; files it manages start with a marker
-comment and are rewritten on save, so keep hand-written profiles in files of
-their own.
+A profile file named after an existing profile merges into it, adding its
+grants to that profile everywhere the profile is used. That is where the
+entries bulle prints after a denied run belong.
 
 Related flags:
   --config PATH     use this configuration directory

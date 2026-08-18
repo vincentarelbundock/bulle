@@ -366,6 +366,11 @@ func pageScratchDiff(s *scratchState, final string, stderr io.Writer) {
 // process cannot change the parent shell's directory, so a subshell is the
 // closest honest equivalent of "cd into the scratch".
 func openScratchShell(s *scratchState, stdout, stderr io.Writer) {
+	// The shell verb can be reached without going through the review gate, and
+	// the shell that opens is the user's own: it must not inherit hooks or
+	// filters the run left in the scratch's configuration.
+	sanitizeScratchGit(s)
+	configureScratchRemotes(s, stdout)
 	shell := os.Getenv("SHELL")
 	if shell == "" {
 		shell = "sh"
@@ -381,6 +386,118 @@ func openScratchShell(s *scratchState, stdout, stderr io.Writer) {
 			fmt.Fprintf(stderr, "bulle: could not start %s: %v\n", shell, err)
 		}
 	}
+}
+
+// scratchLocalRemote is the name the scratch's clone-time remote takes when a
+// remote carried over from the source repository already claims "origin".
+const scratchLocalRemote = "source"
+
+// configureScratchRemotes copies the source repository's remotes into the
+// scratch and prints the push-and-PR recipe. It runs when the review shell
+// opens, never while the command is running: the shell is unsandboxed and is
+// the user, so their existing credentials push, while the confined run keeps
+// seeing a scratch whose only remote is the local clone path — no forge URL,
+// no token, nothing to push with.
+//
+// The names come from the source repository's configuration, which is outside
+// the sandbox and so is not the run's to choose. "origin" in the scratch is
+// the local clone path; when the source carries its own "origin" the local one
+// is renamed rather than shadowed, so `git push origin` in the review shell
+// means the forge, which is what someone typing it there intends.
+func configureScratchRemotes(s *scratchState, stdout io.Writer) {
+	remotes := sourceRemotes(s.Origin)
+	if len(remotes) == 0 {
+		return
+	}
+	existing := map[string]bool{}
+	for _, name := range strings.Fields(strings.ReplaceAll(mustScratchGit(s.Dir, "remote"), "\n", " ")) {
+		existing[name] = true
+	}
+	for _, remote := range remotes {
+		if remote.name == "origin" && existing["origin"] && !existing[scratchLocalRemote] {
+			if _, err := runScratchGit(s.Dir, "remote", "rename", "origin", scratchLocalRemote); err != nil {
+				continue
+			}
+			existing[scratchLocalRemote] = true
+			delete(existing, "origin")
+		}
+		if existing[remote.name] {
+			continue
+		}
+		if _, err := runScratchGit(s.Dir, "remote", "add", remote.name, remote.url); err != nil {
+			continue
+		}
+		existing[remote.name] = true
+		if remote.pushURL != "" && remote.pushURL != remote.url {
+			_, _ = runScratchGit(s.Dir, "remote", "set-url", "--push", remote.name, remote.pushURL)
+		}
+		fmt.Fprintf(stdout, "remote configured: %s -> %s\n", remote.name, remote.url)
+	}
+	printScratchPushRecipe(s, remotes, stdout)
+}
+
+// printScratchPushRecipe prints the branch-safe push. The refspec spelling
+// matters: the scratch checks out the source's branch, so a bare `git push`
+// would target that same branch on the forge. HEAD:scratch/<id> puts the work
+// on a branch of its own, which is what a pull request wants and what keeps a
+// scratch from ever landing on main by accident.
+func printScratchPushRecipe(s *scratchState, remotes []sourceRemote, stdout io.Writer) {
+	remote := remotes[0].name
+	for _, candidate := range remotes {
+		if candidate.name == "origin" {
+			remote = candidate.name
+			break
+		}
+	}
+	branch := "scratch/" + s.ID
+	fmt.Fprintln(stdout, "to open a pull request from this scratch:")
+	fmt.Fprintf(stdout, "  git push -u %s HEAD:%s\n", remote, branch)
+	if _, err := trustedexec.LookPath("gh", os.Getenv("PATH")); err == nil {
+		fmt.Fprintf(stdout, "  gh pr create --head %s\n", branch)
+	}
+}
+
+// sourceRemote is one remote of the source repository, as configured there.
+type sourceRemote struct {
+	name    string
+	url     string
+	pushURL string
+}
+
+// sourceRemotes reads the source repository's remotes, skipping any that
+// point back into the scratch tree — a scratch of a scratch would otherwise
+// suggest pushing a directory that is about to be deleted.
+func sourceRemotes(origin string) []sourceRemote {
+	names, err := runGit(origin, "remote")
+	if err != nil {
+		return nil
+	}
+	var out []sourceRemote
+	for _, name := range strings.Fields(names) {
+		url, err := runGit(origin, "remote", "get-url", name)
+		if err != nil || url == "" {
+			continue
+		}
+		if filepath.IsAbs(url) {
+			continue
+		}
+		remote := sourceRemote{name: name, url: url}
+		if push, err := runGit(origin, "remote", "get-url", "--push", name); err == nil {
+			remote.pushURL = push
+		}
+		out = append(out, remote)
+	}
+	return out
+}
+
+// mustScratchGit returns the command's output, or the empty string when it
+// fails: every caller treats a failure as "nothing configured yet".
+func mustScratchGit(dir string, args ...string) string {
+	out, err := runScratchGit(dir, args...)
+	if err != nil {
+		return ""
+	}
+	return out
 }
 
 // printScratchRecipe prints git-native integration steps, led by the pull
@@ -405,6 +522,9 @@ func printScratchRecipe(s *scratchState, w io.Writer) {
 	fmt.Fprintf(w, "  git -C %s pull %s\n", origin, dir)
 	fmt.Fprintf(w, "  rm -rf %s\n", dir)
 	fmt.Fprintf(w, "to inspect before merging: git -C %s fetch %s HEAD:scratch/%s\n", origin, dir, s.ID)
+	if len(sourceRemotes(s.Origin)) > 0 {
+		fmt.Fprintf(w, "to push it to a branch instead: bulle scratch shell %s\n", s.ID)
+	}
 }
 
 func removeScratch(s *scratchState) {

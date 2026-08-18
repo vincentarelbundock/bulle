@@ -1,6 +1,7 @@
 package record
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,86 +27,40 @@ func TestLearnTargetProfile(t *testing.T) {
 	}
 }
 
-func TestSaveLearnedGrantsCreatesAndMerges(t *testing.T) {
+func TestReportLearnedGrantsShowsGeneralizedEntriesAndTheFileToEdit(t *testing.T) {
 	root := t.TempDir()
-	opts := cli.Options{Flags: cli.Flags{Config: root}, Command: []string{"mytool"}}
-	global := config.DefaultConfig()
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		t.Skip("no home directory to generalize against")
+	}
+	rec := NewRecorder()
+	// Three denials under one directory in the user's home: the report names the
+	// directory, spelled with the variable, and the literal paths the kernel
+	// reported never reach the user.
+	rec.grants = append(rec.grants,
+		Grant{Flag: "--ro", Path: filepath.Join(home, ".cache", "toolcache", "a.json")},
+		Grant{Flag: "--ro", Path: filepath.Join(home, ".cache", "toolcache", "b.json")},
+		Grant{Flag: "--ro", Path: filepath.Join(home, ".cache", "toolcache", "c.json")},
+	)
+	var out bytes.Buffer
+	ReportLearnedGrants(cli.Options{Profile: "claude", Flags: cli.Flags{Config: root}}, config.DefaultConfig(), rec, nil, &out)
 
-	path, err := saveLearnedGrants(opts, global, "mytool", true, learnedEntries([]Grant{
-		{Flag: "--ro", Path: "/etc/mytool.conf"},
-	}))
-	if err != nil {
-		t.Fatalf("saveLearnedGrants: %v", err)
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	text := string(data)
-	for _, want := range []string{learnedMarker, `inherits = ["default"]`, `default_app = "mytool"`, `"?/etc/mytool.conf"`} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("saved profile missing %q:\n%s", want, text)
+	got := out.String()
+	for _, want := range []string{"?$CACHE/toolcache/", "claude", "profiles/claude.toml", "denied accesses"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("report = %q, want it to contain %q", got, want)
 		}
 	}
-
-	// A second save unions into the same file without losing anything.
-	if _, err := saveLearnedGrants(opts, global, "mytool", true, learnedEntries([]Grant{
-		{Flag: "--ro", Path: "/etc/mytool.conf"},
-		{Flag: "--rw", Path: "/var/lib/mytool"},
-	})); err != nil {
-		t.Fatalf("second save: %v", err)
-	}
-	data, _ = os.ReadFile(path)
-	text = string(data)
-	for _, want := range []string{`"?/etc/mytool.conf"`, `"?/var/lib/mytool"`, `default_app = "mytool"`} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("merged profile missing %q:\n%s", want, text)
+	for _, unwanted := range []string{"a.json", "b.json", "c.json", home, "[s]ave", "[w]rite"} {
+		if strings.Contains(got, unwanted) {
+			t.Fatalf("report = %q, want it not to contain %q", got, unwanted)
 		}
-	}
-	if strings.Count(text, "/etc/mytool.conf") != 1 {
-		t.Fatalf("duplicate entries after merge:\n%s", text)
-	}
-
-	// The saved file must load as a profile named after the file.
-	loaded, err := config.LoadProfileDirectory(filepath.Join(root, "profiles"))
-	if err != nil {
-		t.Fatalf("saved profile does not load: %v", err)
-	}
-	if _, ok := loaded.Profiles["mytool"]; !ok {
-		t.Fatalf("profile mytool missing from loaded config: %#v", loaded.Profiles)
 	}
 }
-
-func TestSaveLearnedGrantsRefusesForeignFiles(t *testing.T) {
-	root := t.TempDir()
-	dir := filepath.Join(root, "profiles")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "claude.toml"), []byte("ro = [\"/etc\"]\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	opts := cli.Options{Flags: cli.Flags{Config: root}, Profile: "claude"}
-	_, err := saveLearnedGrants(opts, config.DefaultConfig(), "claude", false, learnedEntries([]Grant{{Flag: "--ro", Path: "/etc/x"}}))
-	if err == nil || !strings.Contains(err.Error(), "not written by bulle") {
-		t.Fatalf("err = %v, want refusal to rewrite a hand-written file", err)
-	}
-}
-func TestSavePreservesHandEditedKeys(t *testing.T) {
-	root := t.TempDir()
-	dir := filepath.Join(root, "profiles")
-	os.MkdirAll(dir, 0o755)
-	path := filepath.Join(dir, "mytool.toml")
-	os.WriteFile(path, []byte(learnedMarker+"\ndeny = [\"network\"]\nenv = [\"PATH\"]\nro = [\"?/etc/a\"]\n\n[linux]\nro = [\"/proc\"]\n"), 0o644)
-	opts := cli.Options{Flags: cli.Flags{Config: root}, Profile: "mytool"}
-	if _, err := saveLearnedGrants(opts, config.DefaultConfig(), "mytool", false, learnedEntries([]Grant{{Flag: "--ro", Path: "/etc/b"}})); err != nil {
-		t.Fatal(err)
-	}
-	data, _ := os.ReadFile(path)
-	t.Logf("\n%s", data)
-	for _, want := range []string{"deny", "network", "env", "PATH", "/etc/a", "/etc/b", "[linux]"} {
-		if !strings.Contains(string(data), want) {
-			t.Fatalf("lost %q", want)
-		}
+func TestReportLearnedGrantsSaysNothingWithoutGrants(t *testing.T) {
+	var out bytes.Buffer
+	ReportLearnedGrants(cli.Options{Profile: "claude"}, config.DefaultConfig(), NewRecorder(), nil, &out)
+	if out.Len() != 0 {
+		t.Fatalf("report with no grants = %q, want nothing", out.String())
 	}
 }

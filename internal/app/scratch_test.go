@@ -384,3 +384,63 @@ func TestRunGitRejectsWritablePATHHelper(t *testing.T) {
 		t.Fatalf("writable PATH git executed outside the sandbox: %v", err)
 	}
 }
+
+func TestConfigureScratchRemotesCarriesForgeRemote(t *testing.T) {
+	origin := makeOrigin(t)
+	gitT(t, origin, "remote", "add", "origin", "git@example.com:owner/repo.git")
+	var stderr bytes.Buffer
+	s, err := createScratch(origin, t.TempDir(), nil, &stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer removeScratch(s)
+
+	// The run sees only the local clone path: no forge URL reaches the sandbox.
+	if remotes := gitT(t, s.Dir, "remote"); remotes != "origin" {
+		t.Fatalf("scratch remotes before review = %q, want just the clone's origin", remotes)
+	}
+	if url := gitT(t, s.Dir, "remote", "get-url", "origin"); url != origin {
+		t.Fatalf("clone origin = %q, want the source path %q", url, origin)
+	}
+
+	var out bytes.Buffer
+	configureScratchRemotes(s, &out)
+
+	if url := gitT(t, s.Dir, "remote", "get-url", "origin"); url != "git@example.com:owner/repo.git" {
+		t.Fatalf("after review setup origin = %q, want the source's forge remote", url)
+	}
+	if url := gitT(t, s.Dir, "remote", "get-url", scratchLocalRemote); url != origin {
+		t.Fatalf("renamed local remote = %q, want the source path %q", url, origin)
+	}
+	if want := "git push -u origin HEAD:scratch/" + s.ID; !strings.Contains(out.String(), want) {
+		t.Fatalf("recipe = %q, want it to contain %q", out.String(), want)
+	}
+
+	// Running the review gate twice must not duplicate or error on the remotes.
+	configureScratchRemotes(s, &bytes.Buffer{})
+	if remotes := gitT(t, s.Dir, "remote"); remotes != "origin\n"+scratchLocalRemote && remotes != scratchLocalRemote+"\norigin" {
+		t.Fatalf("remotes after a second review = %q", remotes)
+	}
+}
+
+func TestConfigureScratchRemotesSkipsLocalOnlySource(t *testing.T) {
+	origin := makeOrigin(t)
+	// A source whose only remote is a local path has nothing to push to, and
+	// suggesting one would name a directory rather than a forge.
+	gitT(t, origin, "remote", "add", "origin", t.TempDir())
+	var stderr bytes.Buffer
+	s, err := createScratch(origin, t.TempDir(), nil, &stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer removeScratch(s)
+
+	var out bytes.Buffer
+	configureScratchRemotes(s, &out)
+	if out.Len() != 0 {
+		t.Fatalf("recipe printed for a source with no forge remote: %q", out.String())
+	}
+	if url := gitT(t, s.Dir, "remote", "get-url", "origin"); url != origin {
+		t.Fatalf("clone origin = %q, want it untouched at %q", url, origin)
+	}
+}

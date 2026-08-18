@@ -18,7 +18,7 @@ import (
 	"github.com/vincentarelbundock/bulle/internal/policy"
 )
 
-// A Recorder accumulates the grants a command was denied across rounds. It is
+// A Recorder accumulates the grants a command was denied during a run. It is
 // threaded into the ordinary run path so recording observes exactly what a
 // real run does, rather than a re-implementation of it.
 type Recorder struct {
@@ -27,10 +27,8 @@ type Recorder struct {
 	// origins records which processes were denied each grant, where the
 	// platform reports one. It annotates the output rather than filtering it.
 	origins map[Grant][]string
-	// saved marks grants already written to a profile by the save prompt.
-	saved map[Grant]bool
 	// LastAdded is how many grants the most recent round contributed. Zero
-	// after a round that ran is the loop's stop condition.
+	// after a round that ran means the run needs no grant it does not have.
 	LastAdded int
 	// LastObserved is how many denials the most recent round saw at all,
 	// before deduplication and coverage filtering. It separates the two very
@@ -40,33 +38,13 @@ type Recorder struct {
 }
 
 func NewRecorder() *Recorder {
-	return &Recorder{seen: map[Grant]bool{}, origins: map[Grant][]string{}, saved: map[Grant]bool{}}
+	return &Recorder{seen: map[Grant]bool{}, origins: map[Grant][]string{}}
 }
 
-// Unsaved returns the accumulated grants not yet written to a profile, in
-// observation order.
-func (r *Recorder) Unsaved() []Grant {
-	var out []Grant
-	for _, gr := range r.grants {
-		if !r.saved[gr] {
-			out = append(out, gr)
-		}
-	}
-	return out
-}
-
-// MarkSaved records that every accumulated grant has been written, so a later
-// prompt in the same session only shows what is new.
-func (r *Recorder) MarkSaved() {
-	for _, gr := range r.grants {
-		r.saved[gr] = true
-	}
-}
-
-// BeginRound clears the per-round counter, so a round that returns before the
+// BeginRound clears the per-round counter, so a run that returns before the
 // command ever runs — an invalid policy, a missing backend — reads as having
-// learned nothing rather than inheriting the previous round's progress and
-// spinning to the cap.
+// observed nothing rather than reporting the previous round's grants a second
+// time.
 func (r *Recorder) BeginRound() { r.LastAdded, r.LastObserved = 0, 0 }
 
 // Observe collects the denials of one round, dropping those the round's own

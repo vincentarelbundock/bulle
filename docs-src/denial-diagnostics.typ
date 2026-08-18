@@ -89,15 +89,39 @@ audit: type=1423 audit(1729738800.268:30): domain=195ba459b blockers=fs.read_fil
 = Retrying with added grants
 <retry>
 
-A sandboxed run often fails because one grant is missing. Alongside the hints above, `bulle` prints a copy-pasteable retry line:
+A sandboxed run often fails because one grant is missing. Each hint carries
+the flag that would have allowed it:
 
 ```text
 bulle: the sandbox denied the following accesses during this run:
   denied: read /home/user/.gitconfig — add --ro ~/.gitconfig
-bulle: retry with these grants added: --ro ~/.gitconfig
 ```
 
 Add those flags before `--` in the original invocation and run it again. The
 sandbox is restarted rather than widened: Landlock cannot extend a live
 sandbox, and no command line or prompt is stored or rewritten behind your
 back.
+
+= Making a grant permanent
+
+For a grant you want every time, `bulle` prints the profile entries rather
+than the flags --- generalized, so what you paste is a rule and not one
+machine's paths:
+
+```text
+bulle: the sandbox denied accesses; add to "claude" (~/.config/bulle/profiles/claude.toml):
+  ro    ?$CACHE/toolcache/
+  rox   ?which:shellcheck
+```
+
+Each line is the entry to add to that file, which merges into the profile of
+the same name at load time. Variables (`$HOME`, `$CACHE`, `$TMP`), resolvers
+(`which:`, `pkg:`), and package store roots are restored, and files denied
+in the same directory collapse into the directory once three of them appear
+--- so the list stays short and keeps meaning the same thing on another
+machine. The leading `?` marks each entry optional: a machine where the path
+does not exist skips it instead of failing the run.
+
+`bulle` never writes those entries for you. A denial is evidence that one run
+wanted an access, not that granting it is safe, and a file that appears in
+your profile should be one you decided to put there.

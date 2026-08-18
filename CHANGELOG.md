@@ -383,6 +383,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `target/`, the cargo global cache, git config for vcs metadata). The
   `node` and `go` profiles ask `npm` and `go env` for their cache locations,
   with the previous literal paths as fallbacks.
+- **The `retry with these grants added:` line is gone.** It restated every
+  grant the hints above it had just named, so a run denied ten paths printed
+  each of them twice. Each hint still ends with the flag that would have
+  allowed it.
+- **A denied run reports entries instead of asking to save them.** The
+  end-of-run save prompt is gone, and with it the profile writer, the managed
+  file format, and its marker comment: `bulle` no longer writes profile files
+  at all. What prints is the generalized entry list — variables restored,
+  resolvers named, store roots collapsed, a directory in place of the files
+  under it — followed by the file to paste it into. A denial is evidence that
+  one run wanted an access, not that granting it is safe, and nothing should
+  end up in a profile that the user did not put there.
+- **A scratch can go straight to a pull request.** Opening the review shell
+  (`s`, or `bulle scratch shell <id>`) now copies your repository's remotes
+  into the scratch and prints the push: `git push -u origin HEAD:scratch/<id>`
+  followed by `gh pr create` where `gh` exists. The refspec targets a branch
+  named after the scratch, so the work never lands on the branch the scratch
+  had checked out. Where this happens is the security property: the confined
+  run still sees a scratch whose only remote is the local clone path — no
+  forge URL, no credentials — while the shell that can push is unsandboxed
+  and is you. The clone's own remote is renamed to `source` when your
+  repository has an `origin` of its own, rather than being shadowed.
+- **The `shell` verb sanitizes the scratch's git configuration** before it
+  opens your shell there, which the review prompt already did and the
+  standalone verb did not. Your shell is unsandboxed: the hooks and filters a
+  run could leave in the scratch's configuration must be gone before it
+  starts.
 - **A `coreutils` profile, inherited by every agent profile.** The standard
   shell commands — `cat`, `ls`, `grep`, `rg`, `find`, `sed`, `awk`, `jq`,
   `tar`, `curl`, and the rest — are now named with `which:` and republished
