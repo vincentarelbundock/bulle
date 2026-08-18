@@ -3,7 +3,7 @@
 #set document(title: [Profiles])
 #metadata((
   title: "Profiles",
-  description: "Named bundles of permissions: selection and inference, the TOML format, portable path entries, and how to write your own.",
+  description: "Named bundles of permissions: explicit selection, the TOML format, portable path entries, and how to write your own.",
 )) <website-metadata>
 
 #title()
@@ -11,49 +11,33 @@
 A profile is a named bundle of path, environment, network, and platform grants. It saves you from spelling out the same permissions every time you run a tool.
 
 #calepin.elements.callout(kind: "warning", title: none)[
-  Profiles can grant broad filesystem, environment, network, and platform access. Use `bulle policy` to inspect the resolved permissions before running an unfamiliar profile or combining profiles.
+  Profiles can grant broad filesystem, environment, network, and platform access. Use `bulle show PROFILE` to inspect the resolved permissions before running an unfamiliar profile or combining profiles.
 ]
 
-= Selection and inference
+= Profile selection
 
-There are two ways a profile gets applied to a run.
-
-*Explicit selection* with `--profile` names the profile directly. When the profile declares a `default_app`, you do not even need to pass a command --- this launches Claude Code with appropriate permissions and constraints:
+Profiles are applied only by explicit selection. The first positional argument names the profile. When it declares a `default_app`, you do not need to pass a command --- this launches Claude Code with appropriate permissions and constraints:
 
 ```bash
-bulle --profile claude
+bulle claude
 ```
 
-*Inference* goes the other way: you pass the command, and `bulle` finds the profile made for it. When no `--profile` is given and the command cannot run under the default profile, `bulle` checks whether exactly one installed profile declares that command as its `default_app`. If so, it selects that profile, announces the choice, and continues:
+`bulle` never infers a profile from an executable name. A repository-controlled
+file called `codex` or `claude` must not acquire that agent's credentials,
+network access, or writable state merely because its basename matches a
+`default_app`. Use `bulle show NAME` to inspect a profile before
+selecting it.
 
-```bash
-bulle -- claude
-```
+An explicit command after `--` gets only its own executable and runtime libraries automatically. It does not select a profile or inherit that tool's credentials, state directories, or network policy:
 
 ```text
-bulle: selected profile "claude" because its default_app runs "claude" and
-the default profile cannot; pass --profile to choose explicitly
-```
-
-Inference is deliberately conservative, because applying a profile changes what the sandbox grants:
-
-- It only ever rescues a run that would otherwise fail command discovery. A command that already works under the default profile is never re-profiled.
-- It never fires when you pass `--profile` --- an explicit selection always wins.
-- If several profiles declare the same command, `bulle` refuses to guess, lists the candidates, and asks you to choose with `--profile`.
-- The selection is always announced on stderr, and `bulle policy` shows the resulting permissions (`bulle policy -- claude`).
-
-Without a profile or an explicit grant, `bulle` cannot find or execute anything, so command discovery fails before the sandbox starts:
-
-```text
-bulle -- ping google.com
-
-command not found before sandbox setup: "ping" is not on policy PATH, parent PATH, or executable roots. Add --env PATH with matching --rox/--rwx roots, add a --rox/--rwx root containing the command, choose a profile, or pass an explicit executable path after --
+bulle -- /usr/bin/printf 'minimal sandbox\n'
 ```
 
 The built-in `tool` profile adds `PATH`, executable discovery, temporary directory access, runtime library access, and network access:
 
 ```text
-bulle --profile tool -- ping google.com
+bulle tool -- ping google.com
 
 PING google.com (...): 56 data bytes
 64 bytes from ...
@@ -62,7 +46,7 @@ PING google.com (...): 56 data bytes
 Comma-separated profiles merge from left to right. Adding `offline` after `tool` keeps the command setup but removes network access:
 
 ```text
-bulle --profile tool,offline -- ping google.com
+bulle tool,offline -- ping google.com
 
 ping: cannot resolve google.com: Unknown host
 ```
@@ -70,15 +54,15 @@ ping: cannot resolve google.com: Unknown host
 You can still add one-off permissions on top of a profile:
 
 ```text
-bulle --profile claude --ro README.qmd --rw ~/Desktop --env GITHUB_TOKEN
+bulle claude --ro README.qmd --rw ~/Desktop --env GITHUB_TOKEN
 ```
 
 = Built-in and installed profiles
 
-Use `bulle profiles list` to print available profiles:
+Use `bulle show profiles` to print available profiles:
 
 ```bash
-bulle profiles list
+bulle show profiles
 
 claude
 codex
@@ -120,7 +104,7 @@ inherits = ["tool", "git", "node"]
 default_app = "my-agent"
 ```
 
-They can also be combined on the command line: `bulle --profile tool,git,rust -- cargo build`.
+They can also be combined on the command line: `bulle tool,git,rust -- cargo build`.
 
 == Installing profiles
 
@@ -132,7 +116,7 @@ bulle profiles install ./profiles
 bulle profiles install github:vincentarelbundock/bulle/custom_profiles
 ```
 
-By default, profiles are installed under the operating system user config directory: usually `$XDG_CONFIG_HOME/bulle/profiles/` or `~/.config/bulle/profiles/` on Linux, and `~/Library/Application Support/bulle/profiles/` on macOS. Use `--config PATH` to install into a different config directory; `bulle` creates its `profiles/` subdirectory if needed. The filename becomes the profile name, so `profiles/agent.toml` is selected with `--profile agent`.
+By default, profiles are installed under the operating system user config directory: usually `$XDG_CONFIG_HOME/bulle/profiles/` or `~/.config/bulle/profiles/` on Linux, and `~/Library/Application Support/bulle/profiles/` on macOS. Use `--config PATH` to install into a different config directory; `bulle` creates its `profiles/` subdirectory if needed. The filename becomes the profile name, so `profiles/agent.toml` is selected with `bulle agent`.
 
 Installing prints the grants each file declares, because an installed profile decides what a sandbox permits. A file named after a profile you already have is not replaced unless you pass `--force`: the merge also reaches every profile that inherits from that name, so an innocuous-looking `node.toml` can widen runs that never mention `node`.
 
@@ -199,7 +183,7 @@ A profile written on one machine should work on another, even when tools are ins
   [`$STATE`], [`$XDG_STATE_HOME` or `~/.local/state`], [`~/Library/Application Support`],
 )
 
-On Linux, the raw `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_CACHE_HOME`, and `XDG_STATE_HOME` names are also available and honor the parent environment when set. On macOS, several of these collapse to the same directory; the `bulle policy` resolution table flags entries whose grants merge because of that.
+On Linux, the raw `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_CACHE_HOME`, and `XDG_STATE_HOME` names are also available and honor the parent environment when set. On macOS, several of these collapse to the same directory; the `bulle show` resolution table flags entries whose grants merge because of that.
 
 == Optional and created entries
 
@@ -235,7 +219,7 @@ rw  = ["?+npm:cache", "?+go:modcache"]
 
 Unlike `which:`/`pkg:`, these name ordinary directories and are valid in every list. Markers work as usual: `?` skips when the tool is absent, `+` creates a directory the tool reports but has not made yet. Results are re-resolved as literal paths, so the symlink pairing and sensitive-target refusals apply exactly as they do to a hand-written path.
 
-Run `bulle resolvers` to see every resolver and what it points at on the current machine --- a resolver that reports nothing is otherwise indistinguishable from one that works. The set is fixed by `bulle`: a profile chooses from it but can never supply a command to run, because profiles are installable from GitHub and one that could run commands would make installing a profile equivalent to running its author's code. An unknown namespace is an error rather than a literal path, and a literal path in that shape must be written `./ruby:gems` or absolute.
+Run `bulle resolvers` to see every resolver and what it points at on the current machine --- a resolver that reports nothing is otherwise indistinguishable from one that works. The set is fixed by `bulle`: a profile chooses from it but can never supply a command to run. Before executing a resolver, `bulle` resolves its real executable and refuses it when the file or any enclosing directory is writable by the current user. Resolver processes receive a narrow, tool-specific environment with credentials and unrelated variables removed. This intentionally rejects project virtualenvs and user-owned tool installations: code that has not entered the sandbox cannot be trusted merely because its filename is `go` or `Rscript`. An unknown namespace is an error rather than a literal path, and a literal path in that shape must be written `./ruby:gems` or absolute.
 
 Some aspects are guarded. `r:prefix` reports R's installation root, which is narrow where R owns its own directory (a Nix store path, a Homebrew Cellar entry) and far too broad where it is `/usr`; results matching the `pkg:` system-root denylist are dropped rather than granted.
 
@@ -360,18 +344,21 @@ usually two to four table rows of the form:
 },
 ```
 
-Constraints the registry enforces for you: resolvers run against the parent
-environment before the sandbox starts, results re-enter normal path
+Constraints the registry enforces for you: resolvers use an immutable
+executable and a scrubbed, tool-specific environment before the sandbox
+starts; results re-enter normal path
 resolution (symlink pairing, sensitive-target refusals), failures are
 non-fatal for `?` entries, and output is deduplicated and sorted so the
-policy is stable across runs. Set `denySystemRoots: true` on any aspect that
-can report an installation prefix, so `/usr` never becomes a grant.
+policy is stable across runs. Every result is also passed through the system
+root and sensitive-path checks, so `/usr` or a home-directory root never
+becomes a grant.
 
 == Debugging a new profile
 
 Run the target command under the profile and read the denial report: bulle
 aggregates denials inside one Nix store item or Homebrew keg into a single
-suggested grant and prints a copy-pasteable `bulle rerun …` retry line.
-`bulle policy` shows the fully resolved grants; `bulle policy --json` is
+suggested grant and prints the flags to add to the next invocation.
+`bulle show PROFILE -- command` shows the fully resolved grants; add `--json`
+for
 machine-readable. Recurring denials usually mean a missing slot from the
 checklist above rather than a one-off path.

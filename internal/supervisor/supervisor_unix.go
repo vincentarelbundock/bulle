@@ -36,6 +36,12 @@ var withSIGTTOUBlocked = blockSIGTTOU
 var ownProcessGroup = unix.Getpgrp
 var continueProcessGroup = killProcessGroup
 
+// timeoutTreeIsolationRequired is overridden only by supervisor unit tests,
+// whose helper executables are deliberately not placed in real cgroups.
+// Production runs require a kernel-owned process container whenever a timeout
+// is requested; process groups alone are escapable with setsid(2).
+var timeoutTreeIsolationRequired = func() bool { return true }
+
 type signalNotifier interface {
 	Notify(chan<- os.Signal, ...os.Signal)
 	Stop(chan<- os.Signal)
@@ -113,11 +119,16 @@ func Run(p policy.Policy, opts Options) error {
 	cmd.Env = os.Environ()
 	cmd.ExtraFiles = []*os.File{read}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cgroup, err := prepareCgroup(cmd, opts.Limits, opts.CgroupSupported)
+	cgroup, err := prepareCgroup(cmd, opts.Limits, opts.CgroupSupported, opts.Timeout > 0 && timeoutTreeIsolationRequired())
 	if err != nil {
 		return err
 	}
-	defer cgroup.close()
+	defer func() {
+		// A command can exit after daemonizing a child. Always empty the run
+		// cgroup before removing it so no sandboxed process outlives Bulle.
+		_ = cgroup.kill()
+		cgroup.close()
+	}()
 
 	term, err := prepareForegroundTerminal(stdin)
 	if err != nil {

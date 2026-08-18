@@ -80,6 +80,49 @@ func TestCreateScratchCarriesDirtyState(t *testing.T) {
 	}
 }
 
+func TestCreateScratchDoesNotShareGitObjectInodes(t *testing.T) {
+	origin := makeOrigin(t)
+	var stderr bytes.Buffer
+	s, err := createScratch(origin, t.TempDir(), nil, &stderr)
+	if err != nil {
+		t.Fatalf("createScratch: %v", err)
+	}
+	defer removeScratch(s)
+
+	hash := gitT(t, origin, "rev-parse", "HEAD")
+	originObject := filepath.Join(origin, ".git", "objects", hash[:2], hash[2:])
+	scratchObject := filepath.Join(s.Dir, ".git", "objects", hash[:2], hash[2:])
+	originInfo, err := os.Stat(originObject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scratchInfo, err := os.Stat(scratchObject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if os.SameFile(originInfo, scratchInfo) {
+		t.Fatal("scratch and origin share a Git object inode")
+	}
+
+	want, err := os.ReadFile(originObject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(scratchObject, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(scratchObject, []byte("corrupt scratch only"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(originObject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatal("modifying a scratch Git object changed the origin")
+	}
+}
+
 func TestCreateScratchRequiresGit(t *testing.T) {
 	var stderr bytes.Buffer
 	_, err := createScratch(t.TempDir(), t.TempDir(), nil, &stderr)
@@ -322,5 +365,22 @@ func TestRewriteScratchPaths(t *testing.T) {
 	}
 	if out[1] != "denied: read /home/u/proj/y — add --ro /home/u/proj/y" {
 		t.Errorf("home-abbreviated rewrite: %s", out[1])
+	}
+}
+
+func TestRunGitRejectsWritablePATHHelper(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "ran")
+	fake := filepath.Join(dir, "git")
+	if err := os.WriteFile(fake, []byte("#!/bin/sh\nprintf ran > \"$MARKER\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	t.Setenv("MARKER", marker)
+	if _, err := runGit("", "version"); err == nil || !strings.Contains(err.Error(), "refusing to run git") {
+		t.Fatalf("runGit error = %v, want immutable-helper refusal", err)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("writable PATH git executed outside the sandbox: %v", err)
 	}
 }

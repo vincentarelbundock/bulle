@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 func requireSandboxExec(t *testing.T) {
@@ -114,66 +113,26 @@ func TestMacOSSeatbeltRunsFromProjectPath(t *testing.T) {
 	}
 }
 
-func TestMacOSSeatbeltTimeoutExits124(t *testing.T) {
+func TestMacOSSeatbeltRejectsTimeoutWithoutSecureTreeContainer(t *testing.T) {
 	requireSandboxExec(t)
 	bin := filepath.Join(t.TempDir(), "bulle")
 	buildBulleForIntegration(t, bin)
 	project := t.TempDir()
 
 	cmd := exec.Command(bin, "--timeout", "100ms", "default", project, "--rox", "/bin", "--", "/bin/sleep", "5")
-	start := time.Now()
 	out, err := cmd.CombinedOutput()
-	elapsed := time.Since(start)
 	if err == nil {
-		t.Fatalf("sleep succeeded, output: %s", string(out))
+		t.Fatalf("timeout run succeeded without secure tree containment, output: %s", string(out))
 	}
 	exitErr, ok := err.(*exec.ExitError)
 	if !ok {
 		t.Fatalf("sleep failed with %T, want *exec.ExitError: %v, output: %s", err, err, string(out))
 	}
-	if got := exitErr.ExitCode(); got != 124 {
-		t.Fatalf("exit code = %d, want 124, output: %s", got, string(out))
+	if got := exitErr.ExitCode(); got != 5 {
+		t.Fatalf("exit code = %d, want sandbox setup failure 5, output: %s", got, string(out))
 	}
-	if elapsed >= 2*time.Second {
-		t.Fatalf("timeout took %v, want under 2s, output: %s", elapsed, string(out))
-	}
-	if !strings.Contains(string(out), "command timed out after 100ms") {
-		t.Fatalf("output = %q, want timeout message", string(out))
-	}
-}
-
-func TestMacOSSeatbeltTimeoutKillsBackgroundChild(t *testing.T) {
-	requireSandboxExec(t)
-	bin := filepath.Join(t.TempDir(), "bulle")
-	buildBulleForIntegration(t, bin)
-	project := t.TempDir()
-	armed := filepath.Join(project, "armed")
-	survived := filepath.Join(project, "survived")
-	timeoutDuration := "1s"
-	childDelaySeconds := "4"
-	childDelay := 4 * time.Second
-	script := "(printf armed > " + shellQuote(armed) + "; sleep " + childDelaySeconds + "; printf survived > " + shellQuote(survived) + ") & wait"
-
-	cmd := exec.Command(bin, "--timeout", timeoutDuration, "default", project, "--rw", project, "--rox", "/bin", "--", "/bin/sh", "-c", script)
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatalf("background child script succeeded, output: %s", string(out))
-	}
-	exitErr, ok := err.(*exec.ExitError)
-	if !ok {
-		t.Fatalf("background child script failed with %T, want *exec.ExitError: %v, output: %s", err, err, string(out))
-	}
-	if got := exitErr.ExitCode(); got != 124 {
-		t.Fatalf("exit code = %d, want 124, output: %s", got, string(out))
-	}
-	if _, err := os.Stat(armed); err != nil {
-		t.Fatalf("armed marker missing after timeout: %v, output: %s", err, string(out))
-	}
-	time.Sleep(childDelay + 200*time.Millisecond)
-	if _, err := os.Stat(survived); err == nil {
-		t.Fatalf("survived marker exists after process group timeout kill")
-	} else if !os.IsNotExist(err) {
-		t.Fatalf("stat survived marker: %v", err)
+	if !strings.Contains(string(out), "cannot securely contain descendants that call setsid") {
+		t.Fatalf("output = %q, want fail-closed timeout explanation", string(out))
 	}
 }
 

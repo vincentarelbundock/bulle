@@ -8,7 +8,9 @@ import (
 
 type Probe struct{}
 
-func StartProbe(policy.Policy) Probe { return Probe{} }
+func StartProbe(*policy.Policy) Probe { return Probe{} }
+
+func (Probe) Close() {}
 
 func (Probe) Hints() []string { return nil }
 

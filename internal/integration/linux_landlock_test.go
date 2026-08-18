@@ -80,6 +80,34 @@ func TestLinuxLandlockClosesInheritedFileDescriptors(t *testing.T) {
 	}
 }
 
+func TestLinuxLandlockTimeoutKillsSetsidChild(t *testing.T) {
+	sh := requireCommand(t, "sh")
+	sleep := requireCommand(t, "sleep")
+	setsid := requireCommand(t, "setsid")
+	bin := filepath.Join(t.TempDir(), "bulle")
+	buildBulleForIntegration(t, bin)
+	project := t.TempDir()
+	marker := filepath.Join(project, "setsid-survived")
+	child := shellQuote(sleep) + " 2; printf survived > " + shellQuote(marker)
+	script := shellQuote(setsid) + " " + shellQuote(sh) + " -c " + shellQuote(child) + " & wait"
+	args := append([]string{"--timeout", "200ms", "--rw", project}, linuxRuntimePathArgs(sh, sleep, setsid)...)
+	args = append(args, "--", sh, "-c", script)
+
+	cmd := exec.Command(bin, args...)
+	cmd.Dir = project
+	out, err := cmd.CombinedOutput()
+	if err != nil && strings.Contains(string(out), "--timeout requires a delegated cgroup") {
+		t.Skipf("secure timeout unavailable on this host: %s", out)
+	}
+	if exitErr, ok := err.(*exec.ExitError); !ok || exitErr.ExitCode() != 124 {
+		t.Fatalf("setsid timeout exit = %v, want 124, output: %s", err, out)
+	}
+	time.Sleep(2300 * time.Millisecond)
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("setsid child survived secure timeout: %v, output: %s", err, out)
+	}
+}
+
 func TestLinuxOfflineProfileDeniesSocketCreation(t *testing.T) {
 	bin := filepath.Join(t.TempDir(), "bulle")
 	buildBulleForIntegration(t, bin)
@@ -173,16 +201,20 @@ func TestLinuxLandlockRunsFromProjectPath(t *testing.T) {
 }
 
 func TestLinuxLandlockTimeoutExits124(t *testing.T) {
-	requireExecutables(t, "/bin/sleep")
+	sleep := requireCommand(t, "sleep")
 	bin := filepath.Join(t.TempDir(), "bulle")
 	buildBulleForIntegration(t, bin)
 	project := t.TempDir()
-	args := append([]string{"--timeout", "100ms", "default", project}, linuxRuntimePathArgs()...)
-	args = append(args, "--", "/bin/sleep", "5")
+	args := append([]string{"--timeout", "100ms"}, linuxRuntimePathArgs(sleep)...)
+	args = append(args, "--", sleep, "5")
 
 	start := time.Now()
 	cmd := exec.Command(bin, args...)
+	cmd.Dir = project
 	out, err := cmd.CombinedOutput()
+	if err != nil && strings.Contains(string(out), "--timeout requires a delegated cgroup") {
+		t.Skipf("secure timeout unavailable on this host: %s", out)
+	}
 	if err == nil {
 		t.Fatalf("sleep succeeded, want timeout, output: %s", string(out))
 	}
@@ -204,18 +236,23 @@ func TestLinuxLandlockTimeoutKillsBackgroundChild(t *testing.T) {
 		childDelay        = 4 * time.Second
 	)
 
-	requireExecutables(t, "/bin/sh", "/bin/sleep")
+	sh := requireCommand(t, "sh")
+	sleep := requireCommand(t, "sleep")
 	bin := filepath.Join(t.TempDir(), "bulle")
 	buildBulleForIntegration(t, bin)
 	project := t.TempDir()
 	armed := filepath.Join(project, "armed")
 	survived := filepath.Join(project, "survived")
-	script := "(printf armed > " + shellQuote(armed) + "; sleep " + childDelaySeconds + "; printf survived > " + shellQuote(survived) + ") & wait"
-	args := append([]string{"--timeout", timeoutDuration, "default", project, "--rw", project}, linuxRuntimePathArgs()...)
-	args = append(args, "--", "/bin/sh", "-c", script)
+	script := "(printf armed > " + shellQuote(armed) + "; " + shellQuote(sleep) + " " + childDelaySeconds + "; printf survived > " + shellQuote(survived) + ") & wait"
+	args := append([]string{"--timeout", timeoutDuration, "--rw", project}, linuxRuntimePathArgs(sh, sleep)...)
+	args = append(args, "--", sh, "-c", script)
 
 	cmd := exec.Command(bin, args...)
+	cmd.Dir = project
 	out, err := cmd.CombinedOutput()
+	if err != nil && strings.Contains(string(out), "--timeout requires a delegated cgroup") {
+		t.Skipf("secure timeout unavailable on this host: %s", out)
+	}
 	if err == nil {
 		t.Fatalf("shell succeeded, want timeout, output: %s", string(out))
 	}
@@ -232,14 +269,15 @@ func TestLinuxLandlockTimeoutKillsBackgroundChild(t *testing.T) {
 }
 
 func TestLinuxLandlockTimeoutZeroBehavesLikeNoTimeout(t *testing.T) {
-	requireExecutables(t, "/usr/bin/true")
+	truePath := requireCommand(t, "true")
 	bin := filepath.Join(t.TempDir(), "bulle")
 	buildBulleForIntegration(t, bin)
 	project := t.TempDir()
-	args := append([]string{"--timeout", "0", "default", project}, linuxRuntimePathArgs()...)
-	args = append(args, "--", "/usr/bin/true")
+	args := append([]string{"--timeout", "0"}, linuxRuntimePathArgs(truePath)...)
+	args = append(args, "--", truePath)
 
 	cmd := exec.Command(bin, args...)
+	cmd.Dir = project
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("true failed: %v, output: %s", err, string(out))

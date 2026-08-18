@@ -178,9 +178,12 @@ Profiles carry an env list with the same NAME / NAME=VALUE / glob syntax.
 	"limits": `Timeouts and resource limits.
 
   --timeout DURATION
-                    kill the sandboxed command if it runs longer than DURATION.
+                    kill the whole sandboxed process tree if it runs longer
+                    than DURATION.
                     Go duration syntax such as 30s, 2m, or 1h30m; 0 disables.
-                    Timed-out commands exit 124.
+                    Linux requires a delegated cgroup; macOS has no secure
+                    unprivileged process-tree primitive, so nonzero timeouts
+                    fail before exec there. Timed-out commands exit 124.
   --memory SIZE     cap resident memory, as in 512M or 4G
   --cpu PERCENT     cap CPU use as a percentage of one core, as in 200%
   --nproc N         cap the number of processes in the sandbox

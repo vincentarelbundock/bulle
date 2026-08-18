@@ -140,17 +140,6 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 		// granted: `bulle -- pandoc doc.md` must work without the binary
 		// being granted by hand.
 		opts.AddExec = true
-		if opts.Profile == "" {
-			// A bare command whose name is some profile's default_app is
-			// almost certainly meant to run under that profile.
-			matches := profilesMatchingCommand(global, opts.Command[0])
-			if len(matches) == 1 {
-				opts.Profile = matches[0]
-				fmt.Fprintf(stderr, "bulle: using profile %q because its default_app runs %q; name a profile before -- to choose explicitly\n", matches[0], opts.Command[0])
-			} else if len(matches) > 1 {
-				fmt.Fprintf(stderr, "bulle: profiles %s all declare a default_app running %q; running under the default profile — name one before -- to choose\n", strings.Join(matches, ", "), opts.Command[0])
-			}
-		}
 		// Library discovery scans the granted executable trees, which a
 		// profile can make enormous; with no profile selected the sandbox is
 		// minimal and the scan is what makes an arbitrary command runnable.
@@ -274,10 +263,10 @@ func runMain(args []string, policyFormat string, stdout io.Writer, stderr io.Wri
 	for _, note := range p.Notes {
 		fmt.Fprintf(stderr, "bulle: %s\n", note)
 	}
-	p.Command = commandWithSessionPermissions(opts.Profile, p.Command, preRunSessionPaste(opts, p))
 	// All runs go through the supervisor (even without a timeout) so a parent
 	// process survives the sandboxed command and can report on its failure.
-	probe := record.StartProbe(p)
+	probe := record.StartProbe(&p)
+	defer probe.Close()
 	code := exitcode.OK
 	failed := false
 	if err := supervisor.Run(p, supervisor.Options{

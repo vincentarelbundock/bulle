@@ -2,6 +2,7 @@ package integration
 
 import (
 	"os"
+	"os/exec"
 	"testing"
 )
 
@@ -54,4 +55,13 @@ func requireExecutables(t *testing.T, paths ...string) {
 			t.Skipf("%s is not an executable on this machine", path)
 		}
 	}
+}
+
+func requireCommand(t *testing.T, name string) string {
+	t.Helper()
+	path, err := exec.LookPath(name)
+	if err != nil {
+		t.Skipf("%s is unavailable on this machine", name)
+	}
+	return path
 }

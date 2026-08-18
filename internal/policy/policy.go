@@ -51,6 +51,11 @@ type Policy struct {
 	// example, a truncated add_libs scan). They are printed to stderr before
 	// the sandboxed command runs.
 	Notes []string
+
+	// AuditMarker is an internal file the Linux child deliberately attempts to
+	// read after entering its Landlock domain. Its denial identifies that exact
+	// domain in the global kernel audit log. It is never granted to the target.
+	AuditMarker string
 }
 
 type View struct {

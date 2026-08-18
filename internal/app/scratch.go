@@ -11,12 +11,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"golang.org/x/sys/unix"
 
 	"github.com/vincentarelbundock/bulle/internal/record"
+	"github.com/vincentarelbundock/bulle/internal/trustedexec"
 )
 
 // scratchState describes a disposable clone of the workspace created for a
@@ -64,9 +64,6 @@ func createScratch(origin string, configuredRoot string, invocation []string, st
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		return nil, err
 	}
-	if !sameFilesystem(origin, root) {
-		fmt.Fprintf(stderr, "bulle: scratch directory %s is on a different filesystem than the workspace; git objects will be copied, not hardlinked\n", root)
-	}
 	if _, err := os.Stat(filepath.Join(origin, ".gitmodules")); err == nil {
 		fmt.Fprintln(stderr, "bulle: warning: submodules are not carried into the scratch")
 	}
@@ -84,7 +81,11 @@ func createScratch(origin string, configuredRoot string, invocation []string, st
 	}
 	branch, _ := runGit(origin, "symbolic-ref", "--short", "-q", "HEAD")
 
-	if _, err := runGit("", "clone", "--local", "--no-checkout", "--quiet", origin, tmp); err != nil {
+	// --no-hardlinks is a security property, not a performance preference.
+	// The scratch is writable by hostile code; sharing object-file inodes with
+	// the origin would let that code corrupt the supposedly unreachable source
+	// repository by chmodding and overwriting a hardlinked object.
+	if _, err := runGit("", "clone", "--local", "--no-hardlinks", "--no-checkout", "--quiet", origin, tmp); err != nil {
 		cleanup()
 		return nil, fmt.Errorf("--scratch: clone failed: %w", err)
 	}
@@ -148,7 +149,10 @@ func carryDirtyState(origin, scratch, base string) (modified int, untracked int,
 	if len(bytes.TrimSpace(diff)) > 0 {
 		names, _ := runGit(origin, "diff", "--name-only", base)
 		modified = len(strings.Fields(names))
-		cmd := exec.Command("git", "-C", scratch, "apply", "--binary", "--whitespace=nowarn")
+		cmd, err := trustedGitCommand("-C", scratch, "apply", "--binary", "--whitespace=nowarn")
+		if err != nil {
+			return 0, 0, err
+		}
 		cmd.Stdin = bytes.NewReader(diff)
 		var errBuf bytes.Buffer
 		cmd.Stderr = &errBuf
@@ -187,12 +191,18 @@ func worktreeTree(scratch string) (string, error) {
 	os.Remove(indexPath) // git add refuses a zero-byte index file
 	defer os.Remove(indexPath)
 	env := append(os.Environ(), "GIT_INDEX_FILE="+indexPath)
-	add := exec.Command("git", scratchGitArgs(scratch, "add", "-A")...)
+	add, err := trustedGitCommand(scratchGitArgs(scratch, "add", "-A")...)
+	if err != nil {
+		return "", err
+	}
 	add.Env = env
 	if out, err := add.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("git add: %s", strings.TrimSpace(string(out)))
 	}
-	write := exec.Command("git", scratchGitArgs(scratch, "write-tree")...)
+	write, err := trustedGitCommand(scratchGitArgs(scratch, "write-tree")...)
+	if err != nil {
+		return "", err
+	}
 	write.Env = env
 	out, err := write.Output()
 	if err != nil {
@@ -290,7 +300,11 @@ func scratchIsDirty(s *scratchState) bool {
 // leaves the origin mid-merge, and the user resolves it there with normal
 // git; the scratch stays around until they wipe it themselves.
 func pullScratch(s *scratchState, stdout, stderr io.Writer) bool {
-	cmd := exec.Command("git", "-C", s.Origin, "pull", "--no-rebase", s.Dir)
+	cmd, err := trustedGitCommand("-C", s.Origin, "pull", "--no-rebase", s.Dir)
+	if err != nil {
+		fmt.Fprintf(stderr, "bulle: pull failed: %v\n", err)
+		return false
+	}
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
@@ -334,7 +348,11 @@ func scratchChangeSummary(s *scratchState, final string) (lines []string, added,
 // pageScratchDiff shows the full diff with the user's terminal inherited, so
 // git's own pager takes over.
 func pageScratchDiff(s *scratchState, final string, stderr io.Writer) {
-	cmd := exec.Command("git", scratchGitArgs(s.Dir, "diff", s.BaselineTree, final)...)
+	cmd, err := trustedGitCommand(scratchGitArgs(s.Dir, "diff", s.BaselineTree, final)...)
+	if err != nil {
+		fmt.Fprintf(stderr, "bulle: diff failed: %v\n", err)
+		return
+	}
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -515,7 +533,10 @@ func runGitRaw(dir string, args ...string) ([]byte, error) {
 	if dir != "" {
 		args = append([]string{"-C", dir}, args...)
 	}
-	cmd := exec.Command("git", args...)
+	cmd, err := trustedGitCommand(args...)
+	if err != nil {
+		return nil, err
+	}
 	var errBuf bytes.Buffer
 	cmd.Stderr = &errBuf
 	out, err := cmd.Output()
@@ -527,6 +548,14 @@ func runGitRaw(dir string, args ...string) ([]byte, error) {
 		return nil, fmt.Errorf("git %s: %s", strings.Join(args, " "), msg)
 	}
 	return out, nil
+}
+
+func trustedGitCommand(args ...string) (*exec.Cmd, error) {
+	git, err := trustedexec.LookPath("git", os.Getenv("PATH"))
+	if err != nil {
+		return nil, fmt.Errorf("refusing to run git outside the sandbox: %w", err)
+	}
+	return exec.Command(git, args...), nil
 }
 
 func copyFile(src, dst string) error {
@@ -561,20 +590,6 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return out.Close()
-}
-
-func sameFilesystem(a, b string) bool {
-	statA, errA := os.Stat(a)
-	statB, errB := os.Stat(b)
-	if errA != nil || errB != nil {
-		return true // unknown: stay quiet rather than warn spuriously
-	}
-	sysA, okA := statA.Sys().(*syscall.Stat_t)
-	sysB, okB := statB.Sys().(*syscall.Stat_t)
-	if !okA || !okB {
-		return true
-	}
-	return sysA.Dev == sysB.Dev
 }
 
 // stdinIsTerminal is a real isatty check: /dev/null is a character device

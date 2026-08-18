@@ -11,6 +11,7 @@ import (
 // A landlockDenial is one Landlock audit record emitted by the kernel for an
 // access the sandbox refused (Linux 6.15+, Landlock ABI v7).
 type landlockDenial struct {
+	Domain   string
 	Blockers []string
 	Path     string
 	Raw      string
@@ -21,6 +22,7 @@ type landlockDenial struct {
 //	audit: type=1423 audit(1729738800.268:30): domain=195ba459b blockers=fs.read_file path="/etc/shadow" dev="vda2" ino=1523541
 //	audit: type=1423 audit(1729738800.268:31): domain=195ba459b blockers=net.connect_tcp daddr=127.0.0.1 dest=443
 var landlockDenialPattern = regexp.MustCompile(`\bblockers=([a-z_.,]+)(?:\s+path="((?:[^"\\]|\\.)*)")?`)
+var landlockDomainPattern = regexp.MustCompile(`\bdomain=([0-9a-fA-F]+)\b`)
 
 var kernelTimestampPattern = regexp.MustCompile(`^\[\s*(\d+\.\d+)\]`)
 
@@ -36,10 +38,12 @@ func parseLandlockDenials(lines []string, sinceUptime float64) []landlockDenial 
 			}
 		}
 		match := landlockDenialPattern.FindStringSubmatch(line)
-		if match == nil {
+		domain := landlockDomainPattern.FindStringSubmatch(line)
+		if match == nil || domain == nil {
 			continue
 		}
 		denials = append(denials, landlockDenial{
+			Domain:   domain[1],
 			Blockers: strings.Split(match[1], ","),
 			Path:     unescapeAuditPath(match[2]),
 			Raw:      strings.TrimSpace(line),

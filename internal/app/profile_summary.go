@@ -197,39 +197,6 @@ func resolvedRights(p policy.Policy) map[string]string {
 	return out
 }
 
-func preRunSessionPaste(opts cli.Options, p policy.Policy) string {
-	if !shouldPrintProfileSummary(opts) {
-		return ""
-	}
-	var b strings.Builder
-	// Agents get exact paths: an abbreviated store hash is not a real path
-	// and would mislead any reasoning about what the sandbox grants.
-	writeProfilePermissionSummary(opts.Profile, p, &b, false)
-	return "For context, bulle launched this session with the following sandbox permissions. Use this as background information; no response is required.\n\n" + b.String()
-}
-
-func commandWithSessionPermissions(profileName string, command []string, summary string) []string {
-	if summary == "" || len(command) == 0 || filepath.Base(command[0]) != profileName {
-		return command
-	}
-	out := make([]string, 0, len(command)+2)
-	out = append(out, command[0])
-	switch profileName {
-	case "claude":
-		out = append(out, "--system-prompt", summary)
-	case "pi":
-		out = append(out, "--append-system-prompt", summary)
-	case "opencode":
-		out = append(out, "--prompt", summary)
-	case "codex":
-		out = append(out, command[1:]...)
-		return append(out, summary)
-	default:
-		return command
-	}
-	return append(out, command[1:]...)
-}
-
 // Right bits for display-time subsumption checks; strongest last so
 // overlapping grants keep their widest right.
 const (

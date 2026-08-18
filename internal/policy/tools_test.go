@@ -131,6 +131,40 @@ func TestExpandToolResolversDoesNotRunProfileSuppliedCommands(t *testing.T) {
 	}
 }
 
+func TestToolResolverRefusesWritablePATHExecutable(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "resolver-ran")
+	fakeGo := filepath.Join(dir, "go")
+	writeToolTestExecutable(t, fakeGo, "#!/bin/sh\ntouch \"$MARKER\"\nprintf '/tmp/attacker-controlled\\n'\n")
+	_, _, err := expandToolResolvers(
+		[]string{"go:path"},
+		"rw",
+		dir,
+		map[string]string{"PATH": dir, "HOME": t.TempDir(), "MARKER": marker},
+	)
+	if err == nil || !strings.Contains(err.Error(), "writable") {
+		t.Fatalf("resolver error = %v, want writable-executable refusal", err)
+	}
+	if toolTestFileExists(marker) {
+		t.Fatal("writable PATH resolver executed outside the sandbox")
+	}
+}
+
+func TestResolverEnvironmentDropsSecrets(t *testing.T) {
+	env := resolverEnvironment("go", "/usr/bin:/bin", map[string]string{
+		"HOME": "/home/user", "PATH": "/usr/bin:/bin", "GOPATH": "/go",
+		"OPENAI_API_KEY": "secret", "CODEX_CONNECTORS_TOKEN": "secret",
+	})
+	if env["GOPATH"] != "/go" {
+		t.Fatalf("GOPATH = %q, want /go", env["GOPATH"])
+	}
+	for _, key := range []string{"OPENAI_API_KEY", "CODEX_CONNECTORS_TOKEN"} {
+		if _, ok := env[key]; ok {
+			t.Fatalf("resolver environment retained secret %s", key)
+		}
+	}
+}
+
 func TestKnownResolverToolsAreSortedAndUnique(t *testing.T) {
 	tools := KnownResolverTools()
 	for i := 1; i < len(tools); i++ {
@@ -154,6 +188,20 @@ func TestEveryRegistryEntryParsesAsAResolver(t *testing.T) {
 		}
 		if len(r.argv) == 0 {
 			t.Fatalf("registry entry %q has no command", entry)
+		}
+	}
+}
+
+func TestRResolversDisableEveryUserStartupSource(t *testing.T) {
+	for _, r := range toolResolvers {
+		if r.tool != "r" {
+			continue
+		}
+		joined := " " + strings.Join(r.argv, " ") + " "
+		for _, flag := range []string{" --no-environ ", " --no-init-file ", " --no-site-file "} {
+			if !strings.Contains(joined, flag) {
+				t.Errorf("resolver r:%s argv %v lacks %s", r.aspect, r.argv, strings.TrimSpace(flag))
+			}
 		}
 	}
 }

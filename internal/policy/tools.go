@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -11,11 +12,12 @@ import (
 	"time"
 
 	bpaths "github.com/vincentarelbundock/bulle/internal/paths"
+	"github.com/vincentarelbundock/bulle/internal/trustedexec"
 )
 
 // toolResolverTimeout bounds a single registry query. Interpreters can be slow
-// to start (R reads its startup files), but a resolver that has not answered in
-// this long is hung, not busy.
+// to start even with user startup files disabled, but a resolver that has not
+// answered in this long is hung, not busy.
 const toolResolverTimeout = 5 * time.Second
 
 type resolverFormat int
@@ -53,25 +55,25 @@ type toolResolver struct {
 var toolResolvers = []toolResolver{
 	{
 		tool: "r", aspect: "home",
-		argv:        []string{"Rscript", "--no-init-file", "--no-site-file", "-e", `cat(R.home())`},
+		argv:        []string{"Rscript", "--no-environ", "--no-init-file", "--no-site-file", "-e", `cat(R.home())`},
 		format:      formatSingle,
 		description: "R installation directory (R.home()), including etc/ and lib/",
 	},
 	{
 		tool: "r", aspect: "prefix",
-		argv:        []string{"Rscript", "--no-init-file", "--no-site-file", "-e", `cat(dirname(dirname(R.home())))`},
+		argv:        []string{"Rscript", "--no-environ", "--no-init-file", "--no-site-file", "-e", `cat(dirname(dirname(R.home())))`},
 		format:      formatSingle,
 		description: "R installation prefix, for builds whose bin/ sits beside R_HOME",
 	},
 	{
 		tool: "r", aspect: "libs",
-		argv:        []string{"Rscript", "--no-init-file", "--no-site-file", "-e", `cat(.libPaths(), sep="\n")`},
+		argv:        []string{"Rscript", "--no-environ", "--no-init-file", "--no-site-file", "-e", `cat(.libPaths(), sep="\n")`},
 		format:      formatLines,
 		description: "every directory on R's package search path (.libPaths())",
 	},
 	{
 		tool: "r", aspect: "libs-user",
-		argv:        []string{"Rscript", "--no-init-file", "--no-site-file", "-e", `cat(Sys.getenv("R_LIBS_USER"))`},
+		argv:        []string{"Rscript", "--no-environ", "--no-init-file", "--no-site-file", "-e", `cat(Sys.getenv("R_LIBS_USER"))`},
 		format:      formatSingle,
 		description: "R's writable user library (R_LIBS_USER)",
 	},
@@ -242,10 +244,14 @@ func (r toolResolver) run(parentPATH string, parentEnv map[string]string) ([]str
 	if err != nil {
 		return nil, fmt.Errorf("%q not found on parent PATH", r.argv[0])
 	}
+	binary, err = trustedexec.Resolve(binary)
+	if err != nil {
+		return nil, fmt.Errorf("refusing to execute resolver %q before sandbox setup: %w", r.argv[0], err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), toolResolverTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, binary, r.argv[1:]...)
-	cmd.Env = envSlice(parentEnv)
+	cmd.Env = envSlice(resolverEnvironment(r.tool, parentPATH, parentEnv))
 	// Resolvers run before any sandbox exists, so whatever they read is read
 	// with the user's full authority. Several of them source files from the
 	// current directory — R evaluates ./.Rprofile, npm reads ./.npmrc, go reads
@@ -273,6 +279,60 @@ func (r toolResolver) run(parentPATH string, parentEnv map[string]string) ([]str
 	// (an .npmrc in the workspace decides what "npm config get cache" prints).
 	paths = dropSystemRoots(paths, parentEnv["HOME"])
 	return paths, nil
+}
+
+// resolverEnvironment retains only the small set of non-secret variables each
+// metadata query needs. Resolver commands run before the target sandbox exists,
+// so inheriting the caller's full environment would expose credentials and
+// allow user configuration to alter privileged helper behavior.
+func resolverEnvironment(tool string, parentPATH string, parentEnv map[string]string) map[string]string {
+	out := map[string]string{
+		"HOME":    parentEnv["HOME"],
+		"USER":    parentEnv["USER"],
+		"LOGNAME": parentEnv["LOGNAME"],
+		"LANG":    parentEnv["LANG"],
+		"LC_ALL":  parentEnv["LC_ALL"],
+		"PATH":    trustedResolverPATH(parentPATH),
+	}
+	allowed := map[string][]string{
+		"r":      {"R_HOME", "R_LIBS", "R_LIBS_USER", "R_LIBS_SITE", "R_USER"},
+		"uv":     {"UV_CACHE_DIR", "UV_TOOL_DIR", "UV_PYTHON_INSTALL_DIR", "UV_PYTHON_BIN_DIR", "UV_TOOL_BIN_DIR", "XDG_CACHE_HOME", "XDG_DATA_HOME"},
+		"tex":    {"TEXMFHOME", "TEXMFVAR", "TEXMFCONFIG"},
+		"go":     {"GOROOT", "GOPATH", "GOMODCACHE"},
+		"npm":    {"npm_config_cache"},
+		"quarto": {"QUARTO_DENO", "QUARTO_PANDOC"},
+	}
+	for _, key := range allowed[tool] {
+		if value, ok := parentEnv[key]; ok {
+			out[key] = value
+		}
+	}
+	// Prevent per-user configuration from turning metadata queries into tool
+	// downloads or from changing which config file npm evaluates.
+	if tool == "go" {
+		out["GOENV"] = "off"
+		out["GOTOOLCHAIN"] = "local"
+	}
+	if tool == "npm" {
+		out["NPM_CONFIG_USERCONFIG"] = os.DevNull
+	}
+	return out
+}
+
+func trustedResolverPATH(parentPATH string) string {
+	seen := map[string]bool{}
+	trusted := []string{}
+	for _, dir := range filepath.SplitList(parentPATH) {
+		if dir == "" || !filepath.IsAbs(dir) {
+			continue
+		}
+		real, err := trustedexec.Resolve(dir)
+		if err == nil && !seen[real] {
+			seen[real] = true
+			trusted = append(trusted, real)
+		}
+	}
+	return strings.Join(trusted, string(os.PathListSeparator))
 }
 
 // keepAppBundleRoots maps each path to the nearest enclosing .app directory,

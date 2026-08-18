@@ -19,10 +19,10 @@
 You can spin up an agent with restricted permissions using this simple command:
 
 ```bash
-bulle /path/to/project -- claude
+bulle claude /path/to/project
 ```
 
-`bulle` notices that the built-in `claude` profile is designed to run this command, announces the profile it selected, and applies its permissions automatically. The same works for `codex`, `opencode`, and `pi`.
+The profile is always explicit: `claude` selects the built-in Claude profile and launches its declared default app. The same form works for `codex`, `opencode`, and `pi`; `bulle` never selects a credential-bearing profile merely because a command has a matching basename.
 
 Sandboxes are not limited to agents. You can use `bulle` to run any command with custom permissions. See the #link("#quick-start")[Quick start] section below, #link("permissions.html")[Permissions] for the grants you write by hand, and the #link("cli-reference.html")[CLI reference] for every flag.
 
@@ -91,24 +91,17 @@ That error is intentional: even finding and executing `ls` requires permission. 
 bulle --rox /bin -- ls
 ```
 
-Instead of specifying the path of every command manually, we can use #link("profiles.html")[profiles]: named bundles of permissions for common tools. `bulle` ships with built-in profiles for several coding agents, and when your command matches the tool a profile was made for, `bulle` selects that profile for you. The commands below each give read-write access to a workspace and launch an agent with minimal permissions:
+Instead of specifying the path of every command manually, we can use #link("profiles.html")[profiles]: explicitly selected bundles of permissions for common tools. `bulle` never selects a credential-bearing profile from an executable basename. The commands below each give read-write access to a workspace and launch an agent with the named profile:
 
 ```sh
-bulle -- claude
-# bulle /path/to/project -- claude
-# bulle -- codex
-# bulle -- pi
-# bulle -- opencode
+bulle claude
+# bulle claude /path/to/project
+# bulle codex
+# bulle pi
+# bulle opencode
 ```
 
-`bulle` announces the choice on startup, for example:
-
-```text
-bulle: selected profile "claude" because its default_app runs "claude" and
-the default profile cannot; pass --profile to choose explicitly
-```
-
-You can always pick a profile explicitly instead --- `bulle --profile claude`, which also launches the app for you --- or combine profiles and one-off grants; see #link("profiles.html")[Profiles] for the distinction between selecting profiles and letting `bulle` infer one.
+Profiles can be combined left to right (`bulle claude,offline`) and composed with one-off grants. See #link("profiles.html")[Profiles] for the complete model.
 
 = Where to go next
 

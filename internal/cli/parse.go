@@ -88,7 +88,7 @@ type Flags struct {
 	NoDefaults bool `name:"no-defaults" help:"Ignore the [defaults] block of the user configuration."`
 
 	NoWorkspace bool   `name:"no-workspace" help:"Do not automatically grant the workspace read-write access."`
-	Timeout     string `name:"timeout" placeholder:"DURATION" help:"Kill the sandboxed command if it runs longer than DURATION, using Go duration syntax such as 30s, 2m, or 1h30m; 0 disables."`
+	Timeout     string `name:"timeout" placeholder:"DURATION" help:"Kill the whole sandboxed process tree after DURATION (Linux with a delegated cgroup; unavailable on macOS); 0 disables."`
 
 	Memory  string `name:"memory" placeholder:"SIZE" help:"Cap the sandbox's resident memory, as in 512M or 4G. Linux only (cgroup v2)."`
 	CPU     string `name:"cpu" placeholder:"PERCENT" help:"Cap the sandbox's CPU use as a percentage of one core, as in 200% for two cores. Linux only (cgroup v2)."`

@@ -3,63 +3,148 @@
 package backends
 
 import (
+	"errors"
+	"fmt"
 	"os"
+	"runtime"
+	"syscall"
 
-	"github.com/landlock-lsm/go-landlock/landlock"
 	llsyscall "github.com/landlock-lsm/go-landlock/landlock/syscall"
 	"github.com/vincentarelbundock/bulle/internal/policy"
+	"golang.org/x/sys/unix"
 )
 
 func applyLandlockFilesystem(p policy.Policy) error {
-	llCfg := landlock.V3
-	// On kernels with Landlock audit support (ABI v7, Linux 6.15+), ask the
-	// kernel to log denials hit by the sandboxed command after execve. The
-	// supervisor reads these back on failure to suggest policy fixes; they are
-	// also visible via journalctl/dmesg. Enforcement stays strict V3 either way.
-	if abi, err := llsyscall.LandlockGetABIVersion(); err == nil && abi >= 7 {
-		llCfg = llCfg.EnableLoggingForSubprocesses()
+	abi, err := llsyscall.LandlockGetABIVersion()
+	if err != nil {
+		return fmt.Errorf("detect Landlock ABI: %w", err)
 	}
-	rules := []landlock.Rule{}
-	for _, path := range p.ReadOnlyExec {
-		rules = append(rules, landlock.PathAccess(fsRights(path, true, false), path))
+	if abi < 3 {
+		return fmt.Errorf("Landlock ABI v3 or newer is required (detected v%d)", abi)
 	}
-	for _, path := range p.ReadWriteExec {
-		rules = append(rules, landlock.PathAccess(fsRights(path, true, true), path))
+
+	// V3 handles every filesystem right through TRUNCATE. Keeping this fixed at
+	// V3 preserves Bulle's existing contract on newer kernels instead of
+	// silently beginning to restrict rights introduced by future ABIs.
+	const handledAccessFS = (uint64(1) << 15) - 1
+	ruleset, err := llsyscall.LandlockCreateRuleset(&llsyscall.RulesetAttr{HandledAccessFS: handledAccessFS}, 0)
+	if err != nil {
+		return fmt.Errorf("create Landlock ruleset: %w", err)
 	}
-	for _, path := range p.ReadOnly {
-		rules = append(rules, landlock.PathAccess(fsRights(path, false, false), path))
+	defer syscall.Close(ruleset)
+
+	for _, group := range []struct {
+		paths      []string
+		executable bool
+		writable   bool
+	}{
+		{p.ReadOnlyExec, true, false},
+		{p.ReadWriteExec, true, true},
+		{p.ReadOnly, false, false},
+		{p.ReadWrite, false, true},
+	} {
+		for _, path := range group.paths {
+			if err := addStableLandlockPath(ruleset, path, group.executable, group.writable); err != nil {
+				return err
+			}
+		}
 	}
-	for _, path := range p.ReadWrite {
-		rules = append(rules, landlock.PathAccess(fsRights(path, false, true), path))
+	if abi < 8 {
+		// libpsx enumerates this directory after restricting the first thread so
+		// it can apply the ruleset to the remaining Go runtime threads. Without
+		// this narrow rule, Landlock blocks libpsx midway through enforcement.
+		taskDir := fmt.Sprintf("/proc/%d/task", os.Getpid())
+		if err := addStableLandlockAccess(ruleset, taskDir, llsyscall.AccessFSReadDir); err != nil {
+			return err
+		}
 	}
-	if len(rules) == 0 {
-		return llCfg.Restrict()
+
+	flags := uint32(0)
+	if abi >= 7 {
+		flags |= llsyscall.FlagRestrictSelfLogNewExecOn
 	}
-	return llCfg.RestrictPaths(rules...)
+	if abi >= 8 {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		if err := unix.Prctl(unix.PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0); err != nil {
+			return fmt.Errorf("set no_new_privs: %w", err)
+		}
+		if err := llsyscall.LandlockRestrictSelf(ruleset, flags|llsyscall.FlagRestrictSelfTSync); err != nil {
+			return fmt.Errorf("apply Landlock ruleset: %w", err)
+		}
+		return nil
+	}
+	if err := llsyscall.AllThreadsPrctl(unix.PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0); err != nil {
+		return fmt.Errorf("set no_new_privs on all threads: %w", err)
+	}
+	if err := llsyscall.AllThreadsLandlockRestrictSelf(ruleset, flags); err != nil {
+		return fmt.Errorf("apply Landlock ruleset on all threads: %w", err)
+	}
+	return nil
 }
 
-func fsRights(path string, executable bool, writable bool) landlock.AccessFSSet {
-	info, err := os.Stat(path)
-	dir := err == nil && info.IsDir()
-	access := landlock.AccessFSSet(0)
-	access |= landlock.AccessFSSet(llsyscall.AccessFSReadFile)
+func addStableLandlockAccess(ruleset int, path string, access uint64) error {
+	how := &unix.OpenHow{Flags: unix.O_PATH | unix.O_CLOEXEC, Resolve: unix.RESOLVE_NO_SYMLINKS}
+	fd, err := unix.Openat2(unix.AT_FDCWD, path, how)
+	if err != nil {
+		return fmt.Errorf("open stable Landlock path %q: %w", path, err)
+	}
+	defer unix.Close(fd)
+	attr := llsyscall.PathBeneathAttr{ParentFd: fd, AllowedAccess: access}
+	if err := llsyscall.LandlockAddPathBeneathRule(ruleset, &attr, 0); err != nil {
+		return fmt.Errorf("add stable Landlock path %q: %w", path, err)
+	}
+	return nil
+}
+
+// addStableLandlockPath opens a path without following any symlink component
+// and adds the rule using that already-open descriptor. Policy resolution also
+// includes each symlink's canonical target, so skipping the alias is both
+// compatible and immune to a repointing race between validation and sandbox
+// entry.
+func addStableLandlockPath(ruleset int, path string, executable bool, writable bool) error {
+	how := &unix.OpenHow{
+		Flags:   unix.O_PATH | unix.O_CLOEXEC,
+		Resolve: unix.RESOLVE_NO_SYMLINKS,
+	}
+	fd, err := unix.Openat2(unix.AT_FDCWD, path, how)
+	if errors.Is(err, unix.ELOOP) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("open stable Landlock path %q: %w", path, err)
+	}
+	defer unix.Close(fd)
+
+	var stat unix.Stat_t
+	if err := unix.Fstat(fd, &stat); err != nil {
+		return fmt.Errorf("stat stable Landlock path %q: %w", path, err)
+	}
+	attr := llsyscall.PathBeneathAttr{
+		ParentFd:      fd,
+		AllowedAccess: fsRights(stat.Mode&unix.S_IFMT == unix.S_IFDIR, executable, writable),
+	}
+	if err := llsyscall.LandlockAddPathBeneathRule(ruleset, &attr, 0); err != nil {
+		return fmt.Errorf("add stable Landlock path %q: %w", path, err)
+	}
+	return nil
+}
+
+func fsRights(dir bool, executable bool, writable bool) uint64 {
+	access := uint64(llsyscall.AccessFSReadFile)
 	if executable {
-		access |= landlock.AccessFSSet(llsyscall.AccessFSExecute)
+		access |= llsyscall.AccessFSExecute
 	}
 	if writable {
-		access |= landlock.AccessFSSet(llsyscall.AccessFSWriteFile)
-		access |= landlock.AccessFSSet(llsyscall.AccessFSTruncate)
+		access |= llsyscall.AccessFSWriteFile | llsyscall.AccessFSTruncate
 	}
 	if dir {
-		access |= landlock.AccessFSSet(llsyscall.AccessFSReadDir)
+		access |= llsyscall.AccessFSReadDir
 		if writable {
-			access |= landlock.AccessFSSet(llsyscall.AccessFSRemoveDir)
-			access |= landlock.AccessFSSet(llsyscall.AccessFSRemoveFile)
-			access |= landlock.AccessFSSet(llsyscall.AccessFSMakeDir)
-			access |= landlock.AccessFSSet(llsyscall.AccessFSMakeReg)
-			access |= landlock.AccessFSSet(llsyscall.AccessFSMakeSock)
-			access |= landlock.AccessFSSet(llsyscall.AccessFSMakeFifo)
-			access |= landlock.AccessFSSet(llsyscall.AccessFSMakeSym)
+			access |= llsyscall.AccessFSRemoveDir | llsyscall.AccessFSRemoveFile
+			access |= llsyscall.AccessFSMakeDir | llsyscall.AccessFSMakeReg
+			access |= llsyscall.AccessFSMakeSock | llsyscall.AccessFSMakeFifo
+			access |= llsyscall.AccessFSMakeSym
 		}
 	}
 	return access

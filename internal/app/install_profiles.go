@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/vincentarelbundock/bulle/internal/config"
+	"github.com/vincentarelbundock/bulle/internal/trustedexec"
 )
 
 // installProfiles copies profile files from a local directory or a GitHub
@@ -141,7 +142,12 @@ func cloneProfileRepository(repo string, subdir string) (string, func(), error) 
 	}
 	cleanup := func() { _ = os.RemoveAll(tmp) }
 	checkout := filepath.Join(tmp, "repo")
-	cmd := exec.Command("git", "clone", "--depth", "1", repo, checkout)
+	git, err := trustedexec.LookPath("git", os.Getenv("PATH"))
+	if err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("refusing to run git outside the sandbox: %w", err)
+	}
+	cmd := exec.Command(git, "clone", "--depth", "1", repo, checkout)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		cleanup()

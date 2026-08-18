@@ -13,7 +13,9 @@ import (
 
 	llsyscall "github.com/landlock-lsm/go-landlock/landlock/syscall"
 
+	bpaths "github.com/vincentarelbundock/bulle/internal/paths"
 	"github.com/vincentarelbundock/bulle/internal/policy"
+	"github.com/vincentarelbundock/bulle/internal/trustedexec"
 )
 
 const denialLogTimeout = 2 * time.Second
@@ -54,16 +56,30 @@ func readKernelLog(since time.Time) (lines []string, viaDmesg bool) {
 	// Denial records reach the journal as _TRANSPORT=audit when journald's
 	// audit socket collects them, or as _TRANSPORT=kernel (printk fallback)
 	// when nothing listens on the audit netlink socket.
-	out, err := exec.CommandContext(ctx, "journalctl", "--quiet", "--no-pager",
-		"--output=cat", fmt.Sprintf("--since=@%d", since.Unix()),
-		"_TRANSPORT=audit", "+", "_TRANSPORT=kernel").Output()
+	journalctl, err := trustedexec.First(
+		"/usr/bin/journalctl",
+		"/bin/journalctl",
+		"/run/current-system/sw/bin/journalctl",
+	)
 	if err == nil {
-		return strings.Split(string(out), "\n"), false
+		out, runErr := exec.CommandContext(ctx, journalctl, "--quiet", "--no-pager",
+			"--output=cat", fmt.Sprintf("--since=@%d", since.Unix()),
+			"_TRANSPORT=audit", "+", "_TRANSPORT=kernel").Output()
+		if runErr == nil {
+			return strings.Split(string(out), "\n"), false
+		}
 	}
 
-	out, err = exec.CommandContext(ctx, "dmesg").Output()
+	dmesg, err := trustedexec.First(
+		"/usr/bin/dmesg",
+		"/bin/dmesg",
+		"/run/current-system/sw/bin/dmesg",
+	)
 	if err == nil {
-		return strings.Split(string(out), "\n"), true
+		out, runErr := exec.CommandContext(ctx, dmesg).Output()
+		if runErr == nil {
+			return strings.Split(string(out), "\n"), true
+		}
 	}
 	return nil, false
 }
@@ -72,15 +88,40 @@ type Probe struct {
 	start       time.Time
 	startUptime float64
 	enabled     bool
+	marker      string
 }
 
 // StartProbe records where the kernel log ends before the sandboxed
 // command runs, so only this run's denials are reported afterwards.
-func StartProbe(p policy.Policy) Probe {
-	if p.Backend != policy.BackendLinuxLandlock || !denialLogSupported() {
+func StartProbe(p *policy.Policy) Probe {
+	if p == nil || p.Backend != policy.BackendLinuxLandlock || !denialLogSupported() {
 		return Probe{}
 	}
-	return Probe{start: time.Now(), startUptime: currentUptime(), enabled: true}
+	file, err := os.CreateTemp("", ".bulle-landlock-audit-*")
+	if err != nil {
+		return Probe{}
+	}
+	marker := file.Name()
+	if err := file.Close(); err != nil {
+		_ = os.Remove(marker)
+		return Probe{}
+	}
+	granted := append([]string{}, p.ReadOnly...)
+	granted = append(granted, p.ReadOnlyExec...)
+	granted = append(granted, p.ReadWrite...)
+	granted = append(granted, p.ReadWriteExec...)
+	if bpaths.IsWithinAnyRootResolvingSymlinks(marker, granted) {
+		_ = os.Remove(marker)
+		return Probe{}
+	}
+	p.AuditMarker = marker
+	return Probe{start: time.Now(), startUptime: currentUptime(), enabled: true, marker: marker}
+}
+
+func (probe Probe) Close() {
+	if probe.marker != "" {
+		_ = os.Remove(probe.marker)
+	}
 }
 
 // records returns the denial records the kernel logged since the probe
@@ -97,7 +138,27 @@ func (probe Probe) records() []landlockDenial {
 	if viaDmesg {
 		sinceUptime = probe.startUptime
 	}
-	return parseLandlockDenials(lines, sinceUptime)
+	return denialsForMarkerDomain(parseLandlockDenials(lines, sinceUptime), probe.marker)
+}
+
+func denialsForMarkerDomain(all []landlockDenial, marker string) []landlockDenial {
+	domain := ""
+	for _, denial := range all {
+		if denial.Path == marker {
+			domain = denial.Domain
+			break
+		}
+	}
+	if domain == "" {
+		return nil
+	}
+	out := make([]landlockDenial, 0, len(all))
+	for _, denial := range all {
+		if denial.Domain == domain && denial.Path != marker {
+			out = append(out, denial)
+		}
+	}
+	return out
 }
 
 // Hints returns copy-pasteable suggestions for sandbox denials logged since

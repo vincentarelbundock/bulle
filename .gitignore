@@ -5,6 +5,8 @@
 /dist/
 /build/
 /.worktrees
+/.config/
+/.local/
 
 # Go test and coverage outputs
 *.test

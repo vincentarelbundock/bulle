@@ -86,17 +86,18 @@ audit: type=1423 audit(1729738800.268:30): domain=195ba459b blockers=fs.read_fil
   A denial means the sandbox worked. Before copying a suggested flag, consider whether the command _should_ have that access --- an untrusted tool probing `~/.ssh` is exactly what the sandbox is for.
 ]
 
-= Rerunning with added grants
-<rerun>
+= Retrying with added grants
+<retry>
 
 A sandboxed run often fails because one grant is missing. Alongside the hints above, `bulle` prints a copy-pasteable retry line:
 
 ```text
 bulle: the sandbox denied the following accesses during this run:
   denied: read /home/user/.gitconfig — add --ro ~/.gitconfig
-bulle: retry with these grants: bulle rerun --ro ~/.gitconfig
+bulle: retry with these grants added: --ro ~/.gitconfig
 ```
 
-`bulle rerun` repeats the previous invocation --- from any shell, restoring the original working directory --- and inserts any extra flags before the command, so the retry line works as-is. Each run overwrites the recorded invocation, and repeated `rerun` invocations accumulate their added grants. The sandbox is restarted rather than widened: Landlock cannot extend a live sandbox, and agents resume from their own session state.
-
-The invocation is recorded in `$XDG_STATE_HOME/bulle/last-run.json` (usually `~/.local/state/bulle/`) on Linux and `~/Library/Application Support/bulle/` on macOS.
+Add those flags before `--` in the original invocation and run it again. The
+sandbox is restarted rather than widened: Landlock cannot extend a live
+sandbox, and no command line or prompt is stored or rewritten behind your
+back.

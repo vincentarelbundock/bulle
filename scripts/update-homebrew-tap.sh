@@ -16,7 +16,6 @@ case "${tag}" in
     ;;
 esac
 
-version="${tag#v}"
 source_url="https://github.com/vincentarelbundock/bulle/archive/refs/tags/${tag}.tar.gz"
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
@@ -30,7 +29,18 @@ else
 fi
 
 tap_dir="${tmpdir}/homebrew-tap"
-git clone "https://x-access-token:${HOMEBREW_TAP_GITHUB_TOKEN}@github.com/vincentarelbundock/homebrew-tap.git" "${tap_dir}"
+askpass="${tmpdir}/git-askpass.sh"
+cat >"${askpass}" <<'ASKPASS'
+#!/bin/sh
+case "$1" in
+  *Username*) printf '%s\n' 'x-access-token' ;;
+  *Password*) printf '%s\n' "${HOMEBREW_TAP_GITHUB_TOKEN}" ;;
+esac
+ASKPASS
+chmod 700 "${askpass}"
+export GIT_ASKPASS="${askpass}"
+export GIT_TERMINAL_PROMPT=0
+git clone "https://x-access-token@github.com/vincentarelbundock/homebrew-tap.git" "${tap_dir}"
 cd "${tap_dir}"
 
 mkdir -p Formula

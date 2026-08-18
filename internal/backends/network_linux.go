@@ -116,6 +116,13 @@ func deniedNetworkSyscalls() []uintptr {
 		unix.SYS_LISTEN,
 		unix.SYS_ACCEPT,
 		unix.SYS_ACCEPT4,
+		// io_uring queue entries can perform the socket, connect, send, and
+		// receive operations without issuing those syscall numbers. In an
+		// offline sandbox there are no legitimate inherited rings, so deny the
+		// complete ring API rather than leave a second network syscall surface.
+		unix.SYS_IO_URING_SETUP,
+		unix.SYS_IO_URING_ENTER,
+		unix.SYS_IO_URING_REGISTER,
 	}
 }
 

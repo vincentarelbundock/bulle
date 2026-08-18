@@ -19,6 +19,9 @@ func TestParseLandlockDenials(t *testing.T) {
 	if denials[0].Path != "/etc/shadow" || denials[0].Blockers[0] != "fs.read_file" {
 		t.Errorf("unexpected first denial: %+v", denials[0])
 	}
+	if denials[0].Domain != "195ba459b" {
+		t.Errorf("domain = %q, want 195ba459b", denials[0].Domain)
+	}
 	if !reflect.DeepEqual(denials[1].Blockers, []string{"fs.write_file", "fs.truncate"}) {
 		t.Errorf("unexpected blockers: %+v", denials[1].Blockers)
 	}

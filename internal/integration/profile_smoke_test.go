@@ -23,7 +23,7 @@ type profileSmokeCase struct {
 	// setup prepares unsandboxed state the sandboxed command needs (for
 	// example, a synced project venv for offline uv runs). It runs in the
 	// test's temporary workspace.
-	setup func(t *testing.T, workspace string)
+	setup func(t *testing.T, workspace string, env []string)
 }
 
 func profileSmokeTable() []profileSmokeCase {
@@ -46,9 +46,9 @@ func profileSmokeTable() []profileSmokeCase {
 			name:     "uv-runs-python-offline",
 			profile:  "uv",
 			requires: "uv",
-			setup: func(t *testing.T, workspace string) {
-				run(t, workspace, "uv", "init", "--no-workspace", "--name", "smoke")
-				run(t, workspace, "uv", "sync")
+			setup: func(t *testing.T, workspace string, env []string) {
+				run(t, workspace, env, "uv", "init", "--no-workspace", "--name", "smoke")
+				run(t, workspace, env, "uv", "sync")
 			},
 			args: []string{"uv", "run", "--offline", "python", "-c", `print("smoke-ok")`},
 			want: "smoke-ok",
@@ -57,9 +57,9 @@ func profileSmokeTable() []profileSmokeCase {
 			name:     "uv-base-profile-denies-network",
 			profile:  "uv",
 			requires: "uv",
-			setup: func(t *testing.T, workspace string) {
-				run(t, workspace, "uv", "init", "--no-workspace", "--name", "smoke")
-				run(t, workspace, "uv", "sync")
+			setup: func(t *testing.T, workspace string, env []string) {
+				run(t, workspace, env, "uv", "init", "--no-workspace", "--name", "smoke")
+				run(t, workspace, env, "uv", "sync")
 			},
 			// The two backends deny the network at different syscalls: the
 			// Linux seccomp filter rejects socket(2) outright, while seatbelt
@@ -96,7 +96,7 @@ except OSError:
 			name:     "go-builds-and-runs",
 			profile:  "go",
 			requires: "go",
-			setup: func(t *testing.T, workspace string) {
+			setup: func(t *testing.T, workspace string, env []string) {
 				writeFile(t, workspace, "go.mod", "module smoke\n\ngo 1.22\n")
 				writeFile(t, workspace, "main.go", "package main\n\nimport \"fmt\"\n\nfunc main() { fmt.Println(\"smoke-ok\") }\n")
 			},
@@ -107,7 +107,7 @@ except OSError:
 			name:     "pandoc-converts",
 			profile:  "pandoc",
 			requires: "pandoc",
-			setup: func(t *testing.T, workspace string) {
+			setup: func(t *testing.T, workspace string, env []string) {
 				writeFile(t, workspace, "doc.md", "# Hi\n\nHello *world*.\n")
 			},
 			args: []string{"sh", "-c", "pandoc doc.md -o doc.html && echo smoke-ok"},
@@ -117,7 +117,7 @@ except OSError:
 			name:     "latex-compiles-pdf",
 			profile:  "latex",
 			requires: "pdflatex",
-			setup: func(t *testing.T, workspace string) {
+			setup: func(t *testing.T, workspace string, env []string) {
 				writeFile(t, workspace, "t.tex", "\\documentclass{article}\\begin{document}Hello TeX\\end{document}\n")
 			},
 			args: []string{"sh", "-c", "pdflatex -interaction=batchmode t.tex >/dev/null; test -f t.pdf && echo smoke-ok"},
@@ -127,7 +127,7 @@ except OSError:
 			name:     "quarto-renders-html",
 			profile:  "quarto",
 			requires: "quarto",
-			setup: func(t *testing.T, workspace string) {
+			setup: func(t *testing.T, workspace string, env []string) {
 				writeFile(t, workspace, "q.qmd", "---\ntitle: Smoke\n---\n\nHello **quarto**.\n")
 			},
 			args: []string{"quarto", "render", "q.qmd", "--to", "html"},
@@ -137,8 +137,8 @@ except OSError:
 			name:     "rust-builds-and-runs",
 			profile:  "rust",
 			requires: "cargo",
-			setup: func(t *testing.T, workspace string) {
-				run(t, workspace, "cargo", "init", "--vcs", "none", "--name", "smoke", ".")
+			setup: func(t *testing.T, workspace string, env []string) {
+				run(t, workspace, env, "cargo", "init", "--vcs", "none", "--name", "smoke", ".")
 			},
 			args: []string{"cargo", "run", "-q", "--offline"},
 			want: "Hello, world!",
@@ -155,13 +155,14 @@ func TestProfileSmoke(t *testing.T) {
 				t.Skipf("%s not on PATH", tc.requires)
 			}
 			workspace := t.TempDir()
+			env := isolatedSmokeEnvironment(t)
 			if tc.setup != nil {
-				tc.setup(t, workspace)
+				tc.setup(t, workspace, env)
 			}
 			args := append([]string{tc.profile, workspace, "--rw", workspace, "--"}, tc.args...)
 			cmd := exec.Command(bin, args...)
 			cmd.Dir = workspace
-			cmd.Env = os.Environ()
+			cmd.Env = env
 			out, err := cmd.CombinedOutput()
 			if err != nil {
 				t.Fatalf("profile %s failed: %v\noutput:\n%s", tc.profile, err, string(out))
@@ -180,11 +181,60 @@ func writeFile(t *testing.T, dir string, name string, content string) {
 	}
 }
 
-func run(t *testing.T, dir string, name string, args ...string) {
+func run(t *testing.T, dir string, env []string, name string, args ...string) {
 	t.Helper()
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
+	cmd.Env = env
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("%s %s: %v, output: %s", name, strings.Join(args, " "), err, string(out))
 	}
+}
+
+func isolatedSmokeEnvironment(t *testing.T) []string {
+	t.Helper()
+	root := t.TempDir()
+	originalHome, _ := os.UserHomeDir()
+	values := map[string]string{}
+	for _, entry := range os.Environ() {
+		if key, value, ok := strings.Cut(entry, "="); ok {
+			values[key] = value
+		}
+	}
+	originalUVPython := values["UV_PYTHON_INSTALL_DIR"]
+	if originalUVPython == "" && values["XDG_DATA_HOME"] != "" {
+		originalUVPython = filepath.Join(values["XDG_DATA_HOME"], "uv", "python")
+	}
+	if originalUVPython == "" && originalHome != "" {
+		originalUVPython = filepath.Join(originalHome, ".local", "share", "uv", "python")
+	}
+	setDir := func(key string, parts ...string) {
+		path := filepath.Join(append([]string{root}, parts...)...)
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		values[key] = path
+	}
+	setDir("HOME", "home")
+	setDir("XDG_CACHE_HOME", "cache")
+	setDir("XDG_CONFIG_HOME", "config")
+	setDir("XDG_DATA_HOME", "data")
+	setDir("XDG_STATE_HOME", "state")
+	setDir("CARGO_HOME", "cargo")
+	setDir("GOCACHE", "cache", "go-build")
+	setDir("GOMODCACHE", "go", "pkg", "mod")
+	setDir("GOPATH", "go")
+	setDir("UV_CACHE_DIR", "cache", "uv")
+	values["UV_PYTHON_INSTALL_DIR"] = originalUVPython
+	setDir("TEXMFVAR", "cache", "texmf-var")
+	setDir("TEXMFCONFIG", "config", "texmf")
+	setDir("R_LIBS_USER", "data", "R", "library")
+	if values["RUSTUP_HOME"] == "" && originalHome != "" {
+		values["RUSTUP_HOME"] = filepath.Join(originalHome, ".rustup")
+	}
+	out := make([]string, 0, len(values))
+	for key, value := range values {
+		out = append(out, key+"="+value)
+	}
+	return out
 }

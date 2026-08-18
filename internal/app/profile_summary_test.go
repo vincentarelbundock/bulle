@@ -225,45 +225,6 @@ func TestGroupSiblingPathsDeduplicatesNames(t *testing.T) {
 	}
 }
 
-func TestPreRunSessionPasteIncludesProfileSummaryWithoutKeychainWarning(t *testing.T) {
-	opts := cli.Options{Profile: "claude"}
-	p := policy.Policy{
-		Backend:     policy.BackendMacOSSeatbelt,
-		ProjectPath: "/tmp/project",
-		Command:     []string{"claude"},
-		Env:         map[string]string{"PATH": "/bin"},
-		MachLookup:  []string{"com.apple.SecurityServer"},
-	}
-
-	got := preRunSessionPaste(opts, p)
-
-	assertContains(t, got, "For context, bulle launched this session")
-	assertContains(t, got, `bulle profile "claude" permissions:`)
-	assertNotContains(t, got, "warning: allowing macOS Keychain access")
-}
-
-func TestCommandWithSessionPermissionsUsesProfileSpecificLaunchFlags(t *testing.T) {
-	summary := "permissions summary"
-	tests := []struct {
-		profile string
-		command []string
-		want    []string
-	}{
-		{"claude", []string{"/opt/bin/claude"}, []string{"/opt/bin/claude", "--system-prompt", summary}},
-		{"pi", []string{"/opt/bin/pi"}, []string{"/opt/bin/pi", "--append-system-prompt", summary}},
-		{"opencode", []string{"/opt/bin/opencode"}, []string{"/opt/bin/opencode", "--prompt", summary}},
-		{"codex", []string{"/opt/bin/codex"}, []string{"/opt/bin/codex", summary}},
-		{"codex", []string{"/opt/bin/codex", "--model", "gpt-5"}, []string{"/opt/bin/codex", "--model", "gpt-5", summary}},
-		{"pi", []string{"/usr/bin/env", "pi"}, []string{"/usr/bin/env", "pi"}},
-	}
-	for _, tt := range tests {
-		got := commandWithSessionPermissions(tt.profile, tt.command, summary)
-		if strings.Join(got, "\x00") != strings.Join(tt.want, "\x00") {
-			t.Fatalf("commandWithSessionPermissions(%q, %#v) = %#v, want %#v", tt.profile, tt.command, got, tt.want)
-		}
-	}
-}
-
 func assertContains(t *testing.T, got string, want string) {
 	t.Helper()
 	if !strings.Contains(got, want) {

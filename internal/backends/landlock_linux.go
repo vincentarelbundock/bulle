@@ -30,6 +30,16 @@ func (landlockBackend) Run(p policy.Policy) error {
 	if err := applyLandlockFilesystem(p); err != nil {
 		return err
 	}
+	if p.AuditMarker != "" {
+		file, err := os.Open(p.AuditMarker)
+		if err == nil {
+			_ = file.Close()
+			return fmt.Errorf("Landlock audit marker %q remained readable after sandboxing", p.AuditMarker)
+		}
+		if !os.IsPermission(err) {
+			return fmt.Errorf("trigger Landlock audit marker %q: %w", p.AuditMarker, err)
+		}
+	}
 	// The seccomp network filter is installed with PR_SET_SECCOMP, which is
 	// per-thread: there is no TSYNC outside seccomp(2). Pin the goroutine to
 	// its OS thread and keep it pinned through the exec, or the runtime is free

@@ -14,6 +14,14 @@ import (
 	"github.com/vincentarelbundock/bulle/internal/policy"
 )
 
+func init() {
+	// These tests exercise signalling and terminal behavior with helper
+	// executables. Cgroup creation and fail-closed timeout admission are covered
+	// separately; requiring host delegation here would make unit tests depend on
+	// the runner's cgroup layout.
+	timeoutTreeIsolationRequired = func() bool { return false }
+}
+
 func TestRunReturnsNilForSuccessfulRunner(t *testing.T) {
 	script := helperScript(t, "exit 0\n")
 	err := Run(policy.Policy{}, Options{Executable: script, Timeout: 5 * time.Second, GracePeriod: 10 * time.Millisecond})
@@ -249,6 +257,56 @@ func TestTimeoutPrefersCompletedWaitWhenProcessGroupIsGone(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("handleTimeout returned %v, want nil", err)
+	}
+}
+
+func TestTimeoutKillsCgroupAfterLeaderExitsDuringGrace(t *testing.T) {
+	waitDone := make(chan error, 1)
+	cgroupKills := 0
+	err := handleTimeout(waitDone, nil, nil, timeoutContext{
+		duration: 50 * time.Millisecond,
+		grace:    10 * time.Millisecond,
+		pgid:     123,
+		kill: func(_ int, sig syscall.Signal) error {
+			if sig == syscall.SIGTERM {
+				waitDone <- nil
+			}
+			return nil
+		},
+		killCgroup: func() bool {
+			cgroupKills++
+			return true
+		},
+	})
+	var timeoutErr *TimeoutError
+	if !errors.As(err, &timeoutErr) {
+		t.Fatalf("handleTimeout error = %v, want TimeoutError", err)
+	}
+	if cgroupKills != 1 {
+		t.Fatalf("cgroup kills = %d, want 1 after the leader exited", cgroupKills)
+	}
+}
+
+func TestTimeoutKillsCgroupAfterGraceExpires(t *testing.T) {
+	waitDone := make(chan error, 1)
+	cgroupKills := 0
+	err := handleTimeout(waitDone, nil, nil, timeoutContext{
+		duration: 50 * time.Millisecond,
+		grace:    time.Millisecond,
+		pgid:     123,
+		kill:     func(int, syscall.Signal) error { return nil },
+		killCgroup: func() bool {
+			cgroupKills++
+			waitDone <- nil
+			return true
+		},
+	})
+	var timeoutErr *TimeoutError
+	if !errors.As(err, &timeoutErr) {
+		t.Fatalf("handleTimeout error = %v, want TimeoutError", err)
+	}
+	if cgroupKills != 1 {
+		t.Fatalf("cgroup kills = %d, want 1 after grace expiry", cgroupKills)
 	}
 }
 

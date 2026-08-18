@@ -152,6 +152,20 @@ func (c *Cgroup) Kill() error {
 	return c.writeFile("cgroup.kill", "1")
 }
 
+// CanKill verifies that this delegated cgroup exposes the atomic whole-tree
+// kill operation. Merely creating a cgroup is insufficient for timeout
+// containment on kernels predating cgroup.kill.
+func (c *Cgroup) CanKill() error {
+	if c == nil {
+		return errors.New("nil cgroup")
+	}
+	path := filepath.Join(c.path, "cgroup.kill")
+	if err := syscall.Access(path, 0o2); err != nil {
+		return fmt.Errorf("cgroup.kill is unavailable or not writable: %w", err)
+	}
+	return nil
+}
+
 // Close removes the cgroup. It is only removable once empty, so a failure here
 // means something in the tree outlived the run; the directory is left behind
 // rather than reported as a run failure, and the next Create sweeps it once it

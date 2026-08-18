@@ -21,14 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is deleted. Errors teach the grammar: a directory in the profile slot, a
   command name without `--`, and a support profile with no default app each
   get a message naming the correct spelling.
-- **`bulle -- cmd` just works.** A command given explicitly after `--`
-  always gets its own binary granted (and, when no profile is selected, its
-  runtime libraries discovered too), so `bulle -- pandoc doc.md` runs under
-  the minimal default sandbox with nothing granted by hand. The `--add-exec`
-  and `--add-libs` flags are gone. Profile inference is now standard rather
-  than rescue-only: a bare command matching exactly one profile's
-  `default_app` selects that profile (announced); an ambiguous match runs
-  under the default profile and names the candidates.
+- **`bulle -- cmd` just works without selecting a privileged profile.** A
+  command given explicitly after `--` always gets its own binary and runtime
+  libraries granted, so `bulle -- pandoc doc.md` runs under the minimal
+  default sandbox with nothing granted by hand. The `--add-exec` and
+  `--add-libs` flags are gone. Profile selection is always explicit: a
+  repository-controlled executable named `codex` or `claude` cannot acquire
+  the matching agent profile's credentials or writable state by basename.
 - **Denied runs end with an offer to save the fix.** On a terminal, a run
   that hit sandbox denials ends by listing the grants that would allow them
   and offering to save them to the profile — `[s]ave and run again`,
@@ -71,7 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`bulle completion bash|zsh|fish` prints a completion script.** The
   scripts are thin shims: at completion time they call `bulle __complete` on
   the installed binary, which answers with subcommand names, verbs, flags,
-  and `--profile` values — including profiles installed later under
+  and positional profile names — including profiles installed later under
   `~/.config/bulle/profiles/`, and comma-separated profile merges. Because
   the binary answers, an installed script never goes stale.
 - **Completions ship with releases.** Release archives include generated
@@ -83,39 +82,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   script keeps working across upgrades either way.
 - **Completion cannot drift from the CLI.** Flag completion is derived by
   reflection from the same `Flags` struct the parser reads, and subcommand
-  completion reads the same table `Run` dispatches from. The hand-maintained
-  `valueFlags` map behind `--` separator inference is now derived from that
-  struct too, closing a long-standing trap where a new value-taking flag
-  silently broke command-boundary inference.
+  completion reads the same table `Run` dispatches from.
 
 #### Per-subcommand help
 
 - **Every subcommand answers `--help`.** `bulle scratch --help`, `bulle
-  record -h`, and the rest print focused help for that subcommand instead of
+  show -h`, and the rest print focused help for that subcommand instead of
   a one-line usage error; `bulle help <subcommand>` prints the same text, and
   `bulle help <TAB>` completes the topic names. A `--help` after the `--`
   separator still belongs to the sandboxed command. A test asserts every
   dispatched subcommand has a help topic, so the two cannot drift.
 - **Bare invocations that have nothing to do print help.** `bulle` alone
   (when no configured default_app gives it something to run), and bare
-  `record`, `profiles`, and `completion` — which cannot mean anything without
-  arguments — show help and exit 0 instead of a terse error. Bare `rerun`,
-  `resolvers`, `policy`, and `scratch` keep their meaningful behavior, and
-  `bulle .` (a workspace with no command) keeps its explicit error.
+  `profiles` and `completion` — which cannot mean anything without arguments
+  — show help and exit 0 instead of a terse error. Bare `show` and `scratch`
+  keep their meaningful behavior.
 
-#### Friendlier errors and `bulle config`
+#### Friendlier errors and `bulle show config`
 
-- **Misspelled profile names get a suggestion.** `--profile claud` now says
+- **Misspelled profile names get a suggestion.** `bulle claud` now says
   `did you mean "claude"?` (drawn from every profile in scope, user-installed
   ones included); with no near miss, the error points at
-  `bulle profiles list`.
+  `bulle show profiles`.
 - **Flag errors point at the flag, not the whole help.** A rejected flag
   value shows that flag's own syntax line (`usage: --memory SIZE ...`)
   instead of referring to the 200-line help; unknown flags keep kong's
   suggestion or fall back to one of ours.
-- **`bulle rerun` with nothing recorded explains itself**, naming the
-  last-run file and that every completed run creates it.
-- **`bulle config` reports the configuration in effect.** It prints the
+- **`bulle show config` reports the configuration in effect.** It prints the
   configuration root, whether `config.toml` and `profiles/` were found and
   load cleanly, and the built-in profile count. Runs deliberately ignore a
   missing `config.toml`, so this is where a mistyped directory or a broken
@@ -126,56 +119,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Subcommand dispatch moved from a literal switch to a declared table
   (`internal/app/commands.go`) shared with completion; `bulle help` and
   `bulle version` dispatch through it as well, with unchanged behavior.
-
-#### Profile recording
-
-- **`bulle record` drafts a profile from a real run.** `bulle record --profile
-  <base> -- <command>` runs the command under an existing profile, collects
-  what the sandbox denied, adds those grants, and runs again until nothing new
-  is denied. It prints a profile inheriting from the base that contains only
-  the additions, so recording against `claude` does not restate everything
-  `tool`, `terminal`, `git`, and `node` already grant.
-- **Honest attribution on macOS.** Recording works on both platforms, but they
-  can promise different things. A Landlock denial is recorded against the
-  sandbox domain, so on Linux every denial belongs to the run being observed.
-  The macOS unified log reports violations from every sandboxed process on the
-  machine, and a violation names a pid that has already exited, so it cannot be
-  traced back to this run's process group. bulle does not guess: filtering by
-  process name would look tidier and would silently drop real grants, since a
-  command's helpers have different names than the command. Instead each entry
-  names the process it was denied to, and the profile header says entries may
-  not all be yours.
-- **Recorded entries are written to travel.** Paths are rewritten into the
-  spelling a hand-written profile would use — `go:modcache` rather than one
-  machine's module cache, `$CONFIG/...` rather than `$HOME/.config/...`,
-  `which:NAME` for a binary that is simply what `PATH` resolves — and every
-  entry is optional, because a path this machine has is not one the next
-  machine has. Clusters of denied siblings collapse into a directory grant. A
-  denial on a variable root never becomes a grant on that root.
-- **Clusters collapse at any depth, and never into a package store.** Two
-  fixes found by recording a real graphical application. A cluster of package
-  roots used to merge into a grant on the whole store — `/nix/store` — undoing
-  the per-package collapse that produced them; store roots are now never merged
-  upward. And a content-addressed cache spreads one file per fanout directory,
-  so grouping by immediate parent found nothing and recorded dozens of hashes
-  that will never recur; promotion now considers ancestors at any depth and
-  picks the deepest directory covering a cluster. A final pass drops entries
-  another grant already covers, at an access level at least as strong.
-- **A stall says where to look.** When a round adds nothing and the command
-  still fails, recording distinguishes the two cases. If the sandbox refused
-  nothing at all, the failure is not about access, and the usual cause is a
-  missing environment variable — bulle passes only what the profile's `env`
-  list names, and recording cannot discover that, since nothing is logged when
-  a variable is simply absent. If denials were seen but all were already
-  granted, the command's own error is the thing to read.
-- **The output says what it proves.** A denial aborts the operation that hit
-  it, so a recording is evidence that one run of one command needed these
-  grants, not that they are sufficient; the emitted header says so, and says
-  more when the command still failed or the round cap was reached. Recording
-  refuses to start unless a deliberately triggered denial actually reaches the
-  kernel log — a kernel can advertise Landlock audit support with auditing
-  disabled, and recording would otherwise converge instantly on an empty
-  profile that reads exactly like success.
 
 #### Graphical applications
 
@@ -197,9 +140,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/etc` from a package store reach fontconfig's configuration through symlinks
   a directory grant does not follow, which the profile handles by globbing; but
   NixOS also writes absolute store paths for each font package into its
-  generated fontconfig files, and those hashes differ per machine. Record the
-  set for yours: `bulle record --profile gui -- <app>`. A denied font tree is
-  not fatal — text renders in the wrong typeface — so it is easy to miss.
+  generated fontconfig files, and those hashes differ per machine. Run the
+  application with `bulle gui -- <app>`, review its denial hints, and add only
+  the required grants. A denied font tree is not fatal — text renders in the
+  wrong typeface — so it is easy to miss.
 
 #### Resource limits
 
@@ -216,21 +160,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `RLIMIT_NPROC` counts processes per UID across the whole system, which would
   throttle the user's unrelated programs. bulle declines to substitute them,
   warns on stderr about any limit it cannot enforce, and names the mechanism
-  behind each limit in `bulle policy` output. `--strict-limits` turns the
+  behind each limit in `bulle show` output. `--strict-limits` turns the
   warning into a refusal to run, for continuous integration.
-- **Timeouts now kill through the cgroup when there is one.** A cgroup-backed
-  run terminates via `cgroup.kill`, which identifies the process tree directly.
-  This closes the PGID-recycling race that group-signalling could not, and
-  catches processes that called `setsid` to leave the group. Runs without a
-  cgroup keep the previous best-effort group-signalling behavior.
+- **Timeouts require a container that can kill the whole process tree.** On
+  Linux, every nonzero timeout creates a delegated cgroup and terminates via
+  `cgroup.kill`, including descendants that called `setsid`; the cgroup is
+  also emptied when the leader exits. The run fails before exec if that
+  guarantee is unavailable. macOS has no equivalent unprivileged primitive,
+  so nonzero timeouts fail closed there instead of promising an escapable
+  process-group timeout.
 
 #### Workspaces
 
 - **`bulle scratch` disposable workspaces.** Run the sandboxed command against
   a throwaway local clone of the workspace instead of the real checkout. The
   clone carries uncommitted work (tracked changes and untracked files) so the
-  agent starts from the state you see; git objects are hardlinked, so cloning
-  is nearly free, and the real checkout is never granted to the sandbox.
+  agent starts from the state you see; git objects are copied with
+  `--no-hardlinks`, so a writable scratch cannot mutate an inode shared with
+  the origin, and the real checkout is never granted to the sandbox.
   After the run, a review gate shows what changed — including work the agent
   committed — and offers diff, pull-into-origin, keep, a subshell inside the
   scratch, or wipe. Pull never commits on your behalf (a dirty scratch routes
@@ -245,12 +192,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same semantics as the prompt letters (id optional when unambiguous, unique
   prefixes accepted). The subcommand covers creation too: anything after
   `scratch` that is not a review verb is an ordinary run
-  (`bulle scratch --profile claude`), with `--` available for a command named
+  (`bulle scratch claude`), with `--` available for a command named
   like a verb and a typo guard so a mistyped verb reports itself instead of
-  cloning. The flag form `--scratch` remains, and is what `bulle rerun` and
-  `bulle policy` compose with. `--scratch-keep` skips the prompt for non-interactive
-  runs, `[scratch] dir` in `config.toml` relocates scratches (warning when
-  the location defeats hardlinking), and denial hints from scratch runs are
+  cloning. The flag form `--scratch` remains and composes with `bulle show`.
+  `--scratch-keep` skips the prompt for non-interactive
+  runs, `[scratch] dir` in `config.toml` relocates scratches, and denial hints from scratch runs are
   rewritten to origin-relative paths so suggested grants stay meaningful.
   Worktree-based isolation is deliberately not offered: worktrees share the
   origin's `.git`, including hooks.
@@ -263,10 +209,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   requires read under both backends, and personal scripts in those
   directories can hold secrets a default sandbox should not see. Agent
   profiles (`claude`, `codex`, `opencode`, `pi`) inherit `user-bin`; other
-  runs add `--profile user-bin` when a user-installed helper is denied.
+  runs add the `user-bin` profile when a user-installed helper is denied.
 - **Built-in `r`, `r-install`, `uv`, and `uv-install` profiles.**
-  `bulle --profile r -- Rscript analysis.R` and
-  `bulle --profile uv -- uv run script.py` work on conventional installs
+  `bulle r -- Rscript analysis.R` and
+  `bulle uv -- uv run script.py` work on conventional installs
   (verified on Nix, the adversarial layout) without hand-written grants. Base
   profiles are offline with read-only libraries; the `-install` variants add a
   writable user library or cache and network access. The `uv` base profile
@@ -288,7 +234,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Small built-in profiles that answer one tool's location questions portably
   (binaries via `which:`/`pkg:`, configuration, caches) plus the environment
   variables an interactive terminal program expects, meant to be assembled
-  through `inherits` or combined with `--profile tool,git,rust`.
+  through `inherits` or combined as `bulle tool,git,rust -- cargo build`.
 - **Profile smoke-test harness.** A table-driven verification suite
   (`internal/integration/profile_smoke_test.go`) proves each shipped profile
   can run its tool — including `cargo run --offline`, `go run`, a knitr
@@ -359,43 +305,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   denials and prints copy-pasteable fixes, e.g.
   `denied: read /home/user/.gitconfig — add --ro ~/.gitconfig`. On Linux
   this uses Landlock audit records (kernel 6.15+ with the audit subsystem
-  enabled); on macOS it queries the unified log, which needs no setup. Hints
-  are best-effort and print nothing when denial records are unavailable.
+  enabled) and a deliberate marker denial to bind records to this run's
+  Landlock domain, so concurrent sandboxes cannot contaminate the result; on
+  macOS it queries the unified log, which needs no setup. Hints are
+  best-effort and print nothing when denial records are unavailable.
   Denials inside one Nix store item or Homebrew keg collapse into a single
   suggested grant for the package root, so following the hints converges in
   one step instead of one file at a time. See the new *Denial Diagnostics*
   documentation page, including one-line setup instructions per Linux
   distribution.
-- **Rerun with an added grant: `--last`.** Every real run records its
-  invocation (arguments and working directory) under the user state
-  directory. `bulle --last` repeats it from any shell, inserting extra flags
-  before the command, and denial diagnostics end with a copy-pasteable
-  `bulle: retry with these grants: bulle --last --ro ...` line. The sandbox
-  restarts rather than widens.
-- **Resolution table in `--policy`.** The policy summary now ends with one
+- **Resolution table in `bulle show`.** The policy summary now ends with one
   line per configured entry showing its outcome (granted, skipped, created,
   resolver expansion), and flags entries whose grants collapse into a
-  stronger permission on the current platform. `--policy` also works without
-  a command: command-dependent grants (`add_exec`, shebang discovery) are
-  simply absent from the output.
+  stronger permission on the current platform. Inspection also works without
+  a command: command-dependent grants are simply absent from the output.
 
 #### Command-line conveniences
 
-- **Profile inference: `bulle -- claude` selects the matching profile.** When
-  no `--profile` is given and the command cannot run under the default
-  profile, `bulle` checks whether exactly one installed profile declares that
-  command as its `default_app`, selects it, and announces the choice on
-  stderr. Inference only rescues runs that would otherwise fail command
-  discovery, never overrides an explicit `--profile`, and refuses to guess
-  when several profiles match.
+- **Profiles are selected explicitly.** The profile is the first positional
+  argument, and an explicit command begins only after `--`. Executable
+  basenames are never treated as authority to load a profile.
 - **Configuration defaults: `[defaults]` block.** `config.toml` can supply
   `profile`, `timeout`, `env`, and path grants used when the corresponding
   flag is absent, so bare `bulle` does the usual thing in a repository.
   Explicit flags win; `--no-defaults` ignores the block.
-- **The `--` separator may be omitted when unambiguous.** The first
-  positional that is an existing directory reads as the workspace; the first
-  positional that is not starts the command, announced on stderr. Ambiguity
-  resolves toward the workspace, and `--` remains the explicit override.
+- **The `--` separator is mandatory before a command.** This keeps a profile,
+  workspace directory, and command syntactically distinct; no filesystem
+  lookup or heuristic changes the parse.
 - **Environment conveniences.** `--env 'GIT_*'` name globs against the
   parent environment (also in profile `env` lists), `--env-file PATH` for
   dotenv-style files, and `--env-all-except NAME,...` for the whole parent
@@ -414,17 +350,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   profile already grants `/proc` whole. Note that this grant lets the sandboxed
   command read other same-uid processes' `/proc` entries; the recorded profile
   entry says so, and the hint is a suggestion you review before applying.
-- **Verbs are subcommands now; the verb-flags are gone.** `bulle policy`
-  (with `--json`) replaces `--policy`/`--policy=json`, `bulle rerun` replaces
-  `--last`, `bulle profiles list` replaces `--list-profiles`,
-  `bulle profiles install SOURCE` replaces `--install-profiles`, and
-  `bulle resolvers` replaces `--list-resolvers`. The run itself stays bare —
-  `bulle --profile claude ~/project` is unchanged, and everything that
-  modifies a run (grants, env, `--timeout`, `--scratch`) remains a flag.
-  `policy` accepts every run flag; `rerun` still inserts extra flags before
-  the recorded command, and denial hints now suggest `bulle rerun --ro ...`.
-  Subcommand names are reserved as the first argument; a workspace with such
-  a name is reachable as `./policy` or after `--`.
+- **Inspection verbs are consolidated under `bulle show`.** `show policy`
+  (the default), `show profiles`, `show resolvers`, and `show config` share a
+  single non-executing entry point; obsolete `record` and `rerun` stateful
+  workflows are removed.
 - **`deny = ["network"]` no longer blocks `socketpair(2)` or the
   `send*`/`recv*` syscalls on Linux.** A socketpair is a connected
   in-process pipe (Linux only supports `AF_UNIX` pairs) and cannot reach
@@ -548,8 +477,8 @@ workspace controls flowed into a decision bulle makes *outside* the sandbox.
   empty ones are swept.
 - **The permission summary no longer prints `none` over a real grant.** A path
   held both `rw` and `rox` was treated as subsumed by "the other" list and
-  dropped from both — including in the summary a user approves a profile from,
-  and the one pasted to the agent as its system prompt.
+  dropped from both. Policy summaries are inspection output only and are no
+  longer pasted into an agent prompt or command input.
 - **Learned grants: a much higher promotion floor, and a prompt that shows
   what is written.** Three denied files promoted to a grant on the directory
   holding them with only one component below `$HOME` or `/`, so

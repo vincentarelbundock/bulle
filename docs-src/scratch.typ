@@ -11,7 +11,7 @@ writes reach your real checkout at all: the command runs against a disposable
 local clone, and its changes become a reviewable diff.
 
 ```text
-$ bulle scratch --profile claude
+$ bulle scratch claude
 bulle: scratch ~/.local/state/bulle/scratch/project-a1b2c3d4 (origin ~/project, from HEAD + 3 modified, 1 untracked)
 # ... agent works ...
 scratch: 4 files changed, 1 added, 0 deleted
@@ -34,16 +34,14 @@ after `scratch` is an ordinary run, so any invocation becomes a scratched one
 by inserting a single word.
 
 ```text
-bulle --profile claude              # runs in your checkout
-bulle scratch --profile claude      # runs in a disposable clone
+bulle claude                        # runs in your checkout
+bulle scratch claude                # runs in a disposable clone
 ```
 
-`--scratch` is the same thing as a run flag. It exists so scratches compose
-with the other subcommands, which have their own first word:
+`--scratch` is the same thing as a run flag and composes with policy inspection:
 
 ```text
-bulle rerun --scratch               # replay the last run, in a clone
-bulle policy --scratch              # resolve the policy, without running
+bulle show --scratch claude         # resolve a scratched policy, without running
 ```
 
 The subcommand's one ambiguity is a command named like a review verb
@@ -62,10 +60,10 @@ run a nonexistent command. And `--scratch` takes no value: there is no
 
 = How it works
 
-+ *Clone.* `git clone --local` creates a self-contained copy under
-  `$XDG_STATE_HOME/bulle/scratch/`. Git objects are hardlinked, not copied,
-  so cloning is nearly free even on repositories with deep history; only the
-  working-tree checkout costs real disk.
++ *Clone.* `git clone --local --no-hardlinks` creates a self-contained copy
+  under `$XDG_STATE_HOME/bulle/scratch/`. Git objects are copied rather than
+  hardlinked: the writable scratch can never mutate an object inode shared
+  with the origin.
 + *Carry your uncommitted work.* A fresh clone would start at `HEAD`, a
   state you are not looking at. So the scratch always starts from what you
   see: uncommitted tracked changes are applied and untracked, non-ignored
@@ -154,7 +152,7 @@ exactly that reason --- a push updates refs, never your working tree.)
 Tools like Worktrunk's `wt` already automate "run an agent in a separate
 directory" with `git worktree add`. They are good at what they do --- templated
 paths, setup hooks, a merge command --- and they compose with bulle today:
-`wt switch -c feature-x` then `bulle --profile claude` inside the worktree.
+`wt switch -c feature-x` then `bulle claude` inside the worktree.
 
 But a worktree's `.git` is a pointer file into your real repository. For git
 to work there at all, the sandbox would have to grant read-write access to
@@ -162,7 +160,7 @@ your repository's `.git` --- objects, refs, config, and `.git/hooks`, which all
 worktrees share. An untrusted agent could write a `pre-commit` hook that runs
 on _your_ next commit, outside the sandbox. That re-exposes exactly what
 scratch exists to contain, which is why `--scratch=worktree` is not offered.
-`git clone --local` gives the same separate-directory experience with a
+`git clone --local --no-hardlinks` gives the same separate-directory experience with a
 genuinely severed `.git`: hooks are not carried over, and no write access to
 your repository is needed.
 
@@ -199,15 +197,13 @@ go to die.
   pick them up) and not in `/tmp` (whose cleaners are not patient enough to
   wait for your review). Override with `[scratch] dir = "..."` in
   `config.toml`, useful when your repositories live on a different filesystem
-  than your state directory: hardlinks cannot cross filesystems, and bulle
-  warns when objects would be copied instead.
+  than your state directory. Object files are copied on every filesystem;
+  placing the scratch root near repositories can still reduce other I/O costs.
 - *Metadata.* A `meta.toml` beside each scratch records its origin, base
   commit, and the invocation that created it.
 - *Denial hints* report paths in origin-relative form, so a suggested
   `--ro` grant from a scratch run is meaningful on the next one.
-- *`bulle rerun`* replays as a _new_ scratch carrying your current uncommitted
-  state, rather than reusing the previous one.
 - *Submodules* are not carried into the scratch (bulle warns when the
   origin has them).
-- *`bulle policy --scratch`* prints the scratch-to-origin mapping and the
+- *`bulle show --scratch PROFILE`* prints the scratch-to-origin mapping and the
   resolved policy without running anything, then removes the unused clone.

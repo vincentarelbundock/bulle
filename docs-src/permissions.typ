@@ -29,14 +29,11 @@ Additional filesystem access is explicit. Use these flags to add paths to the ac
   Grant the narrowest paths that are practical. Use `--rw` or `--rwx` only for paths outside the workspace that the command should be allowed to modify.
 ]
 
-The `--` separator may be omitted when the reading is unambiguous. The first positional argument that is an existing directory reads as the workspace; the first positional that is not an existing directory starts the command, and `bulle` announces the split on stderr:
+Everything before `--` is policy; everything after it is the command. The first positional argument is the profile, the optional second positional argument is the workspace, and the separator is required when supplying a command:
 
 ```bash
-bulle ~/repos/project git status
-# bulle: treating "git" as the start of the command; use -- to separate the command explicitly
+bulle git ~/repos/project -- git status
 ```
-
-Ambiguity resolves toward the workspace reading, so `--` remains the explicit way to force a directory name to be treated as a command.
 
 Path entries written in a profile can also use variables, globs, and optional/create markers so one entry works on every machine; see #link("profiles.html#portable-profiles")[Portable profiles].
 
@@ -67,8 +64,8 @@ The summary and JSON views list environment variables by name only; neither view
 Network access is controlled by profiles. The built-in `network` profile allows it, and the built-in `offline` profile denies it. On macOS, the `network` profile also inherits DNS and certificate service bundles that network clients normally need. Built-in agent profiles inherit network access for compatibility with package managers and remote services.
 
 ```bash
-bulle --profile offline --rox /bin -- /bin/ls
-bulle --profile codex,offline
+bulle offline --rox /bin -- /bin/ls
+bulle codex,offline
 ```
 
 In a profile the capability is named `network`, so `allow = ["network"]` enables access and `deny = ["network"]` disables it.
@@ -76,32 +73,32 @@ In a profile the capability is named `network`, so `allow = ["network"]` enables
 = Executables and libraries
 <executables-and-libraries>
 
-For quick local commands, `--add-exec` can save you from spelling out executable grants by hand. It resolves the command before the sandbox starts and adds the executable to the policy:
+An explicit command after `--` is resolved before the sandbox starts and its executable is added to the policy automatically:
 
 ```bash
-bulle --add-exec -- /bin/ls
+bulle -- /bin/ls
 ```
 
-On Linux, dynamically linked executables also need access to runtime libraries. `--add-libs` discovers the shared libraries needed by the executable and adds read-only grants for them:
+On Linux, its required shared-library closure is discovered and granted read-only automatically:
 
 ```bash
-bulle --add-exec --add-libs -- /usr/bin/git status
+bulle -- /usr/bin/git status
 ```
 
-These flags are conveniences for executables and runtime libraries. They do not add app state files, config directories, caches, secrets, or shell environment variables. Use #link("profiles.html")[profiles] for agents and other tools that need a larger, repeatable policy.
+This command grant does not add app state files, config directories, caches, secrets, shell environment variables, or a matching profile. Use #link("profiles.html")[profiles] for agents and other tools that need a larger, repeatable policy.
 
 Profiles can enable these conveniences with `add_exec = true` and `add_libs = true`. Boolean settings inherit like other scalar profile settings: an explicit value in a later inherited profile or child profile overrides the earlier value.
 
 = Inspecting the policy
 <policy>
 
-Use `bulle policy` to inspect the resolved sandbox policy without running the command. By default, it prints the same human-readable permissions summary that `bulle` sends to supported LLM agent profiles at startup. This is a useful safety check before launching an agent or script, especially when combining profiles with extra filesystem or environment grants.
+Use `bulle show` to inspect the resolved sandbox policy without running the command. It prints a human-readable permissions summary and is a useful safety check before launching an agent or script, especially when combining profiles with extra filesystem or environment grants. Policy text is never injected into the command's input or agent prompt.
 
 ```bash
-bulle policy --profile codex
+bulle show codex
 ```
 
-No command is required: without one (and without a configured `default_app`), the policy is resolved and printed as-is, minus command-dependent grants such as `--add-exec` and shebang interpreter discovery.
+No command is required: without one (and without a configured `default_app`), the policy is resolved and printed as-is, minus command-dependent grants such as an explicit command binary and shebang interpreter discovery.
 
 == The resolution table
 
@@ -116,10 +113,10 @@ The summary ends with a *resolution table*: one line per configured entry showin
 
 == JSON output
 
-Stable machine-readable output is available with `bulle policy --json`:
+Stable machine-readable output is available with `bulle show --json`:
 
 ```bash
-bulle policy --json ~/Desktop --rox /bin -- /bin/ls
+bulle show --json default ~/Desktop --rox /bin -- /bin/ls
 ```
 
 ```json
@@ -139,7 +136,7 @@ bulle policy --json ~/Desktop --rox /bin -- /bin/ls
 }
 ```
 
-In the `bulle policy --json` example, `workspace_path` is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to `/home/user/Desktop`, shown in the `rw` array. The `command` field is the command that would be executed, and the `ro`, `rox`, `rw`, and `rwx` arrays show the readable, executable, writable, and writable-executable path grants. The `env_keys` array lists environment variables that would be passed into the sandbox. The `mach_lookup` array lists configured macOS Mach services. The `network` field shows the resolved network state. The `backend` value depends on your operating system.
+In the `bulle show --json` example, `workspace_path` is the directory where the command would run. Because workspaces are granted automatically by default, the command would run with read-write access to `/home/user/Desktop`, shown in the `rw` array. The `command` field is the command that would be executed, and the `ro`, `rox`, `rw`, and `rwx` arrays show the readable, executable, writable, and writable-executable path grants. The `env_keys` array lists environment variables that would be passed into the sandbox. The `mach_lookup` array lists configured macOS Mach services. The `network` field shows the resolved network state. The `backend` value depends on your operating system.
 
 = Configuration defaults
 <configuration-defaults>
@@ -154,12 +151,20 @@ env = ["GITHUB_TOKEN"]
 ro = ["?~/.gitconfig"]
 ```
 
-Explicit flags always win: `--profile codex` overrides the default profile, `--timeout` the default timeout, and list-valued defaults (`env`, `ro`, `rox`, `rw`, `rwx`) are merged with command-line entries taking precedence. Pass `--no-defaults` to ignore the block entirely.
+Explicit arguments always win: a positional `codex` overrides the default profile, `--timeout` overrides the default timeout, and list-valued defaults (`env`, `ro`, `rox`, `rw`, `rwx`) are merged with command-line entries taking precedence. Pass `--no-defaults` to ignore the block entirely.
 
 = Resource limits
 <resource-limits>
 
 Beyond the wall-clock `--timeout`, `bulle` can cap what a run consumes:
+
+On Linux, a nonzero timeout requires a delegated cgroup even when no cgroup
+resource limit was requested. The cgroup is what lets `bulle` terminate every
+descendant, including a child that calls `setsid`, and it is emptied when the
+main command exits so daemonized children cannot survive the run. If no cgroup
+can be created, the run fails before the command starts. macOS has no
+unprivileged process-tree container with the same guarantee, so nonzero
+timeouts fail closed there; `--timeout 0` remains valid.
 
 #table(
   columns: 3,
@@ -177,7 +182,9 @@ Beyond the wall-clock `--timeout`, `bulle` can cap what a run consumes:
 
 The first three limits require cgroup v2, so they apply on Linux when a cgroup is delegated to your user, and nowhere else. macOS has no equivalent: Seatbelt has no resource controls, and the POSIX limits that look like substitutes are not per-process-tree. `RLIMIT_AS` caps virtual address space rather than resident memory, which kills runtimes that merely reserve large sparse mappings — Go, the JVM, and Node all do. `RLIMIT_NPROC` counts every process owned by your user across the whole system, so using it here would throttle your editor and your other shells rather than the sandbox. Silently substituting either one would report a cap that does not do what it says, so `bulle` declines instead.
 
-The remaining three limits are portable and apply on both platforms.
+The remaining three limits are portable and apply on both platforms. `bulle`
+lowers both the soft and hard rlimit in the child, so the command cannot raise
+the cap again after `exec`.
 
 `--cpu-time` measures a different clock than `--timeout`: an agent waiting for input consumes wall clock but almost no CPU, so `--cpu-time 5m --timeout 8h` permits a long idle session while still stopping a process that spins. Note that `RLIMIT_CPU` applies per process rather than to the whole tree — children inherit the limit but each gets its own budget, so a run that spawns many processes is capped less tightly than the number suggests. Neither cgroup v2 nor macOS offers a cumulative per-tree CPU-time cap, so there is no stronger mechanism to fall back on; `--cpu` caps the rate instead.
 
@@ -189,7 +196,7 @@ bulle: --memory is not enforced here: macOS has no per-process-tree memory cap
 
 Pass `--strict-limits` (or set `strict_limits = true` under `[defaults]`) to make that a refusal to run instead, with exit code 2. Warning by default keeps a single configuration usable across a Linux workstation and a Mac laptop; `--strict-limits` suits continuous integration, where an unenforced limit means the run should not proceed at all.
 
-`bulle policy` names the mechanism behind every limit, so whether a cap is real is something you can check rather than infer:
+`bulle show` names the mechanism behind every limit, so whether a cap is real is something you can check rather than infer:
 
 ```
   limits:
@@ -219,11 +226,11 @@ The same file holds the `[vars]` table used by #link("profiles.html#portable-pro
 = OS-level sandboxing
 <os-level-sandboxing>
 
-`bulle` builds a policy before the command starts. The policy is assembled from the workspace, selected profile, command-line flags, selected environment variables, network profile settings, executable discovery, and runtime library defaults. Paths are resolved before sandbox setup, and `bulle policy` prints the resulting policy without running the command.
+`bulle` builds a policy before the command starts. The policy is assembled from the workspace, selected profile, command-line flags, selected environment variables, network profile settings, executable discovery, and runtime library defaults. Paths are resolved before sandbox setup, and `bulle show` prints the resulting policy without running the command.
 
 == Linux
 
-On Linux, `bulle` applies the policy with #link("https://docs.kernel.org/userspace-api/landlock.html")[Landlock]. Landlock is a kernel feature, not a package to install; basic filesystem sandboxing requires Linux 5.13 or later with Landlock enabled. The Linux backend restricts filesystem access for the process and its children according to the resolved read, write, and execute grants. When the resolved network setting is denied, it also installs a seccomp filter before `exec` to deny socket-related system calls.
+On Linux, `bulle` applies the policy with #link("https://docs.kernel.org/userspace-api/landlock.html")[Landlock]. Landlock is a kernel feature, not a package to install; basic filesystem sandboxing requires Linux 5.13 or later with Landlock enabled. The Linux backend restricts filesystem access for the process and its children according to the resolved read, write, and execute grants. Rules are installed from descriptors opened atomically without following symlinks, so a grant cannot be repointed between policy validation and sandbox entry. When the resolved network setting is denied, a seccomp filter denies direct socket operations and the complete `io_uring` syscall API, whose queue opcodes can otherwise perform equivalent network operations.
 
 == macOS
 

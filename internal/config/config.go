@@ -31,8 +31,7 @@ type Config struct {
 // ScratchSettings is the [scratch] block of the user configuration.
 type ScratchSettings struct {
 	// Dir overrides where scratch clones are created; useful when the default
-	// state directory is on a different filesystem than the repositories, which
-	// would defeat object hardlinking.
+	// state directory is not the desired place for long-lived review clones.
 	Dir string `toml:"dir"`
 }
 

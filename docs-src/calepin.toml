@@ -69,7 +69,4 @@ fold = true
   target = "denial-diagnostics.typ"
 
   [[sidebar.section.item]]
-  target = "record.typ"
-
-  [[sidebar.section.item]]
   target = "cli-reference.typ"

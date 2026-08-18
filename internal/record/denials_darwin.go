@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/vincentarelbundock/bulle/internal/policy"
+	"github.com/vincentarelbundock/bulle/internal/trustedexec"
 )
 
 // log show has to scan the unified log store, which routinely takes a few
@@ -26,12 +27,14 @@ type Probe struct {
 // run's Seatbelt violations are reported afterwards. macOS logs sandbox
 // denials to the unified log unconditionally, so no capability probing is
 // needed.
-func StartProbe(p policy.Policy) Probe {
-	if p.Backend != policy.BackendMacOSSeatbelt {
+func StartProbe(p *policy.Policy) Probe {
+	if p == nil || p.Backend != policy.BackendMacOSSeatbelt {
 		return Probe{}
 	}
 	return Probe{start: time.Now(), enabled: true}
 }
+
+func (Probe) Close() {}
 
 // Hints returns copy-pasteable suggestions for sandbox denials logged since
 // the probe started, or nil when the log is unreadable or shows no denials.
@@ -50,7 +53,11 @@ func (probe Probe) records() []seatbeltDenial {
 	ctx, cancel := context.WithTimeout(context.Background(), denialLogTimeout)
 	defer cancel()
 
-	out, err := exec.CommandContext(ctx, "log", "show",
+	logTool, err := trustedexec.First("/usr/bin/log")
+	if err != nil {
+		return nil
+	}
+	out, err := exec.CommandContext(ctx, logTool, "show",
 		"--style", "syslog",
 		"--start", probe.start.Format("2006-01-02 15:04:05"),
 		"--predicate", `sender == "Sandbox" OR process == "sandboxd"`).Output()
