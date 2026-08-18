@@ -591,10 +591,10 @@ func TestDefaultConfigIncludesAgentProfiles(t *testing.T) {
 		statePath string
 		inherits  []string
 	}{
-		"codex":    {app: "codex", statePath: "${CODEX_HOME:-$HOME/.codex}", inherits: []string{"tool", "terminal", "user-bin", "keychain", "git", "node"}},
-		"claude":   {app: "claude", statePath: "$HOME/.claude", inherits: []string{"tool", "terminal", "user-bin", "git", "node"}},
-		"opencode": {app: "opencode", statePath: "$HOME/.config/opencode", inherits: []string{"tool", "terminal", "user-bin", "git", "node"}},
-		"pi":       {app: "pi", statePath: "$HOME/.pi", inherits: []string{"tool", "terminal", "user-bin", "git", "node"}},
+		"codex":    {app: "codex", statePath: "${CODEX_HOME:-$HOME/.codex}", inherits: []string{"tool", "coreutils", "terminal", "user-bin", "keychain", "git", "node"}},
+		"claude":   {app: "claude", statePath: "$HOME/.claude", inherits: []string{"tool", "coreutils", "terminal", "user-bin", "git", "node"}},
+		"opencode": {app: "opencode", statePath: "$HOME/.config/opencode", inherits: []string{"tool", "coreutils", "terminal", "user-bin", "git", "node"}},
+		"pi":       {app: "pi", statePath: "$HOME/.pi", inherits: []string{"tool", "coreutils", "terminal", "user-bin", "git", "node"}},
 	} {
 		profile, err := cfg.ResolveProfile(name)
 		if err != nil {

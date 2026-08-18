@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 	"syscall"
 
 	llsyscall "github.com/landlock-lsm/go-landlock/landlock/syscall"
@@ -107,7 +108,7 @@ func addStableLandlockPath(ruleset int, path string, executable bool, writable b
 		Flags:   unix.O_PATH | unix.O_CLOEXEC,
 		Resolve: unix.RESOLVE_NO_SYMLINKS,
 	}
-	fd, err := unix.Openat2(unix.AT_FDCWD, path, how)
+	fd, err := unix.Openat2(unix.AT_FDCWD, currentProcPath(path), how)
 	if errors.Is(err, unix.ELOOP) {
 		return nil
 	}
@@ -128,6 +129,22 @@ func addStableLandlockPath(ruleset int, path string, executable bool, writable b
 		return fmt.Errorf("add stable Landlock path %q: %w", path, err)
 	}
 	return nil
+}
+
+// currentProcPath rewrites a /proc/self grant to the pid of this process,
+// which is the pid the command runs under: the ruleset is built here and the
+// command arrives by exec, with no fork in between. The rewrite is what makes
+// such a grant work at all — /proc/self is a symlink, so the no-symlinks open
+// above skips it, and resolving it earlier in the run names the supervisor
+// rather than the sandboxed process. Children of the command keep their own
+// pid and are not covered: a tool that reads /proc/<pid> in each of its
+// children still needs a whole-/proc grant, as the quarto profile documents.
+func currentProcPath(path string) string {
+	const self = "/proc/self"
+	if path != self && !strings.HasPrefix(path, self+"/") {
+		return path
+	}
+	return fmt.Sprintf("/proc/%d%s", os.Getpid(), strings.TrimPrefix(path, self))
 }
 
 func fsRights(dir bool, executable bool, writable bool) uint64 {

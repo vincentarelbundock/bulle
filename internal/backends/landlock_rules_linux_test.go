@@ -3,6 +3,7 @@
 package backends
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -35,5 +36,25 @@ func TestStableLandlockRuleNeverFollowsSymlinkAlias(t *testing.T) {
 	// policy resolution supplies the canonical target as a separate rule.
 	if err := addStableLandlockPath(-1, alias, false, false); err != nil {
 		t.Fatalf("symlink alias was followed while constructing Landlock rule: %v", err)
+	}
+}
+
+func TestProcSelfRuleUsesThisProcessPid(t *testing.T) {
+	self := fmt.Sprintf("/proc/%d", os.Getpid())
+	for path, want := range map[string]string{
+		"/proc/self":      self,
+		"/proc/self/maps": self + "/maps",
+		"/proc/selfish":   "/proc/selfish",
+		"/proc/1/maps":    "/proc/1/maps",
+		"/etc/ssl":        "/etc/ssl",
+	} {
+		if got := currentProcPath(path); got != want {
+			t.Fatalf("currentProcPath(%q) = %q, want %q", path, got, want)
+		}
+	}
+	// The rewritten path is a real directory, so unlike the /proc/self symlink
+	// it survives the no-symlinks open that builds every rule.
+	if err := addStableLandlockPath(-1, "/proc/self", false, false); err == nil {
+		t.Fatal("a /proc/self grant was skipped instead of becoming a rule")
 	}
 }

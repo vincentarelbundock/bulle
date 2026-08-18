@@ -1,0 +1,84 @@
+title = "Coreutils"
+description = "the standard commands a shell session reaches for (cat, ls, grep, find, ...)"
+# The platform exec roots cover these on a distribution that puts its commands
+# in /usr/bin. They cover nothing on NixOS, Guix, or a linuxbrew prefix, where
+# the real PATH entries sit outside every root and are dropped from the
+# sandboxed PATH — leaving a shell in which no command resolves at all, which
+# reads as a broken shell rather than as a denial. Naming the commands with
+# which: is what makes this independent of where the distribution keeps them:
+# each one resolves on the parent PATH and is republished through the shim
+# directory, which is always on the sandboxed PATH.
+#
+# Every entry is optional, so a machine missing any of them simply skips it.
+# This is deliberately the general-purpose shell set and not a package
+# manifest: language toolchains stay in their own profiles.
+rox = [
+  # Shell and process basics.
+  "?which:sh",
+  "?which:bash",
+  "?which:env",
+  "?which:echo",
+  "?which:printf",
+  "?which:true",
+  "?which:false",
+  "?which:sleep",
+  "?which:timeout",
+  "?which:which",
+  "?which:xargs",
+  "?which:uname",
+  "?which:date",
+  "?which:ps",
+  "?which:kill",
+  # Paths.
+  "?which:basename",
+  "?which:dirname",
+  "?which:realpath",
+  "?which:readlink",
+  "?which:pwd",
+  # Reading files.
+  "?which:cat",
+  "?which:head",
+  "?which:tail",
+  "?which:wc",
+  "?which:cut",
+  "?which:tr",
+  "?which:sort",
+  "?which:uniq",
+  "?which:tee",
+  "?which:diff",
+  # Listing and searching.
+  "?which:ls",
+  "?which:find",
+  "?which:fd",
+  "?which:grep",
+  "?which:egrep",
+  "?which:rg",
+  "?which:tree",
+  "?which:stat",
+  "?which:du",
+  "?which:df",
+  # Editing streams.
+  "?which:sed",
+  "?which:awk",
+  "?which:jq",
+  # Changing files. An agent that can write in the workspace can already do
+  # these through its own runtime; withholding the commands would only break
+  # the shell, not withhold the capability.
+  "?which:mkdir",
+  "?which:rmdir",
+  "?which:touch",
+  "?which:cp",
+  "?which:mv",
+  "?which:rm",
+  "?which:ln",
+  "?which:chmod",
+  # Archives and transfers, which agents use to unpack fixtures and to fetch
+  # what the network profile already allows them to reach.
+  "?which:tar",
+  "?which:gzip",
+  "?which:gunzip",
+  "?which:zip",
+  "?which:unzip",
+  "?which:curl",
+  "?which:wget",
+]

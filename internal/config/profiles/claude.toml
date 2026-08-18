@@ -1,6 +1,6 @@
 title = "Claude"
 description = "Claude Code app state, config, and login support"
-inherits = ["tool", "terminal", "user-bin", "git", "node"]
+inherits = ["tool", "coreutils", "terminal", "user-bin", "git", "node"]
 default_app = "claude"
 rw = [
   "+$HOME/.claude.json",

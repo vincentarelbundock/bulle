@@ -66,6 +66,7 @@ bulle show profiles
 
 claude
 codex
+coreutils
 default
 git
 go

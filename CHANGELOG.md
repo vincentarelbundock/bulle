@@ -383,6 +383,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `target/`, the cargo global cache, git config for vcs metadata). The
   `node` and `go` profiles ask `npm` and `go env` for their cache locations,
   with the previous literal paths as fallbacks.
+- **A `coreutils` profile, inherited by every agent profile.** The standard
+  shell commands — `cat`, `ls`, `grep`, `rg`, `find`, `sed`, `awk`, `jq`,
+  `tar`, `curl`, and the rest — are now named with `which:` and republished
+  through the shim directory. The platform exec roots only ever covered them
+  on a distribution that keeps its commands in `/usr/bin`: on NixOS, Guix, or
+  a linuxbrew prefix the real PATH entries fall outside every root and are
+  dropped from the sandboxed PATH, so a sandboxed agent had no command that
+  resolved at all — which surfaces as a shell that fails silently rather than
+  as a denial. Every entry is optional and skips where absent.
 - **Agent profiles assemble from capability profiles.** `claude`, `codex`,
   `opencode`, and `pi` now inherit `terminal`, `git`, and `node` rather than
   restating environment lists, so they carry git configuration and the Node
@@ -398,6 +407,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`/proc/self` grants reach the sandboxed process.** The default Linux
+  policy has always granted `/proc/self`, but the grant was inert: it names a
+  symlink, which the no-symlinks rule opener skips, and its resolved form
+  named the supervisor rather than the command. The rule is now built against
+  the pid the command execs under, so `/proc/self/maps`, `/proc/self/cgroup`,
+  and friends are readable again — which is what a Bun-based `claude` needs to
+  get past startup instead of aborting. Children of the command keep their own
+  pid and are still not covered; that case continues to need a whole-`/proc`
+  grant, as the `quarto` profile documents.
+- **`tool` grants `/proc/sys/vm/mmap_min_addr`**, the last startup probe a
+  JavaScriptCore runtime reads before it decides it cannot map memory safely.
 - **Markers survive resolver expansion.** `?` and `+` on a resolver entry
   were dropped when it expanded, so an optional resolver whose directory did
   not yet exist became a hard failure in a `rw` list.

@@ -1,5 +1,5 @@
 title = "Pi"
 description = "Pi app state and config support"
-inherits = ["tool", "terminal", "user-bin", "git", "node"]
+inherits = ["tool", "coreutils", "terminal", "user-bin", "git", "node"]
 default_app = "pi"
 rwx = ["+$HOME/.pi/"]

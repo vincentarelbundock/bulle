@@ -10,6 +10,7 @@ ro = [
   "?/proc/sys/kernel/osrelease",
   "?/proc/sys/vm/overcommit_memory",
   "?/proc/sys/vm/max_map_count",
+  "?/proc/sys/vm/mmap_min_addr",
   "?/sys/devices/system/cpu",
   "?/sys/kernel/mm/transparent_hugepage",
   "?/sys/fs/cgroup",
